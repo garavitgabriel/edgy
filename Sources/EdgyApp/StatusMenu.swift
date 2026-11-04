@@ -1,0 +1,80 @@
+import AppKit
+
+@MainActor
+protocol StatusMenuHandler: AnyObject {
+  func toggleEnabled()
+  func pauseForOneHour()
+  func resumeNow()
+  func openConfigFile()
+  func reloadConfig()
+  func showAbout()
+  func quit()
+}
+
+/// Placeholder text-only status item. The real icon and menu design come from the design sprint.
+@MainActor
+final class StatusMenu: NSObject {
+  struct State {
+    var enabled: Bool
+    var pausedUntil: Date?
+    var configPath: String
+  }
+
+  private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+  private weak var handler: StatusMenuHandler?
+
+  init(handler: StatusMenuHandler) {
+    self.handler = handler
+    super.init()
+  }
+
+  func update(_ state: State) {
+    let active = state.enabled && state.pausedUntil == nil
+    item.button?.title = "Edgy"
+    item.button?.appearsDisabled = !active
+    item.button?.toolTip = active ? "Edgy is on" : "Edgy is off"
+
+    let menu = NSMenu()
+    let enabled = entry("Enabled", #selector(toggleEnabled))
+    enabled.state = state.enabled ? .on : .off
+    menu.addItem(enabled)
+
+    if let until = state.pausedUntil {
+      let time = until.formatted(date: .omitted, time: .shortened)
+      let paused = NSMenuItem(title: "Paused until \(time)", action: nil, keyEquivalent: "")
+      paused.isEnabled = false
+      menu.addItem(paused)
+      menu.addItem(entry("Resume Now", #selector(resumeNow)))
+    } else {
+      let pause = entry("Pause for 1 Hour", #selector(pauseForOneHour))
+      pause.isEnabled = state.enabled
+      menu.addItem(pause)
+    }
+
+    menu.addItem(.separator())
+    let open = entry("Open Config File", #selector(openConfigFile))
+    open.toolTip = state.configPath
+    menu.addItem(open)
+    menu.addItem(entry("Reload Config", #selector(reloadConfig)))
+    menu.addItem(.separator())
+    menu.addItem(entry("About Edgy", #selector(showAbout)))
+    menu.addItem(entry("Quit Edgy", #selector(quit), key: "q"))
+    // Items with a target are validated against it; keep them enabled unless set above.
+    menu.autoenablesItems = false
+    item.menu = menu
+  }
+
+  private func entry(_ title: String, _ action: Selector, key: String = "") -> NSMenuItem {
+    let menuItem = NSMenuItem(title: title, action: action, keyEquivalent: key)
+    menuItem.target = self
+    return menuItem
+  }
+
+  @objc private func toggleEnabled() { handler?.toggleEnabled() }
+  @objc private func pauseForOneHour() { handler?.pauseForOneHour() }
+  @objc private func resumeNow() { handler?.resumeNow() }
+  @objc private func openConfigFile() { handler?.openConfigFile() }
+  @objc private func reloadConfig() { handler?.reloadConfig() }
+  @objc private func showAbout() { handler?.showAbout() }
+  @objc private func quit() { handler?.quit() }
+}
