@@ -43,4 +43,6 @@ verification: pass
 ## Open questions
 1. **Is `MTDeviceStart` required?** Unanswered on hardware (needs a human touching the pad). The bridge calls it by default after registering; `EDGY_MT_SKIP_START=1` disables it and `smoke-touch.sh start-check` runs both variants back-to-back.
 2. Ellipse-axis units: assumed to share the record's device units with absolute position, calibrated from velocity. If the smoke check shows fingertips far outside 8–15 mm, a fixed correction factor goes in `AxisScaleEstimator`.
+2b. Layout check kill switch: if the "frame field equals callback frame" assumption is wrong on real hardware, devices go silent after 3 frames with a fault in `log stream --predicate 'subsystem == "app.edgy"'`. `EDGY_MT_SKIP_LAYOUT_CHECK=1` bypasses it; the smoke script's start-check prints these instructions.
+2c. Velocity is passed through as the device's normalized velocity, assumed per second — units unverified on hardware. The Gestures batch should treat velocity thresholds as provisional until traces are recorded.
 3. Callback thread: by default frames arrive on the framework's own thread (no run-loop scheduling). `EDGY_MT_RUNLOOP=1` schedules on the main run loop instead. The App batch's router must be thread-safe either way.
