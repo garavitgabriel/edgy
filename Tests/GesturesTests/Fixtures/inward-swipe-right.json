@@ -1,0 +1,504 @@
+{
+  "device" : {
+    "familyID" : 0,
+    "id" : 7,
+    "kind" : "builtInTrackpad",
+    "sensorSizeMM" : {
+      "height" : 95,
+      "width" : 150
+    }
+  },
+  "expectation" : "A fast swipe from the right edge toward the centre: handed off to the system.",
+  "frames" : [
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.9866666666666667,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "starting",
+          "velocity" : {
+            "dx" : 0,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 0,
+      "timestamp" : 100
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.9725925925925926,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888913,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 1,
+      "timestamp" : 100.00833333333334
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.9585185185185184,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888913,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 2,
+      "timestamp" : 100.01666666666667
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.9444444444444444,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888913,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 3,
+      "timestamp" : 100.025
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.9303703703703703,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888913,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 4,
+      "timestamp" : 100.03333333333333
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.9162962962962964,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888687,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 5,
+      "timestamp" : 100.04166666666667
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.9022222222222223,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888687,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 6,
+      "timestamp" : 100.05
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.8881481481481482,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888913,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 7,
+      "timestamp" : 100.05833333333334
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.8740740740740741,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888913,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 8,
+      "timestamp" : 100.06666666666666
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.86,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888913,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 9,
+      "timestamp" : 100.075
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.8459259259259259,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888913,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 10,
+      "timestamp" : 100.08333333333333
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.8318518518518518,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888913,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 11,
+      "timestamp" : 100.09166666666667
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.8177777777777777,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888913,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 12,
+      "timestamp" : 100.1
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.8037037037037036,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888913,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 13,
+      "timestamp" : 100.10833333333333
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.7896296296296296,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.68888888888888,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 14,
+      "timestamp" : 100.11666666666666
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.7755555555555556,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888913,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 15,
+      "timestamp" : 100.125
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.7614814814814815,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.68888888888888,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 16,
+      "timestamp" : 100.13333333333334
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.7474074074074074,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888913,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 17,
+      "timestamp" : 100.14166666666667
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.7333333333333333,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "touching",
+          "velocity" : {
+            "dx" : -1.6888888888888913,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 18,
+      "timestamp" : 100.15
+    },
+    {
+      "contacts" : [
+        {
+          "angle" : 0,
+          "density" : 0.5,
+          "id" : 1,
+          "majorAxisMM" : 9,
+          "minorAxisMM" : 8,
+          "position" : {
+            "x" : 0.7333333333333333,
+            "y" : 0.5263157894736842
+          },
+          "size" : 0.6,
+          "state" : "lifting",
+          "velocity" : {
+            "dx" : -1.6888888888888913,
+            "dy" : 0
+          }
+        }
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 19,
+      "timestamp" : 100.15833333333333
+    },
+    {
+      "contacts" : [
+
+      ],
+      "deviceID" : 7,
+      "frameNumber" : 20,
+      "timestamp" : 100.16666666666667
+    }
+  ],
+  "label" : "inward-swipe-right",
+  "schemaVersion" : 1
+}
