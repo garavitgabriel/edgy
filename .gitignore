@@ -6,3 +6,4 @@ build/
 *.app/
 .DS_Store
 .env
+.claude/worktrees/
