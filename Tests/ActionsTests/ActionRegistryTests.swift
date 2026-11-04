@@ -201,7 +201,8 @@ import Testing
   }
 
   @Test func levelStepRule() {
-    #expect(LevelStep.apply(delta: 0.25, sensitivity: 1, to: 0.5) == LevelStep(level: 0.75, ticks: 4, strongTick: false))
+    #expect(
+      LevelStep.apply(delta: 0.25, sensitivity: 1, to: 0.5) == LevelStep(level: 0.75, ticks: 4, strongTick: false))
     #expect(LevelStep.apply(delta: 0.01, sensitivity: 1, to: 0.99) == LevelStep(level: 1, ticks: 0, strongTick: true))
     #expect(LevelStep.apply(delta: -0.01, sensitivity: 1, to: 0.01) == LevelStep(level: 0, ticks: 0, strongTick: true))
     #expect(LevelStep.apply(delta: 1, sensitivity: 1, to: 0) == LevelStep(level: 1, ticks: 15, strongTick: true))
