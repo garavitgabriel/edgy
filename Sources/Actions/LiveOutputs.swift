@@ -182,7 +182,7 @@ final class LiveHapticOutput: HapticOutput, @unchecked Sendable {
   private func play(_ pattern: Int32, fallback: NSHapticFeedbackManager.FeedbackPattern) {
     queue.async {
       let played = self.actuate(pattern)
-      actionsLog.debug(
+      actionsLog.info(
         "haptic pattern \(pattern, privacy: .public): \(played ? "actuator" : "fallback", privacy: .public)")
       if played { return }
       DispatchQueue.main.async {
