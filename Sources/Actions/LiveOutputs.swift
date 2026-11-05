@@ -160,16 +160,99 @@ final class LiveHUDOutput: HUDOutput, @unchecked Sendable {
 
 // MARK: - Haptics
 
-/// Trackpad haptics. Trackpads without Force Touch simply do nothing.
-final class LiveHapticOutput: HapticOutput {
-  func tick() { Self.perform(.alignment) }
-  func strongTick() { Self.perform(.levelChange) }
+/// Trackpad haptics.
+///
+/// The public feedback API only plays for the frontmost app, and Edgy lives in the background, so
+/// on hardware it was silent. The primary path drives the trackpad's actuator directly through the
+/// private multitouch framework (looked up by name at runtime); the public API stays as a fallback.
+/// Trackpads without Force Touch simply do nothing.
+final class LiveHapticOutput: HapticOutput, @unchecked Sendable {
+  /// Actuation patterns felt on a MacBook Pro trackpad (2026-11-04): 1–6 play, 15/16 don't.
+  static let tickPattern: Int32 = 1
+  static let strongPattern: Int32 = 6
 
-  private static func perform(_ pattern: NSHapticFeedbackManager.FeedbackPattern) {
-    DispatchQueue.main.async {
-      NSHapticFeedbackManager.defaultPerformer.perform(pattern, performanceTime: .now)
+  private let queue = DispatchQueue(label: "com.garavit.edgy.haptics")
+  private var actuator: TrackpadActuator?
+  private var actuatorUnavailable = false
+
+  func tick() { play(Self.tickPattern, fallback: .alignment) }
+  func strongTick() { play(Self.strongPattern, fallback: .levelChange) }
+
+  private func play(_ pattern: Int32, fallback: NSHapticFeedbackManager.FeedbackPattern) {
+    queue.async {
+      if self.actuate(pattern) { return }
+      DispatchQueue.main.async {
+        NSHapticFeedbackManager.defaultPerformer.perform(fallback, performanceTime: .now)
+      }
     }
   }
+
+  /// Queue-confined. Opens the actuator lazily and reopens it once if an actuation fails (e.g.
+  /// after sleep/wake or a trackpad reconnect).
+  private func actuate(_ pattern: Int32) -> Bool {
+    if actuatorUnavailable { return false }
+    for attempt in 0..<2 {
+      if actuator == nil {
+        actuator = TrackpadActuator()
+        if actuator == nil {
+          actuatorUnavailable = attempt == 0
+          if actuatorUnavailable {
+            actionsLog.notice("haptics: trackpad actuator unavailable; using the public feedback API")
+          }
+          return false
+        }
+      }
+      if actuator?.actuate(pattern) == true { return true }
+      actuator = nil
+    }
+    return false
+  }
+}
+
+/// The default trackpad's haptic actuator, via private MultitouchSupport functions resolved by name.
+private final class TrackpadActuator {
+  private typealias CreateDefault = @convention(c) () -> UnsafeMutableRawPointer?
+  private typealias GetDeviceID = @convention(c) (UnsafeMutableRawPointer?, UnsafeMutablePointer<UInt64>) -> Int32
+  private typealias Create = @convention(c) (UInt64) -> Unmanaged<CFTypeRef>?
+  private typealias Open = @convention(c) (CFTypeRef) -> Int32
+  private typealias Actuate = @convention(c) (CFTypeRef, Int32, UInt32, Float, Float) -> Int32
+  private typealias Close = @convention(c) (CFTypeRef) -> Int32
+
+  nonisolated(unsafe) private static let bundle: CFBundle? = CFBundleCreate(
+    kCFAllocatorDefault,
+    URL(fileURLWithPath: "/System/Library/PrivateFrameworks/MultitouchSupport.framework") as CFURL)
+
+  private static func lookup<T>(_ name: String, as type: T.Type) -> T? {
+    guard let bundle, let pointer = CFBundleGetFunctionPointerForName(bundle, name as CFString) else {
+      return nil
+    }
+    return unsafeBitCast(pointer, to: type)
+  }
+
+  private let handle: CFTypeRef
+  private let actuateFn: Actuate
+  private let closeFn: Close?
+
+  init?() {
+    guard let createDefault = Self.lookup("MTDeviceCreateDefault", as: CreateDefault.self),
+      let getID = Self.lookup("MTDeviceGetDeviceID", as: GetDeviceID.self),
+      let create = Self.lookup("MTActuatorCreateFromDeviceID", as: Create.self),
+      let open = Self.lookup("MTActuatorOpen", as: Open.self),
+      let actuate = Self.lookup("MTActuatorActuate", as: Actuate.self),
+      let device = createDefault()
+    else { return nil }
+    var deviceID: UInt64 = 0
+    guard getID(device, &deviceID) == 0, deviceID != 0,
+      let handle = create(deviceID)?.takeRetainedValue(), open(handle) == 0
+    else { return nil }
+    self.handle = handle
+    actuateFn = actuate
+    closeFn = Self.lookup("MTActuatorClose", as: Close.self)
+  }
+
+  func actuate(_ pattern: Int32) -> Bool { actuateFn(handle, pattern, 0, 0, 0) == 0 }
+
+  deinit { _ = closeFn?(handle) }
 }
 
 // MARK: - Shortcuts
