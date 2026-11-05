@@ -49,10 +49,14 @@ public protocol ActionPerforming: AnyObject {
   func perform(_ id: ActionID, input: ActionInput, context: ActionContext) throws
   /// Live app-settings change (HUD mode, haptics). Implementations keep their in-flight state.
   func apply(settings: AppSettings)
+  /// Haptic feedback for a gesture moment (not tied to an action's own output). Implementations
+  /// decide with `AppSettings.allowsHaptic(_:parameters:)` using `context.parameters`.
+  func feedback(_ event: HapticEvent, context: ActionContext)
 }
 
 extension ActionPerforming {
   public func apply(settings: AppSettings) {}
+  public func feedback(_ event: HapticEvent, context: ActionContext) {}
 }
 
 public enum ActionError: Error, Equatable {

@@ -42,8 +42,12 @@ public final class Router {
     guard let binding else { return }
     guard let input = input(for: event) else { return }
     let context = ActionContext(frontmostBundleID: frontmostBundleID, parameters: binding.parameters)
+    if event.kind == .slide && event.phase == .began {
+      actions.feedback(.gestureCaught, context: context)
+    }
     do {
       try actions.perform(binding.action, input: input, context: context)
+      if case .trigger = input { actions.feedback(.actionFired, context: context) }
     } catch {
       logger.log(.error, "Action \(binding.action.rawValue) failed: \(error)")
     }

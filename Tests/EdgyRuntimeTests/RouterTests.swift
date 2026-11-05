@@ -20,6 +20,21 @@ import Testing
     return config
   }
 
+  @Test func slideBeganSignalsGestureCaughtAndTriggersSignalActionFired() {
+    router.route(
+      Sample.event(.edge(.right), .slide, phase: .began), config: .defaults, frontmostBundleID: nil)
+    router.route(
+      Sample.event(.edge(.right), .slide, phase: .changed, delta: 0.1), config: .defaults, frontmostBundleID: nil)
+    router.route(Sample.event(.corner(.topRight), .doubleTap), config: .defaults, frontmostBundleID: nil)
+    #expect(actions.feedbacks == [.gestureCaught, .actionFired])
+  }
+
+  @Test func failedActionGivesNoFiredFeedback() {
+    actions.errorToThrow = ActionError.unavailable("audio.mute", reason: "test")
+    router.route(Sample.event(.corner(.topRight), .doubleTap), config: .defaults, frontmostBundleID: nil)
+    #expect(actions.feedbacks.isEmpty)
+  }
+
   @Test func defaultProfileUsedWhenNoAppProfileMatches() {
     router.route(
       Sample.event(.edge(.right), .slide, phase: .changed, delta: 0.1), config: Self.config,

@@ -30,3 +30,26 @@ import Testing
   try trace.write(to: url)
   #expect(try TraceFile.load(from: url) == trace)
 }
+
+@Test func legacyConfigWithoutHapticEventsEnablesAllEvents() throws {
+  let json = """
+    {"enabled":true,"showMenuBarIcon":true,"hud":"native","haptics":true,"launchAtLogin":false}
+    """
+  let settings = try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8))
+  #expect(settings.hapticEvents == Set(HapticEvent.allCases))
+}
+
+@Test func hapticPreferencesGateEachEvent() throws {
+  var settings = AppSettings.defaults
+  settings.hapticEvents = [.slideLimits, .actionFired]
+  #expect(settings.allowsHaptic(.slideLimits))
+  #expect(!settings.allowsHaptic(.slideSteps))
+  // Per-binding override silences just that binding.
+  #expect(!settings.allowsHaptic(.actionFired, parameters: ["haptics": "off"]))
+  // The master switch wins over the event list.
+  settings.haptics = false
+  #expect(!settings.allowsHaptic(.slideLimits))
+  // Round-trips with the chosen events.
+  let data = try JSONEncoder().encode(settings)
+  #expect(try JSONDecoder().decode(AppSettings.self, from: data) == settings)
+}

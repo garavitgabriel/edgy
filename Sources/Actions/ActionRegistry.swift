@@ -48,6 +48,14 @@ public final class ActionRegistry: ActionPerforming {
 
   public func apply(settings: AppSettings) { self.settings = settings }
 
+  public func feedback(_ event: HapticEvent, context: ActionContext) {
+    guard settings.allowsHaptic(event, parameters: context.parameters) else { return }
+    switch event {
+    case .gestureCaught, .slideSteps: haptics.tick()
+    case .actionFired, .slideLimits: haptics.strongTick()
+    }
+  }
+
   let audio: AudioOutput
   let display: BrightnessOutput
   let media: MediaKeyOutput
@@ -111,8 +119,10 @@ public final class ActionRegistry: ActionPerforming {
     guard step.level != old else { return }
 
     try setLevel(id, step.level, rising: step.level > old)
-    if settings.haptics {
-      if step.strongTick { haptics.strongTick() }
+    if step.strongTick && settings.allowsHaptic(.slideLimits, parameters: context.parameters) {
+      haptics.strongTick()
+    }
+    if settings.allowsHaptic(.slideSteps, parameters: context.parameters) {
       for _ in 0..<step.ticks { haptics.tick() }
     }
   }

@@ -74,6 +74,9 @@ final class FakeActions: ActionPerforming {
   private(set) var performed: [PerformedAction] = []
   var errorToThrow: Error?
   private(set) var appliedSettings: [AppSettings] = []
+  private(set) var feedbacks: [HapticEvent] = []
+
+  func feedback(_ event: HapticEvent, context: ActionContext) { feedbacks.append(event) }
 
   func apply(settings: AppSettings) { appliedSettings.append(settings) }
 

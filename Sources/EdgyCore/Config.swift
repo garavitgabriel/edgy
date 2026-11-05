@@ -66,22 +66,59 @@ public struct Profile: Codable, Hashable, Sendable {
 
 public enum HUDMode: String, Codable, Sendable { case native, none }
 
+/// Moments that can produce trackpad haptic feedback. Users pick which ones they want.
+public enum HapticEvent: String, Codable, CaseIterable, Hashable, Sendable {
+  /// Light tick on every 1/16 step while sliding a level (volume, brightness).
+  case slideSteps
+  /// Stronger tick when a level reaches 0 or 1.
+  case slideLimits
+  /// Light tick the moment Edgy takes hold of a slide ("got it").
+  case gestureCaught
+  /// Click when a discrete gesture (tap, double-tap, swipe, long-press) runs its action.
+  case actionFired
+}
+
 public struct AppSettings: Codable, Hashable, Sendable {
   public var enabled: Bool
   public var showMenuBarIcon: Bool
   public var hud: HUDMode
+  /// Master haptics switch. Off silences every haptic regardless of `hapticEvents`.
   public var haptics: Bool
+  /// Which haptic moments are on (when `haptics` is on). Missing from older config files → all.
+  public var hapticEvents: Set<HapticEvent>
   public var launchAtLogin: Bool
+
+  /// Per-binding override key in `Binding.parameters`: `"off"` silences that binding's haptics.
+  public static let hapticsParameter = "haptics"
 
   public static let defaults = AppSettings(
     enabled: true, showMenuBarIcon: true, hud: .native, haptics: true, launchAtLogin: false)
 
-  public init(enabled: Bool, showMenuBarIcon: Bool, hud: HUDMode, haptics: Bool, launchAtLogin: Bool) {
+  public init(
+    enabled: Bool, showMenuBarIcon: Bool, hud: HUDMode, haptics: Bool,
+    hapticEvents: Set<HapticEvent> = Set(HapticEvent.allCases), launchAtLogin: Bool
+  ) {
     self.enabled = enabled
     self.showMenuBarIcon = showMenuBarIcon
     self.hud = hud
     self.haptics = haptics
+    self.hapticEvents = hapticEvents
     self.launchAtLogin = launchAtLogin
+  }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    enabled = try c.decode(Bool.self, forKey: .enabled)
+    showMenuBarIcon = try c.decode(Bool.self, forKey: .showMenuBarIcon)
+    hud = try c.decode(HUDMode.self, forKey: .hud)
+    haptics = try c.decode(Bool.self, forKey: .haptics)
+    hapticEvents = try c.decodeIfPresent(Set<HapticEvent>.self, forKey: .hapticEvents) ?? Set(HapticEvent.allCases)
+    launchAtLogin = try c.decode(Bool.self, forKey: .launchAtLogin)
+  }
+
+  /// Whether `event` should produce haptics for a binding with these parameters.
+  public func allowsHaptic(_ event: HapticEvent, parameters: [String: String] = [:]) -> Bool {
+    haptics && hapticEvents.contains(event) && parameters[Self.hapticsParameter] != "off"
   }
 }
 

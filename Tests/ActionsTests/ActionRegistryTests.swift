@@ -192,6 +192,36 @@ import Testing
     #expect(h.haptics.strongTicks == 1)
   }
 
+  @Test func stepsAndLimitsAreSeparatePreferences() throws {
+    var settings = AppSettings.defaults
+    settings.hapticEvents = [.slideLimits]
+    let h = Harness(settings: settings)
+    h.audio.volume = 0.875
+    try h.slide("audio.volume", 0.5, phase: .began)  // crosses 0.9375 and reaches 1
+    #expect(h.haptics.ticks == 0)
+    #expect(h.haptics.strongTicks == 1)
+  }
+
+  @Test func perBindingOverrideSilencesSlideHaptics() throws {
+    let h = Harness()
+    try h.slide("audio.volume", 0.25, phase: .began, ["haptics": "off"])
+    #expect(h.haptics.ticks == 0 && h.haptics.strongTicks == 0)
+  }
+
+  @Test func gestureFeedbackFollowsPreferences() {
+    var settings = AppSettings.defaults
+    settings.hapticEvents = [.actionFired]
+    let h = Harness(settings: settings)
+    let context = ActionContext(frontmostBundleID: nil, parameters: [:])
+    h.registry.feedback(.gestureCaught, context: context)
+    #expect(h.haptics.ticks == 0)
+    h.registry.feedback(.actionFired, context: context)
+    #expect(h.haptics.strongTicks == 1)
+    h.registry.apply(settings: .with(haptics: false))
+    h.registry.feedback(.actionFired, context: context)
+    #expect(h.haptics.strongTicks == 1)
+  }
+
   @Test func noHapticsWhenDisabled() throws {
     let h = Harness(settings: .with(haptics: false))
     try h.slide("audio.volume", 0.5, phase: .began)
