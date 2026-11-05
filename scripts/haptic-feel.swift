@@ -14,9 +14,13 @@ print("device id status:", fn("MTDeviceGetDeviceID", GetDeviceID.self)(device, &
 guard let act = fn("MTActuatorCreateFromDeviceID", ActCreate.self)(id)?.takeRetainedValue() else { print("no actuator"); exit(1) }
 print("open:", fn("MTActuatorOpen", ActOpen.self)(act))
 let actuate = fn("MTActuatorActuate", ActActuate.self)
-print("Rest a finger lightly on the trackpad. Playing patterns in 2 s…"); sleep(2)
-for pattern: Int32 in [1, 2, 3, 4, 5, 6, 15, 16] {
-  print("pattern \(pattern):", actuate(act, pattern, 0, 0, 0) == 0 ? "played" : "failed")
-  Thread.sleep(forTimeInterval: 1.2)
+print("Slowly slide a finger on the trackpad while this runs. Starting in 2 s…"); sleep(2)
+for pattern: Int32 in [1, 2, 3, 4, 5, 6] {
+  print("pattern \(pattern): 4 quick ticks")
+  for _ in 0..<4 {
+    _ = actuate(act, pattern, 0, 0, 0)
+    Thread.sleep(forTimeInterval: 0.12)
+  }
+  Thread.sleep(forTimeInterval: 1.5)
 }
 _ = fn("MTActuatorClose", ActClose.self)(act)
