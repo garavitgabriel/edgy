@@ -29,10 +29,12 @@ struct Replay {
 func replay(
   _ frames: [TouchFrame], device: TouchDeviceInfo = TraceBuilder.defaultDevice, zones: Set<Zone>,
   settings: GestureSettings = .defaults, secondsSinceLastKeyPress: Double? = nil,
+  slideZones: Set<Zone>? = nil, longPressZones: Set<Zone>? = nil,
   recognizer: GestureRecognizing = makeGestureRecognizer()
 ) -> Replay {
   let context = GestureContext(
-    settings: settings, enabledZones: zones, secondsSinceLastKeyPress: secondsSinceLastKeyPress)
+    settings: settings, enabledZones: zones, secondsSinceLastKeyPress: secondsSinceLastKeyPress,
+    slideZones: slideZones, longPressZones: longPressZones)
   return Replay(frames: frames, outputs: frames.map { recognizer.process($0, device: device, context: context) })
 }
 

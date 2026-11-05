@@ -61,6 +61,14 @@ final class EngineHarness {
     #expect(h.guardCalls == ["engage", "engage", "engage", "release"])
   }
 
+  @Test func contextCarriesSlideAndLongPressZonesFromTheProfile() throws {
+    let h = try EngineHarness()
+    h.step()
+    // Defaults bind slides on the left and right edges and no long-press anywhere.
+    #expect(h.recognizer.contexts.last?.slideZones == [.edge(.left), .edge(.right)])
+    #expect(h.recognizer.contexts.last?.longPressZones == [])
+  }
+
   @Test func pauseReleasesGuardAndStopsRouting() throws {
     let h = try EngineHarness()
     h.step(GestureOutput(events: [Self.slide], claimedContactIDs: [1]))

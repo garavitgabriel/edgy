@@ -115,7 +115,9 @@ public final class Engine: @unchecked Sendable {
     let context = GestureContext(
       settings: config.gestures,
       enabledZones: profile.disabled ? [] : Set(profile.bindings.map(\.zone)),
-      secondsSinceLastKeyPress: typing.secondsSinceLastKeyPress)
+      secondsSinceLastKeyPress: typing.secondsSinceLastKeyPress,
+      slideZones: zones(bound: .slide, in: profile),
+      longPressZones: zones(bound: .longPress, in: profile))
     let output = recognizer.process(frame, device: device, context: context)
     updatePointerGuard(claimed: !output.claimedContactIDs.isEmpty, at: frame.timestamp)
     for (contactID, reason) in output.rejections where reason != .startedOutsideZone {
@@ -124,6 +126,10 @@ public final class Engine: @unchecked Sendable {
     for event in output.events {
       router.route(event, config: config, frontmostBundleID: bundleID)
     }
+  }
+
+  private func zones(bound kind: GestureKind, in profile: Profile) -> Set<Zone> {
+    profile.disabled ? [] : Set(profile.bindings.filter { $0.gesture == kind }.map(\.zone))
   }
 
   private func setDevices(_ list: [TouchDeviceInfo]) {

@@ -21,6 +21,8 @@ struct Tuning: Hashable, Sendable {
   var swipeMinTravelMM = 6.0
   /// A swipe candidate must lift within this time of landing.
   var swipeMaxDurationS = 0.35
+  /// Swipe time limit on zones with no slide bound (no slide to confuse it with, so be generous).
+  var swipeOnlyMaxDurationS = 0.6
   /// Longest touch that can still be a tap.
   var tapMaxDurationS = 0.25
   /// Most a tap may travel.

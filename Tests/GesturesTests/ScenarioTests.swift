@@ -172,6 +172,39 @@ private let rightEdge: Set<Zone> = [.edge(.right)]
   #expect(run.neverClaimed)
 }
 
+// Seen on hardware: an unhurried swipe along the bottom (~75 mm/s, under the flick speed) was
+// claimed as a slide on a zone that binds no slide, so nothing fired and the pointer froze.
+@Test func slowSwipeOnSwipeOnlyZoneFiresWithoutClaiming() {
+  let frames = TraceBuilder([
+    Stroke(id: 1, [(0, 50, 3), (0.4, 80, 3)]),
+    Stroke(id: 2, [(1.0, 80, 3), (1.4, 50, 3)]),
+  ]).frames()
+  let run = replay(frames, zones: [.edge(.bottom)], slideZones: [])
+  #expect(run.events.map(\.kind) == [.swipe(.right), .swipe(.left)])
+  #expect(run.slideEvents.isEmpty)
+  #expect(run.neverClaimed)
+}
+
+@Test func slowAlongMotionIsStillASlideWhereSlideIsBound() {
+  let frames = TraceBuilder([Stroke(id: 1, [(0, 50, 3), (0.4, 80, 3)])]).frames()
+  let run = replay(frames, zones: [.edge(.bottom)], slideZones: [.edge(.bottom)])
+  #expect(run.slideEvents.first?.phase == .began)
+  #expect(!run.events.contains { if case .swipe = $0.kind { true } else { false } })
+}
+
+@Test func restingFingerOnSwipeOnlyZoneNeverClaims() {
+  let frames = TraceBuilder([Stroke(id: 1, [(0, 60, 3), (0.6, 60, 3)])]).frames()
+  let run = replay(frames, zones: [.edge(.bottom)], slideZones: [], longPressZones: [])
+  #expect(run.events.isEmpty)
+  #expect(run.neverClaimed)
+}
+
+@Test func longPressFiresOnlyWhereBound() {
+  let frames = TraceBuilder([Stroke(id: 1, [(0, 60, 3), (0.7, 60, 3)])]).frames()
+  let bound = replay(frames, zones: [.edge(.bottom)], slideZones: [], longPressZones: [.edge(.bottom)])
+  #expect(bound.events.map(\.kind) == [.longPress])
+}
+
 @Test func segmentedEdgeRoutesToCorrectSegment() {
   let zones: Set<Zone> = Set((0..<3).map { Zone.edge(.right, segment: $0, segments: 3) })
   let frames = TraceBuilder([

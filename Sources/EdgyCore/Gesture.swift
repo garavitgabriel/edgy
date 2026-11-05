@@ -88,10 +88,22 @@ public struct GestureContext: Sendable {
   /// Zones the active profile actually maps (unmapped zones never claim touches).
   public var enabledZones: Set<Zone>
   public var secondsSinceLastKeyPress: TimeInterval?
+  /// Zones with a slide bound. A zone outside this set never becomes a slide: a resting finger
+  /// doesn't claim the pointer, and along-axis motion is a swipe at any speed. `nil` = every
+  /// enabled zone may slide.
+  public var slideZones: Set<Zone>?
+  /// Zones with a long-press bound. Elsewhere a resting finger never fires (or claims as) a
+  /// long-press. `nil` = every enabled zone may long-press.
+  public var longPressZones: Set<Zone>?
 
-  public init(settings: GestureSettings, enabledZones: Set<Zone>, secondsSinceLastKeyPress: TimeInterval?) {
+  public init(
+    settings: GestureSettings, enabledZones: Set<Zone>, secondsSinceLastKeyPress: TimeInterval?,
+    slideZones: Set<Zone>? = nil, longPressZones: Set<Zone>? = nil
+  ) {
     self.settings = settings
     self.enabledZones = enabledZones
     self.secondsSinceLastKeyPress = secondsSinceLastKeyPress
+    self.slideZones = slideZones
+    self.longPressZones = longPressZones
   }
 }

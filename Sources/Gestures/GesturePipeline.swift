@@ -113,6 +113,14 @@ struct FrameStep {
   var now: Double { frame.timestamp }
 
   /// Most simultaneous contacts a gesture may involve. Three or more always belong to the system.
+  func slideAllowed(_ candidate: Candidate) -> Bool {
+    context.slideZones?.contains(candidate.zone) ?? true
+  }
+
+  func swipeLimit(_ candidate: Candidate) -> Double {
+    slideAllowed(candidate) ? tuning.swipeMaxDurationS : tuning.swipeOnlyMaxDurationS
+  }
+
   var fingerLimit: Int { min(max(context.settings.fingers, 1), 2) }
 
   var typingNow: Bool {
@@ -296,7 +304,7 @@ struct FrameStep {
         fireLongPress(candidate.key)
       }
     case .swipe:
-      if elapsed > tuning.swipeMaxDurationS {
+      if elapsed > swipeLimit(candidate) {
         rejectCandidate(candidate.key, .tooFast)
       }
     case .pending:
@@ -309,11 +317,11 @@ struct FrameStep {
   mutating func advancePendingEdge(_ candidate: Candidate, edge: Zone.Edge, travel: Double, elapsed: Double) {
     let along = geometry.along(edge, candidate.current) - geometry.along(edge, candidate.origin)
     let inward = geometry.inward(edge, from: candidate.origin, to: candidate.current)
-    let slideFingersMatch = candidate.members.count == fingerLimit
+    let slideFingersMatch = candidate.members.count == fingerLimit && slideAllowed(candidate)
 
     if abs(along) >= tuning.alongClaimMM && abs(along) >= tuning.axisDominance * abs(inward) {
       let speed = abs(along) / max(elapsed, tuning.minimumIntervalS)
-      if speed >= tuning.flickSpeedMMPerS {
+      if speed >= tuning.flickSpeedMMPerS || !slideAllowed(candidate) {
         setPhase(candidate.key, .swipe)
       } else if slideFingersMatch {
         // Anchor at the landing point so the motion that earned the claim is emitted right away.
@@ -383,7 +391,9 @@ struct FrameStep {
   }
 
   mutating func fireLongPress(_ key: Int) {
-    guard let index = index(of: key) else { return }
+    guard let index = index(of: key),
+      context.longPressZones?.contains(state.candidates[index].zone) ?? true
+    else { return }
     state.candidates[index].longPressFired = true
     emit(state.candidates[index], .longPress, phase: .ended, deltaMM: 0)
   }
@@ -415,7 +425,9 @@ struct FrameStep {
       }
     case .pending:
       guard !candidate.longPressFired else { return }
-      if let direction = swipeDirection(candidate, elapsed: elapsed), isFlick(candidate, elapsed: elapsed) {
+      if let direction = swipeDirection(candidate, elapsed: elapsed),
+        isFlick(candidate, elapsed: elapsed) || !slideAllowed(candidate)
+      {
         emit(candidate, .swipe(direction), phase: .ended, deltaMM: 0)
       } else if tapLike {
         tap(candidate)
@@ -436,7 +448,7 @@ struct FrameStep {
   }
 
   func swipeDirection(_ candidate: Candidate, elapsed: Double) -> SwipeDirection? {
-    guard case .edge(let edge) = candidate.region, elapsed <= tuning.swipeMaxDurationS else { return nil }
+    guard case .edge(let edge) = candidate.region, elapsed <= swipeLimit(candidate) else { return nil }
     let along = geometry.along(edge, candidate.current) - geometry.along(edge, candidate.origin)
     let inward = geometry.inward(edge, from: candidate.origin, to: candidate.current)
     guard abs(along) >= tuning.swipeMinTravelMM, abs(along) >= tuning.axisDominance * abs(inward) else {
