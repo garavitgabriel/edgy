@@ -94,9 +94,9 @@ final class FakeTap: EventTapping, @unchecked Sendable {
   var installSucceeds = true
   private(set) var installCount = 0
   private(set) var enableCalls: [Bool] = []
-  private var handler: (@Sendable (TapEventKind) -> TapVerdict)?
+  private var handler: (@Sendable (TapEventKind, Point2D?) -> TapVerdict)?
 
-  func install(handler: @escaping @Sendable (TapEventKind) -> TapVerdict) -> Bool {
+  func install(handler: @escaping @Sendable (TapEventKind, Point2D?) -> TapVerdict) -> Bool {
     lock.withLock {
       installCount += 1
       if installSucceeds { self.handler = handler }
@@ -104,9 +104,9 @@ final class FakeTap: EventTapping, @unchecked Sendable {
     }
   }
   func setEnabled(_ enabled: Bool) { lock.withLock { enableCalls.append(enabled) } }
-  func send(_ kind: TapEventKind) -> TapVerdict? {
+  func send(_ kind: TapEventKind, at location: Point2D? = nil) -> TapVerdict? {
     let h = lock.withLock { handler }
-    return h?(kind)
+    return h?(kind, location)
   }
 }
 

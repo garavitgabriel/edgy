@@ -142,6 +142,19 @@ import Testing
     #expect(cursor.warps.isEmpty)  // cursor did not move, so no pin warp
   }
 
+  // Seen on hardware: the global cursor position lags the event being swallowed, so pinning by it
+  // never fired (436 swallowed, 0 pinned) while the cursor visibly moved.
+  @Test func pinsByTheEventLocationNotTheLaggingCursorPosition() {
+    let tap = FakeTap()
+    let cursor = FakeCursor()
+    let pointerGuard = PointerGuardCore(
+      tap: tap, cursor: cursor, scheduler: FakeScheduler(), lookback: 0.3, pinWhileEngaged: true, now: { 1 })
+    pointerGuard.engage()
+    // The cursor still reports the engage point; only the event knows where it is heading.
+    #expect(tap.send(.pointerMotion, at: Point2D(x: 100, y: 240)) == .swallow)
+    #expect(cursor.warps == [Point2D(x: 100, y: 200)])
+  }
+
   @Test func otherEventsAlwaysPass() {
     let (guard_, tap, _, _) = make()
     guard_.engage()

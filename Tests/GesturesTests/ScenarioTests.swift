@@ -169,12 +169,12 @@ private let rightEdge: Set<Zone> = [.edge(.right)]
   #expect(run.events.allSatisfy { $0.zone == .edge(.bottom) && $0.phase == .ended })
   #expect(run.slideEvents.isEmpty)
   #expect(run.rejections.isEmpty)
-  #expect(run.neverClaimed)
+  #expect(run.everClaimed && run.endsUnclaimed)
 }
 
 // Seen on hardware: an unhurried swipe along the bottom (~75 mm/s, under the flick speed) was
 // claimed as a slide on a zone that binds no slide, so nothing fired and the pointer froze.
-@Test func slowSwipeOnSwipeOnlyZoneFiresWithoutClaiming() {
+@Test func slowSwipeOnSwipeOnlyZoneFires() {
   let frames = TraceBuilder([
     Stroke(id: 1, [(0, 50, 3), (0.4, 80, 3)]),
     Stroke(id: 2, [(1.0, 80, 3), (1.4, 50, 3)]),
@@ -182,7 +182,7 @@ private let rightEdge: Set<Zone> = [.edge(.right)]
   let run = replay(frames, zones: [.edge(.bottom)], slideZones: [])
   #expect(run.events.map(\.kind) == [.swipe(.right), .swipe(.left)])
   #expect(run.slideEvents.isEmpty)
-  #expect(run.neverClaimed)
+  #expect(run.everClaimed && run.endsUnclaimed)
 }
 
 @Test func slowAlongMotionIsStillASlideWhereSlideIsBound() {

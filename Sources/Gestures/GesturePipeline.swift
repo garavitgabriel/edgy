@@ -86,8 +86,9 @@ struct Candidate: Sendable {
   var slide = SlideOutput()
   var longPressFired = false
 
-  /// Whether this candidate owns its fingers (the pointer guard should be engaged).
-  var claims: Bool { phase == .sliding || longPressFired }
+  /// Whether this candidate owns its fingers (the pointer guard should be engaged): a slide, a
+  /// swipe in flight, or a fired long-press.
+  var claims: Bool { phase == .sliding || phase == .swipe || longPressFired }
 }
 
 struct DeviceState: Sendable {

@@ -91,7 +91,7 @@ private let rightEdge: Set<Zone> = [.edge(.right)]
   let run = replay(frames, zones: [.edge(.bottom)])
   #expect(run.events.isEmpty)
   #expect(run.rejections == [Rejection(id: 1, reason: .tooFast)])
-  #expect(run.neverClaimed)
+  #expect(run.endsUnclaimed)
 }
 
 @Test func flickHeldTooLongIsTooFast() {
@@ -99,7 +99,7 @@ private let rightEdge: Set<Zone> = [.edge(.right)]
   let run = replay(frames, zones: [.edge(.bottom)])
   #expect(run.events.isEmpty)
   #expect(run.rejections == [Rejection(id: 1, reason: .tooFast)])
-  #expect(run.neverClaimed)
+  #expect(run.endsUnclaimed)
 }
 
 @Test func diagonalMotionIsOffAxis() {

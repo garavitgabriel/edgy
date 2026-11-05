@@ -20,7 +20,9 @@ public enum TapVerdict: Sendable, Equatable {
 /// An active event tap on pointer-motion events. Behind a protocol so tests never create one.
 public protocol EventTapping: AnyObject, Sendable {
   /// Installs the tap. Returns false if it could not be created (usually missing Accessibility).
-  func install(handler: @escaping @Sendable (TapEventKind) -> TapVerdict) -> Bool
+  /// The handler gets the event kind and, for pointer motion, the event's own location (the
+  /// position the cursor is about to move to; the global cursor position still lags behind).
+  func install(handler: @escaping @Sendable (TapEventKind, Point2D?) -> TapVerdict) -> Bool
   func setEnabled(_ enabled: Bool)
 }
 
@@ -178,7 +180,7 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
       return true
     }
     guard shouldInstall else { return }
-    let ok = tap.install { [weak self] kind in self?.handleTap(kind) ?? .pass }
+    let ok = tap.install { [weak self] kind, location in self?.handleTap(kind, location: location) ?? .pass }
     lock.withLock {
       tapInstalled = ok
       installing = false
@@ -191,7 +193,7 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
   }
 
   /// Called by the tap for every event it sees.
-  func handleTap(_ kind: TapEventKind) -> TapVerdict {
+  func handleTap(_ kind: TapEventKind, location: Point2D? = nil) -> TapVerdict {
     switch kind {
     case .disabledByTimeout, .disabledByUserInput:
       lock.withLock { _reEnableCount += 1 }
@@ -199,7 +201,7 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
       return .pass
     case .pointerMotion:
       let wantsHistory = lookback > 0
-      let position = (wantsHistory || pinWhileEngaged) ? cursor.position() : nil
+      let position = (wantsHistory || pinWhileEngaged) ? (location ?? cursor.position()) : nil
       let at = now()
       let (swallow, pinTo) = lock.withLock { () -> (Bool, Point2D?) in
         if engaged {

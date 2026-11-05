@@ -22,6 +22,9 @@ struct Replay {
   var slideEvents: [GestureEvent] { events.filter { $0.kind == .slide } }
   var changed: [GestureEvent] { slideEvents.filter { $0.phase == .changed } }
   var neverClaimed: Bool { outputs.allSatisfy(\.claimedContactIDs.isEmpty) }
+  var everClaimed: Bool { outputs.contains { !$0.claimedContactIDs.isEmpty } }
+  /// Nothing is still claimed once the trace is over (the pointer guard always lets go).
+  var endsUnclaimed: Bool { outputs.last?.claimedContactIDs.isEmpty ?? true }
   /// Seconds since the first frame.
   func relative(_ event: GestureEvent) -> Double { event.timestamp - (frames.first?.timestamp ?? 0) }
 }

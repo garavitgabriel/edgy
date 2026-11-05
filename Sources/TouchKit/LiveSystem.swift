@@ -39,9 +39,9 @@ final class LiveTouchSource: TouchSource, @unchecked Sendable {
 final class LiveEventTap: EventTapping, @unchecked Sendable {
   private let lock = NSLock()
   private var port: CFMachPort?
-  private var handler: (@Sendable (TapEventKind) -> TapVerdict)?
+  private var handler: (@Sendable (TapEventKind, Point2D?) -> TapVerdict)?
 
-  func install(handler: @escaping @Sendable (TapEventKind) -> TapVerdict) -> Bool {
+  func install(handler: @escaping @Sendable (TapEventKind, Point2D?) -> TapVerdict) -> Bool {
     lock.withLock { self.handler = handler }
     let types: [CGEventType] = [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged]
     let mask = types.reduce(CGEventMask(0)) { $0 | (CGEventMask(1) << CGEventMask($1.rawValue)) }
@@ -63,7 +63,7 @@ final class LiveEventTap: EventTapping, @unchecked Sendable {
     if let port = lock.withLock({ port }) { CGEvent.tapEnable(tap: port, enable: enabled) }
   }
 
-  fileprivate func handle(_ type: CGEventType) -> TapVerdict {
+  fileprivate func handle(_ type: CGEventType, location: CGPoint) -> TapVerdict {
     let kind: TapEventKind
     switch type {
     case .mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged: kind = .pointerMotion
@@ -71,14 +71,15 @@ final class LiveEventTap: EventTapping, @unchecked Sendable {
     case .tapDisabledByUserInput: kind = .disabledByUserInput
     default: kind = .other
     }
-    return lock.withLock { handler }?(kind) ?? .pass
+    let point = kind == .pointerMotion ? Point2D(x: location.x, y: location.y) : nil
+    return lock.withLock { handler }?(kind, point) ?? .pass
   }
 }
 
 private let liveTapCallback: CGEventTapCallBack = { _, type, event, refcon in
   guard let refcon else { return Unmanaged.passUnretained(event) }
   let tap = Unmanaged<LiveEventTap>.fromOpaque(refcon).takeUnretainedValue()
-  return tap.handle(type) == .swallow ? nil : Unmanaged.passUnretained(event)
+  return tap.handle(type, location: event.location) == .swallow ? nil : Unmanaged.passUnretained(event)
 }
 
 /// Cursor position in global display coordinates (origin top-left of the main display).
