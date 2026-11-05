@@ -1,9 +1,9 @@
-import Actions
-import EdgyCore
-import EdgyRuntime
-import Gestures
-import TouchKit
+import AppKit
 
-// Batch EDGY-APP owns this target. Placeholder entry point so the skeleton builds.
-print(
-  "Edgy skeleton — \(EdgyRuntimeInfo.module), \(TouchKitInfo.module), \(GesturesInfo.module), \(ActionsInfo.module)")
+// Menu-bar app entry point. Accessory policy keeps Edgy out of the Dock even when run unbundled
+// (`swift run Edgy`); the bundled app also sets LSUIElement.
+let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
+app.setActivationPolicy(.accessory)
+app.run()
