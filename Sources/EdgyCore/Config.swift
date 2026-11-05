@@ -86,7 +86,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
   public var haptics: Bool
   /// Which haptic moments are on (when `haptics` is on). Missing from older config files → all.
   public var hapticEvents: Set<HapticEvent>
-  /// Strength of light ticks (slide steps, gesture caught), `hapticStrengthRange`. A slider in UI.
+  /// Strength of light ticks (slide steps, gesture caught), `hapticStrengthRange`. A slider in UI. Default 6: on hardware, lower steps were not felt on a finger moving along an edge.
   public var hapticTickStrength: Int
   /// Strength of clicks (slide limits, action fired), `hapticStrengthRange`.
   public var hapticClickStrength: Int
@@ -103,7 +103,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
 
   public init(
     enabled: Bool, showMenuBarIcon: Bool, hud: HUDMode, haptics: Bool,
-    hapticEvents: Set<HapticEvent> = Set(HapticEvent.allCases), hapticTickStrength: Int = 3,
+    hapticEvents: Set<HapticEvent> = Set(HapticEvent.allCases), hapticTickStrength: Int = 6,
     hapticClickStrength: Int = 6, launchAtLogin: Bool
   ) {
     self.enabled = enabled
@@ -127,7 +127,7 @@ public struct AppSettings: Codable, Hashable, Sendable {
     hud = try c.decode(HUDMode.self, forKey: .hud)
     haptics = try c.decode(Bool.self, forKey: .haptics)
     hapticEvents = try c.decodeIfPresent(Set<HapticEvent>.self, forKey: .hapticEvents) ?? Set(HapticEvent.allCases)
-    hapticTickStrength = Self.clampStrength(try c.decodeIfPresent(Int.self, forKey: .hapticTickStrength) ?? 3)
+    hapticTickStrength = Self.clampStrength(try c.decodeIfPresent(Int.self, forKey: .hapticTickStrength) ?? 6)
     hapticClickStrength = Self.clampStrength(try c.decodeIfPresent(Int.self, forKey: .hapticClickStrength) ?? 6)
     launchAtLogin = try c.decode(Bool.self, forKey: .launchAtLogin)
   }

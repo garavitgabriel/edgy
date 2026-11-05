@@ -59,7 +59,7 @@ import Testing
     {"enabled":true,"showMenuBarIcon":true,"hud":"native","haptics":true,"launchAtLogin":false}
     """
   let legacy = try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8))
-  #expect(legacy.hapticTickStrength == 3 && legacy.hapticClickStrength == 6)
+  #expect(legacy.hapticTickStrength == 6 && legacy.hapticClickStrength == 6)
   let wild = """
     {"enabled":true,"showMenuBarIcon":true,"hud":"native","haptics":true,"launchAtLogin":false,
      "hapticTickStrength":0,"hapticClickStrength":99}
