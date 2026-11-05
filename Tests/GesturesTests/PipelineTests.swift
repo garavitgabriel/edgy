@@ -121,8 +121,11 @@ private let rightEdge: Set<Zone> = [.edge(.right)]
   #expect(run.neverClaimed)
 }
 
-@Test func unmappedCornerDoesNotFallThroughToEdge() {
-  let run = replay(TraceBuilder([Stroke(id: 1, [(0, 146, 5), (0.08, 146, 5)])]).frames(), zones: rightEdge)
+// Corner fall-through (see unmappedCornerFallsThroughToItsEdge) only reaches a *mapped* edge: with
+// neither the corner nor its edges mapped, the touch is still a disabled zone.
+@Test func unmappedCornerWithUnmappedEdgesIsDisabled() {
+  let run = replay(
+    TraceBuilder([Stroke(id: 1, [(0, 146, 5), (0.08, 146, 5)])]).frames(), zones: [.edge(.left)])
   #expect(run.events.isEmpty)
   #expect(run.rejections == [Rejection(id: 1, reason: .disabledZone)])
 }

@@ -96,6 +96,7 @@ public final class Engine: @unchecked Sendable {
   public func apply(_ config: EdgyConfig) {
     onQueue {
       self.config = config
+      router.actions.apply(settings: config.app)
       quiesce()
     }
   }

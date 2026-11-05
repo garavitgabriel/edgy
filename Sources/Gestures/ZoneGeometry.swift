@@ -43,6 +43,15 @@ struct ZoneGeometry: Sendable {
       case (false, false): return .corner(.topRight)
       }
     }
+    return edgeRegion(at: point)
+  }
+
+  /// The nearest edge strip containing the point, ignoring corner squares.
+  func edgeRegion(at point: Point2D) -> Region? {
+    let left = point.x
+    let right = width - point.x
+    let bottom = point.y
+    let top = height - point.y
     var best: (edge: Zone.Edge, distance: Double)?
     let distances: [(Zone.Edge, Double)] = [(.left, left), (.right, right), (.bottom, bottom), (.top, top)]
     for (edge, distance) in distances where distance < edgeWidth {
@@ -79,6 +88,18 @@ struct ZoneGeometry: Sendable {
 
   /// The mapped zone a touch landing at `point` (inside `region`) belongs to, or nil if unmapped.
   /// When several segmentations of the same edge are mapped, the finest one wins.
+  /// Region + mapped zone for a landing point. Corners win when mapped; an unmapped corner square
+  /// falls through to the edge strip it overlaps, so the ends of an edge are never dead.
+  func resolve(at point: Point2D, enabled: Set<Zone>) -> (region: Region, zone: Zone?)? {
+    guard let region = region(at: point) else { return nil }
+    if case .corner = region, zone(for: region, at: point, enabled: enabled) == nil,
+      let edge = edgeRegion(at: point), let edgeZone = zone(for: edge, at: point, enabled: enabled)
+    {
+      return (edge, edgeZone)
+    }
+    return (region, zone(for: region, at: point, enabled: enabled))
+  }
+
   func zone(for region: Region, at point: Point2D, enabled: Set<Zone>) -> Zone? {
     switch region {
     case .corner(let corner):

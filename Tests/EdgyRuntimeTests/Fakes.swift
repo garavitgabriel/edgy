@@ -73,6 +73,9 @@ final class FakeActions: ActionPerforming {
   var available: [ActionDescriptor] { [] }
   private(set) var performed: [PerformedAction] = []
   var errorToThrow: Error?
+  private(set) var appliedSettings: [AppSettings] = []
+
+  func apply(settings: AppSettings) { appliedSettings.append(settings) }
 
   func perform(_ id: ActionID, input: ActionInput, context: ActionContext) throws {
     performed.append(

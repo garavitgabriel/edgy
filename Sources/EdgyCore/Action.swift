@@ -47,6 +47,12 @@ public struct ActionDescriptor: Sendable, Hashable {
 public protocol ActionPerforming: AnyObject {
   var available: [ActionDescriptor] { get }
   func perform(_ id: ActionID, input: ActionInput, context: ActionContext) throws
+  /// Live app-settings change (HUD mode, haptics). Implementations keep their in-flight state.
+  func apply(settings: AppSettings)
+}
+
+extension ActionPerforming {
+  public func apply(settings: AppSettings) {}
 }
 
 public enum ActionError: Error, Equatable {

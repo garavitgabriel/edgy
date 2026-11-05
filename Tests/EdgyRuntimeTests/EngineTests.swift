@@ -69,6 +69,17 @@ final class EngineHarness {
     #expect(h.recognizer.contexts.last?.longPressZones == [])
   }
 
+  @Test func configApplyPushesAppSettingsToActionsInPlace() throws {
+    let h = try EngineHarness()
+    var config = EdgyConfig.defaults
+    config.app.haptics = false
+    config.app.hud = .none
+    h.engine.apply(config)
+    h.queue.sync {}
+    #expect(h.actions.appliedSettings.last?.haptics == false)
+    #expect(h.actions.appliedSettings.last?.hud == HUDMode.none)
+  }
+
   @Test func pauseReleasesGuardAndStopsRouting() throws {
     let h = try EngineHarness()
     h.step(GestureOutput(events: [Self.slide], claimedContactIDs: [1]))

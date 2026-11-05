@@ -4,7 +4,7 @@ import Foundation
 import IOKit.hidsystem
 import os
 
-let actionsLog = Logger(subsystem: "app.edgy", category: "actions")
+let actionsLog = Logger(subsystem: "com.garavit.edgy", category: "actions")
 
 // MARK: - Brightness
 

@@ -241,6 +241,18 @@ private let rightEdge: Set<Zone> = [.edge(.right)]
   #expect(run.neverClaimed)
 }
 
+// Default config binds no bottom-right corner: its square must fall through to the right edge,
+// otherwise the bottom 12 mm of the volume edge would be dead.
+@Test func unmappedCornerFallsThroughToItsEdge() {
+  let frames = TraceBuilder([
+    Stroke(id: 1, [(0, 146, 5), (0.08, 146, 5)])
+  ]).frames()
+  let run = replay(frames, zones: [.edge(.right)])
+  #expect(run.events.map(\.kind) == [.tap])
+  #expect(run.events.map(\.zone) == [.edge(.right)])
+  #expect(run.rejections.isEmpty)
+}
+
 // MARK: - Determinism
 
 @Test func pipelineIsDeterministic() throws {

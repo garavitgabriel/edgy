@@ -21,7 +21,9 @@ Open-source macOS menu-bar app: every edge and corner of the trackpad, mapped to
 ```bash
 swift build && swift test && swift format lint --strict -r Sources Tests Package.swift
 ```
-Formatting: `swift format format -i -r Sources Tests Package.swift` (config in `.swift-format`).
+Formatting (config in `.swift-format`): format **only the paths you own**, e.g. `swift format format -i -r Sources/Gestures Tests/GesturesTests`. Never run it over the whole tree in a parallel build: it rewrites frozen files (`Package.swift`, `Sources/EdgyCore/`) and siblings' code. The chief may format the whole tree on `main`.
+
+Logs: every module logs under subsystem `com.garavit.edgy` (category per module). On-device: `/usr/bin/log show --last 10m --predicate 'subsystem == "com.garavit.edgy"' --info` (use the full path; zsh has a `log` builtin).
 
 ## Hard rules
 

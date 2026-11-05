@@ -46,6 +46,8 @@ public final class ActionRegistry: ActionPerforming {
   /// HUD and haptics follow these live; the app may replace them at any time.
   public var settings: AppSettings
 
+  public func apply(settings: AppSettings) { self.settings = settings }
+
   let audio: AudioOutput
   let display: BrightnessOutput
   let media: MediaKeyOutput

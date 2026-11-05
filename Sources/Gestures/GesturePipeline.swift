@@ -188,8 +188,9 @@ struct FrameStep {
       rejectTrack(contact.id, .palm)
       return
     }
-    guard let region = geometry.region(at: position) else { return }
-    guard let zone = geometry.zone(for: region, at: position, enabled: context.enabledZones) else {
+    guard let resolved = geometry.resolve(at: position, enabled: context.enabledZones) else { return }
+    let region = resolved.region
+    guard let zone = resolved.zone else {
       rejectTrack(contact.id, .disabledZone)
       return
     }
@@ -255,8 +256,7 @@ struct FrameStep {
   mutating func reportDriftIntoZones() {
     for id in state.tracks.keys.sorted() {
       guard let track = state.tracks[id], track.role == .outside, !track.isPalm,
-        let region = geometry.region(at: track.position),
-        geometry.zone(for: region, at: track.position, enabled: context.enabledZones) != nil
+        geometry.resolve(at: track.position, enabled: context.enabledZones)?.zone != nil
       else { continue }
       rejectTrack(id, .startedOutsideZone)
     }

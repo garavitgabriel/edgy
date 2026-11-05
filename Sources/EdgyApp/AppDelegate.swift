@@ -60,9 +60,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private func apply(_ newConfig: EdgyConfig) {
     let old = config
     config = newConfig
-    if old.app != newConfig.app {
-      engine?.replaceActions(makeLiveActionRegistry(settings: newConfig.app))
-    }
     if old.app.launchAtLogin != newConfig.app.launchAtLogin {
       LaunchAtLogin.sync(wanted: newConfig.app.launchAtLogin, logger: logger)
     }

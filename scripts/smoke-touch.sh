@@ -37,7 +37,7 @@ if [[ "${1:-}" == "start-check" ]]; then
   echo
   echo "If the second run printed no frame lines, the start call is required. Note the answer in the done report."
   echo "If NEITHER run printed frames: in a second terminal run"
-  echo "   log stream --predicate 'subsystem == \"app.edgy\"'"
+  echo "   log stream --predicate 'subsystem == \"com.garavit.edgy\"'"
   echo "and look for 'contact layout check failed'. If present, retry with EDGY_MT_SKIP_LAYOUT_CHECK=1 and report the numbers."
   exit 0
 fi

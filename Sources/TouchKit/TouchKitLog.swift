@@ -1,9 +1,9 @@
 import os
 
 enum TouchKitLog {
-  static let touch = Logger(subsystem: "app.edgy", category: "touch")
-  static let pointer = Logger(subsystem: "app.edgy", category: "pointer")
-  static let typing = Logger(subsystem: "app.edgy", category: "typing")
+  static let touch = Logger(subsystem: "com.garavit.edgy", category: "touch")
+  static let pointer = Logger(subsystem: "com.garavit.edgy", category: "pointer")
+  static let typing = Logger(subsystem: "com.garavit.edgy", category: "typing")
 }
 
 /// Errors surfaced by the live touch source.
