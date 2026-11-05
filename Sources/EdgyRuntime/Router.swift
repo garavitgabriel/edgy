@@ -34,9 +34,12 @@ public final class Router {
   public func route(_ event: GestureEvent, config: EdgyConfig, frontmostBundleID: String?) {
     let profile = config.profile(for: frontmostBundleID)
     guard !profile.disabled else { return }
-    guard let binding = profile.bindings.first(where: { $0.zone == event.zone && $0.gesture == event.kind }) else {
-      return
+    let binding = profile.bindings.first(where: { $0.zone == event.zone && $0.gesture == event.kind })
+    if event.kind != .slide || event.phase != .changed {
+      logger.log(
+        .info, "Gesture \(event.kind) \(event.phase) at \(event.zone) → \(binding?.action.rawValue ?? "unbound")")
     }
+    guard let binding else { return }
     guard let input = input(for: event) else { return }
     let context = ActionContext(frontmostBundleID: frontmostBundleID, parameters: binding.parameters)
     do {

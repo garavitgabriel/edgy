@@ -13,8 +13,16 @@ public func makeLiveTouchSource() -> TouchSource { LiveTouchSource() }
 
 /// Live pointer guard (keeps the cursor still while a gesture owns a finger).
 public func makeLivePointerGuard() -> PointerGuarding {
-  PointerGuardCore(tap: LiveEventTap(), cursor: LiveCursor(), scheduler: DispatchGuardScheduler())
+  let core = PointerGuardCore(
+    tap: LiveEventTap(), cursor: LiveCursor(), scheduler: DispatchGuardScheduler(),
+    lookback: livePointerLookbackS, pinWhileEngaged: true)
+  core.prepare()
+  return core
 }
+
+/// How far back the guard reaches for the engage point: covers the gesture layer's dwell
+/// (120 ms default) plus frame and queue latency.
+let livePointerLookbackS: TimeInterval = 0.3
 
 /// Live typing-activity source (used to suppress edge gestures while typing).
 public func makeLiveTypingActivitySource() -> TypingActivitySource {

@@ -52,6 +52,15 @@ final class EngineHarness {
     #expect(h.actions.performed.count == 2)
   }
 
+  @Test func longClaimKeepsGuardAliveAboutOncePerSecond() throws {
+    let h = try EngineHarness()
+    // 250 frames at 120 Hz ≈ 2.08 s of one continuous claim.
+    for _ in 0..<250 { h.step(GestureOutput(claimedContactIDs: [1])) }
+    #expect(h.guardCalls == ["engage", "engage", "engage"])
+    h.step(GestureOutput())
+    #expect(h.guardCalls == ["engage", "engage", "engage", "release"])
+  }
+
   @Test func pauseReleasesGuardAndStopsRouting() throws {
     let h = try EngineHarness()
     h.step(GestureOutput(events: [Self.slide], claimedContactIDs: [1]))

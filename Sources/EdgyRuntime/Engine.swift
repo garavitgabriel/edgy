@@ -28,6 +28,7 @@ public final class Engine: @unchecked Sendable {
   private var running = false
   private var paused = false
   private var guardEngaged = false
+  private var lastGuardEngage: Double?
 
   public init(
     touchSource: TouchSource, recognizer: GestureRecognizing, actions: ActionPerforming,
@@ -116,7 +117,10 @@ public final class Engine: @unchecked Sendable {
       enabledZones: profile.disabled ? [] : Set(profile.bindings.map(\.zone)),
       secondsSinceLastKeyPress: typing.secondsSinceLastKeyPress)
     let output = recognizer.process(frame, device: device, context: context)
-    updatePointerGuard(claimed: !output.claimedContactIDs.isEmpty)
+    updatePointerGuard(claimed: !output.claimedContactIDs.isEmpty, at: frame.timestamp)
+    for (contactID, reason) in output.rejections where reason != .startedOutsideZone {
+      logger.log(.info, "Rejected contact \(contactID): \(reason)")
+    }
     for event in output.events {
       router.route(event, config: config, frontmostBundleID: bundleID)
     }
@@ -127,9 +131,16 @@ public final class Engine: @unchecked Sendable {
     logger.log(.info, "Touch devices: \(list.map { "\($0.kind.rawValue)#\($0.id)" }.joined(separator: ", "))")
   }
 
-  private func updatePointerGuard(claimed: Bool) {
+  /// While a claim lasts, re-engage this often so the guard's safety timeout never ends a long slide.
+  static let guardKeepAliveS: Double = 1
+
+  private func updatePointerGuard(claimed: Bool, at timestamp: Double? = nil) {
     if claimed && !guardEngaged {
       guardEngaged = true
+      lastGuardEngage = timestamp
+      pointerGuard.engage()
+    } else if claimed, let timestamp, let last = lastGuardEngage, timestamp - last >= Self.guardKeepAliveS {
+      lastGuardEngage = timestamp
       pointerGuard.engage()
     } else if !claimed && guardEngaged {
       guardEngaged = false

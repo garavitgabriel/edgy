@@ -47,6 +47,11 @@ public protocol GuardScheduling: AnyObject, Sendable {
 /// - Safety timeout: if `release()` never arrives, the guard releases itself so the cursor can
 ///   never stay stuck.
 /// - If the system disables the tap, it is re-enabled immediately.
+/// - Lookback: the gesture layer only claims a finger after its intent gate (dwell or along-axis
+///   motion), so the cursor has already drifted by then. While idle, the guard keeps a short
+///   history of cursor positions and engages at the oldest one inside `lookback`.
+/// - Pinning (`pinWhileEngaged`): every swallowed motion event also warps the cursor back to the
+///   engage point, so it stays put even where swallowing alone does not stop it on screen.
 public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
   public static let defaultSafetyTimeout: TimeInterval = 3
 
@@ -54,6 +59,10 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
   private let cursor: CursorControlling
   private let scheduler: GuardScheduling
   private let safetyTimeout: TimeInterval
+  private let lookback: TimeInterval
+  private let pinWhileEngaged: Bool
+  private let now: @Sendable () -> TimeInterval
+  private var history: [(time: TimeInterval, point: Point2D)] = []
 
   private let lock = NSLock()
   private var engaged = false
@@ -68,13 +77,21 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
 
   public init(
     tap: EventTapping, cursor: CursorControlling, scheduler: GuardScheduling,
-    safetyTimeout: TimeInterval = PointerGuardCore.defaultSafetyTimeout
+    safetyTimeout: TimeInterval = PointerGuardCore.defaultSafetyTimeout,
+    lookback: TimeInterval = 0, pinWhileEngaged: Bool = false,
+    now: @escaping @Sendable () -> TimeInterval = { ProcessInfo.processInfo.systemUptime }
   ) {
     self.tap = tap
     self.cursor = cursor
     self.scheduler = scheduler
     self.safetyTimeout = safetyTimeout
+    self.lookback = lookback
+    self.pinWhileEngaged = pinWhileEngaged
+    self.now = now
   }
+
+  /// Installs the tap ahead of the first engage so the lookback history is already filling.
+  public func prepare() { installTapIfNeeded() }
 
   public var isEngaged: Bool { lock.withLock { engaged } }
   public var isTapInstalled: Bool { lock.withLock { tapInstalled } }
@@ -85,10 +102,15 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
   public func engage() {
     installTapIfNeeded()
     let position = cursor.position()
+    let at = now()
     lock.lock()
+    var pinTo: Point2D?
     if !engaged {
       engaged = true
-      engagePoint = position
+      let earliest = lookback > 0 ? history.first(where: { at - $0.time <= lookback })?.point : nil
+      engagePoint = earliest ?? position
+      history.removeAll()
+      if pinWhileEngaged, let earliest, earliest != position { pinTo = earliest }
     }
     generation += 1
     let token = generation
@@ -96,6 +118,7 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
     timer = nil
     lock.unlock()
 
+    if let pinTo { cursor.warp(to: pinTo) }
     let newTimer = scheduler.schedule(after: safetyTimeout) { [weak self] in self?.timeoutFired(token: token) }
     lock.lock()
     if engaged && generation == token {
@@ -161,10 +184,21 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
       tap.setEnabled(true)
       return .pass
     case .pointerMotion:
-      let swallow = lock.withLock { () -> Bool in
-        if engaged { _swallowedCount += 1 }
-        return engaged
+      let wantsHistory = lookback > 0
+      let position = (wantsHistory || pinWhileEngaged) ? cursor.position() : nil
+      let at = now()
+      let (swallow, pinTo) = lock.withLock { () -> (Bool, Point2D?) in
+        if engaged {
+          _swallowedCount += 1
+          return (true, pinWhileEngaged ? engagePoint : nil)
+        }
+        if wantsHistory, let position {
+          history.append((at, position))
+          history.removeAll(where: { at - $0.time > lookback })
+        }
+        return (false, nil)
       }
+      if let pinTo, let position, position != pinTo { cursor.warp(to: pinTo) }
       return swallow ? .swallow : .pass
     case .other:
       return .pass

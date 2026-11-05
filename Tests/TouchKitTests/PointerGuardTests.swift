@@ -101,6 +101,47 @@ import Testing
     #expect(guard_.isTapInstalled && tap.installCount == 2)
   }
 
+  @Test func lookbackEngagesAtWhereTheFingerLandedAndPinsThere() {
+    let clock = Box<TimeInterval>(10)
+    let tap = FakeTap()
+    let cursor = FakeCursor()
+    let guard_ = PointerGuardCore(
+      tap: tap, cursor: cursor, scheduler: FakeScheduler(), lookback: 0.3, pinWhileEngaged: true,
+      now: { clock.value })
+    guard_.prepare()
+    #expect(tap.installCount == 1)
+    // Stale motion (older than the lookback) must not become the engage point.
+    cursor.current = Point2D(x: 10, y: 10)
+    #expect(tap.send(.pointerMotion) == .pass)
+    // The finger lands at (100, 100) and drifts while the gesture layer is still deciding.
+    clock.value = 10.5
+    cursor.current = Point2D(x: 100, y: 100)
+    #expect(tap.send(.pointerMotion) == .pass)
+    clock.value = 10.6
+    cursor.current = Point2D(x: 100, y: 130)
+    #expect(tap.send(.pointerMotion) == .pass)
+    clock.value = 10.7
+    guard_.engage()
+    #expect(cursor.warps == [Point2D(x: 100, y: 100)])
+    // While engaged, motion is swallowed and the cursor is pinned back to the landing point.
+    cursor.current = Point2D(x: 100, y: 160)
+    #expect(tap.send(.pointerMotion) == .swallow)
+    #expect(cursor.warps.last == Point2D(x: 100, y: 100))
+    guard_.release()
+    #expect(cursor.current == Point2D(x: 100, y: 100))
+  }
+
+  @Test func withoutHistoryEngageKeepsCurrentPointAndDoesNotWarp() {
+    let tap = FakeTap()
+    let cursor = FakeCursor()
+    let guard_ = PointerGuardCore(
+      tap: tap, cursor: cursor, scheduler: FakeScheduler(), lookback: 0.3, pinWhileEngaged: true, now: { 5 })
+    guard_.engage()
+    #expect(cursor.warps.isEmpty)
+    #expect(tap.send(.pointerMotion) == .swallow)
+    #expect(cursor.warps.isEmpty)  // cursor did not move, so no pin warp
+  }
+
   @Test func otherEventsAlwaysPass() {
     let (guard_, tap, _, _) = make()
     guard_.engage()
