@@ -9,11 +9,12 @@ public enum ActionsInfo {
 
 /// The live action registry, backed by real system outputs. Only the app may call this;
 /// tests must build registries from mock outputs.
-public func makeLiveActionRegistry(settings: AppSettings) -> ActionPerforming { NoopActionRegistry() }
-
-final class NoopActionRegistry: ActionPerforming {
-  var available: [ActionDescriptor] { [] }
-  func perform(_ id: ActionID, input: ActionInput, context: ActionContext) throws {
-    throw ActionError.unknownAction(id)
-  }
+///
+/// Building the registry has no side effects: every output connects or loads on first use.
+/// The returned object is an `ActionRegistry`; the app can cast to it to update `settings`.
+public func makeLiveActionRegistry(settings: AppSettings) -> ActionPerforming {
+  ActionRegistry(
+    settings: settings, audio: LiveAudioOutput(), display: LiveBrightnessOutput(),
+    media: LiveMediaKeyOutput(), hud: LiveHUDOutput(), haptics: LiveHapticOutput(),
+    shortcuts: LiveShortcutRunner())
 }
