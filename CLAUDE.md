@@ -28,7 +28,7 @@ Formatting: `swift format format -i -r Sources Tests Package.swift` (config in `
 1. **Never touch the user's real system from tests.** Every system output (volume, brightness, mute, media keys, HUD, haptics, Shortcuts, event taps, cursor) sits behind a protocol. Tests use mocks only. Live paths are exercised by manual `scripts/smoke-*.sh` scripts that the human runs.
 2. **Frozen contracts.** `Sources/EdgyCore/**`, `Package.swift`, and the `makeLive…` / `makeGestureRecognizer` factory signatures change only on `main`, by the chief. Need a change? Write a blocker note and stop.
 3. **Own work only.** Outside open-source code is reference for learning, never copied or ported. Write everything fresh.
-4. **No third-party product names** anywhere in this repo — code, comments, docs, commits. Before every commit: `git grep -niE "$(paste -sd'|' ~/.config/edgy-names-denylist)"` must return nothing. The denylist lives outside the repo on purpose (it contains the names).
+4. **No third-party product names** anywhere in this repo — code, comments, docs, commits. Before every commit: `git grep -niE -f ~/.config/edgy-names-denylist` must return nothing. The denylist lives outside the repo on purpose (it contains the names).
 5. **Units:** gesture geometry in millimetres (sensor size from the device), time in milliseconds in settings, seconds in timestamps.
 6. **Private frameworks** (MultitouchSupport, DisplayServices, OSD helper) are loaded at runtime by name through `CFBundle` function lookup — never linked. Every lookup failure degrades gracefully with a logged reason.
 7. **Signing:** dev builds are signed with the local "Apple Development" identity (so Accessibility grants survive rebuilds). Never ad-hoc for anything that needs TCC.
