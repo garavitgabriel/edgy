@@ -1,0 +1,18 @@
+import os
+
+enum TouchKitLog {
+  static let touch = Logger(subsystem: "app.edgy", category: "touch")
+  static let pointer = Logger(subsystem: "app.edgy", category: "pointer")
+  static let typing = Logger(subsystem: "app.edgy", category: "typing")
+}
+
+/// Errors surfaced by the live touch source.
+public enum TouchKitError: Error, Equatable, CustomStringConvertible {
+  case multitouchUnavailable(reason: String)
+
+  public var description: String {
+    switch self {
+    case .multitouchUnavailable(let reason): return "multitouch unavailable: \(reason)"
+    }
+  }
+}
