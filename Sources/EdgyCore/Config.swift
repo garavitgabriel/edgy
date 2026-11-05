@@ -86,7 +86,14 @@ public struct AppSettings: Codable, Hashable, Sendable {
   public var haptics: Bool
   /// Which haptic moments are on (when `haptics` is on). Missing from older config files → all.
   public var hapticEvents: Set<HapticEvent>
+  /// Strength of light ticks (slide steps, gesture caught), `hapticStrengthRange`. A slider in UI.
+  public var hapticTickStrength: Int
+  /// Strength of clicks (slide limits, action fired), `hapticStrengthRange`.
+  public var hapticClickStrength: Int
   public var launchAtLogin: Bool
+
+  /// Trackpad haptics come in fixed steps; this is the user-facing scale (1 = lightest).
+  public static let hapticStrengthRange = 1...6
 
   /// Per-binding override key in `Binding.parameters`: `"off"` silences that binding's haptics.
   public static let hapticsParameter = "haptics"
@@ -96,14 +103,21 @@ public struct AppSettings: Codable, Hashable, Sendable {
 
   public init(
     enabled: Bool, showMenuBarIcon: Bool, hud: HUDMode, haptics: Bool,
-    hapticEvents: Set<HapticEvent> = Set(HapticEvent.allCases), launchAtLogin: Bool
+    hapticEvents: Set<HapticEvent> = Set(HapticEvent.allCases), hapticTickStrength: Int = 3,
+    hapticClickStrength: Int = 6, launchAtLogin: Bool
   ) {
     self.enabled = enabled
     self.showMenuBarIcon = showMenuBarIcon
     self.hud = hud
     self.haptics = haptics
     self.hapticEvents = hapticEvents
+    self.hapticTickStrength = Self.clampStrength(hapticTickStrength)
+    self.hapticClickStrength = Self.clampStrength(hapticClickStrength)
     self.launchAtLogin = launchAtLogin
+  }
+
+  public static func clampStrength(_ value: Int) -> Int {
+    min(max(value, hapticStrengthRange.lowerBound), hapticStrengthRange.upperBound)
   }
 
   public init(from decoder: Decoder) throws {
@@ -113,6 +127,8 @@ public struct AppSettings: Codable, Hashable, Sendable {
     hud = try c.decode(HUDMode.self, forKey: .hud)
     haptics = try c.decode(Bool.self, forKey: .haptics)
     hapticEvents = try c.decodeIfPresent(Set<HapticEvent>.self, forKey: .hapticEvents) ?? Set(HapticEvent.allCases)
+    hapticTickStrength = Self.clampStrength(try c.decodeIfPresent(Int.self, forKey: .hapticTickStrength) ?? 3)
+    hapticClickStrength = Self.clampStrength(try c.decodeIfPresent(Int.self, forKey: .hapticClickStrength) ?? 6)
     launchAtLogin = try c.decode(Bool.self, forKey: .launchAtLogin)
   }
 

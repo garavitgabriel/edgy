@@ -1,5 +1,6 @@
 import AppKit
 import CoreGraphics
+import EdgyCore
 import Foundation
 import IOKit.hidsystem
 import os
@@ -168,15 +169,15 @@ final class LiveHUDOutput: HUDOutput, @unchecked Sendable {
 /// Trackpads without Force Touch simply do nothing.
 final class LiveHapticOutput: HapticOutput, @unchecked Sendable {
   /// Actuation patterns felt on a MacBook Pro trackpad (2026-11-04): 1–6 play, 15/16 don't.
-  static let tickPattern: Int32 = 1
-  static let strongPattern: Int32 = 6
+  /// The user's strength (1…6) maps straight onto them.
+  static func pattern(for strength: Int) -> Int32 { Int32(AppSettings.clampStrength(strength)) }
 
   private let queue = DispatchQueue(label: "com.garavit.edgy.haptics")
   private var actuator: TrackpadActuator?
   private var actuatorUnavailable = false
 
-  func tick() { play(Self.tickPattern, fallback: .alignment) }
-  func strongTick() { play(Self.strongPattern, fallback: .levelChange) }
+  func tick(strength: Int) { play(Self.pattern(for: strength), fallback: .alignment) }
+  func strongTick(strength: Int) { play(Self.pattern(for: strength), fallback: .levelChange) }
 
   private func play(_ pattern: Int32, fallback: NSHapticFeedbackManager.FeedbackPattern) {
     queue.async {

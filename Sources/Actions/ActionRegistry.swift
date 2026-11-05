@@ -51,8 +51,8 @@ public final class ActionRegistry: ActionPerforming {
   public func feedback(_ event: HapticEvent, context: ActionContext) {
     guard settings.allowsHaptic(event, parameters: context.parameters) else { return }
     switch event {
-    case .gestureCaught, .slideSteps: haptics.tick()
-    case .actionFired, .slideLimits: haptics.strongTick()
+    case .gestureCaught, .slideSteps: haptics.tick(strength: settings.hapticTickStrength)
+    case .actionFired, .slideLimits: haptics.strongTick(strength: settings.hapticClickStrength)
     }
   }
 
@@ -120,10 +120,10 @@ public final class ActionRegistry: ActionPerforming {
 
     try setLevel(id, step.level, rising: step.level > old)
     if step.strongTick && settings.allowsHaptic(.slideLimits, parameters: context.parameters) {
-      haptics.strongTick()
+      haptics.strongTick(strength: settings.hapticClickStrength)
     }
     if settings.allowsHaptic(.slideSteps, parameters: context.parameters) {
-      for _ in 0..<step.ticks { haptics.tick() }
+      for _ in 0..<step.ticks { haptics.tick(strength: settings.hapticTickStrength) }
     }
   }
 

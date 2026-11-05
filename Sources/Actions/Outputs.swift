@@ -48,8 +48,9 @@ protocol HUDOutput: AnyObject {
 
 /// Trackpad haptics. The registry never calls it when haptics are disabled.
 protocol HapticOutput: AnyObject {
-  func tick()
-  func strongTick()
+  /// `strength` is on `AppSettings.hapticStrengthRange` (1 = lightest).
+  func tick(strength: Int)
+  func strongTick(strength: Int)
 }
 
 /// Runs a user Shortcut. Must return immediately; the work happens off the caller's thread.

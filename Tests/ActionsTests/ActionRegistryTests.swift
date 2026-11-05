@@ -222,6 +222,20 @@ import Testing
     #expect(h.haptics.strongTicks == 1)
   }
 
+  @Test func strengthsComeFromSettingsAndApplyLive() throws {
+    var settings = AppSettings.defaults
+    settings.hapticTickStrength = 2
+    settings.hapticClickStrength = 5
+    let h = Harness(settings: settings)
+    h.audio.volume = 0.875
+    try h.slide("audio.volume", 0.5, phase: .began)  // one step tick (2) then the end bump (5)
+    #expect(Set(h.haptics.strengths) == [2, 5])
+    settings.hapticTickStrength = 4
+    h.registry.apply(settings: settings)
+    h.registry.feedback(.gestureCaught, context: ActionContext(frontmostBundleID: nil, parameters: [:]))
+    #expect(h.haptics.strengths.last == 4)
+  }
+
   @Test func noHapticsWhenDisabled() throws {
     let h = Harness(settings: .with(haptics: false))
     try h.slide("audio.volume", 0.5, phase: .began)

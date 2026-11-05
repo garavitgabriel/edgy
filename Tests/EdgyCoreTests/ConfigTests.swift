@@ -53,3 +53,17 @@ import Testing
   let data = try JSONEncoder().encode(settings)
   #expect(try JSONDecoder().decode(AppSettings.self, from: data) == settings)
 }
+
+@Test func hapticStrengthsDefaultClampAndLoadFromOlderFiles() throws {
+  let json = """
+    {"enabled":true,"showMenuBarIcon":true,"hud":"native","haptics":true,"launchAtLogin":false}
+    """
+  let legacy = try JSONDecoder().decode(AppSettings.self, from: Data(json.utf8))
+  #expect(legacy.hapticTickStrength == 3 && legacy.hapticClickStrength == 6)
+  let wild = """
+    {"enabled":true,"showMenuBarIcon":true,"hud":"native","haptics":true,"launchAtLogin":false,
+     "hapticTickStrength":0,"hapticClickStrength":99}
+    """
+  let clamped = try JSONDecoder().decode(AppSettings.self, from: Data(wild.utf8))
+  #expect(clamped.hapticTickStrength == 1 && clamped.hapticClickStrength == 6)
+}

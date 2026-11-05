@@ -67,8 +67,15 @@ final class MockHUDOutput: HUDOutput {
 final class MockHapticOutput: HapticOutput {
   private(set) var ticks = 0
   private(set) var strongTicks = 0
-  func tick() { ticks += 1 }
-  func strongTick() { strongTicks += 1 }
+  private(set) var strengths: [Int] = []
+  func tick(strength: Int) {
+    ticks += 1
+    strengths.append(strength)
+  }
+  func strongTick(strength: Int) {
+    strongTicks += 1
+    strengths.append(strength)
+  }
 }
 
 final class MockShortcutRunner: ShortcutRunner {
