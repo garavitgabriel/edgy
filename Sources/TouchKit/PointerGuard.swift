@@ -74,6 +74,9 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
   private var _reEnableCount = 0
   private var _timeoutReleaseCount = 0
   private var _swallowedCount = 0
+  private var _pinCount = 0
+  private var swallowedAtEngage = 0
+  private var pinsAtEngage = 0
 
   public init(
     tap: EventTapping, cursor: CursorControlling, scheduler: GuardScheduling,
@@ -107,6 +110,8 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
     var pinTo: Point2D?
     if !engaged {
       engaged = true
+      swallowedAtEngage = _swallowedCount
+      pinsAtEngage = _pinCount
       let earliest = lookback > 0 ? history.first(where: { at - $0.time <= lookback })?.point : nil
       engagePoint = earliest ?? position
       history.removeAll()
@@ -154,7 +159,12 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
     engagePoint = nil
     let pending = timer
     timer = nil
+    let swallowed = _swallowedCount - swallowedAtEngage
+    let pins = _pinCount - pinsAtEngage
+    let installed = tapInstalled
     lock.unlock()
+    TouchKitLog.pointer.info(
+      "pointer guard released: tap \(installed ? "on" : "off"), swallowed \(swallowed), pinned \(pins)")
 
     pending?.cancel()
     if let point { cursor.warp(to: point) }
@@ -173,7 +183,11 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
       tapInstalled = ok
       installing = false
     }
-    if !ok { TouchKitLog.pointer.error("pointer guard: event tap unavailable (Accessibility not granted?)") }
+    if ok {
+      TouchKitLog.pointer.info("pointer guard: event tap installed")
+    } else {
+      TouchKitLog.pointer.error("pointer guard: event tap unavailable (Accessibility not granted?)")
+    }
   }
 
   /// Called by the tap for every event it sees.
@@ -198,7 +212,10 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
         }
         return (false, nil)
       }
-      if let pinTo, let position, position != pinTo { cursor.warp(to: pinTo) }
+      if let pinTo, let position, position != pinTo {
+        lock.withLock { _pinCount += 1 }
+        cursor.warp(to: pinTo)
+      }
       return swallow ? .swallow : .pass
     case .other:
       return .pass
