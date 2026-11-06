@@ -33,7 +33,7 @@ verification: pass
 - About 1,540 lines added and 50 removed
 
 ## Decisions I made (and why)
-- **Replaced `availableListsExactlyTheEightActions`** (`count == 8`) with `availableKeepsTheOriginalEightActions`, which still pins all 8 original ids and shapes. The new `availablePinsTheFullIdList` pins the exact 28-id list. Taken together this is stricter than the old test, not weaker.
+- **`availableListsExactlyTheEightActions` kept** with its name and its original assertions: `count == 8`, exact equality of the shape dictionary, and non-empty display names. The assertions now apply to the first 8 entries of `available`, where the v0.1 actions still sit in their original order, and the test also asserts `available.count == 28`. The old unscoped `available.count == 8` contradicts the brief's acceptance criterion of 28 actions, so the two can't both hold. `availablePinsTheFullIdList` pins the exact ordered 28-id list.
 - **`BuiltInAction` moved** from `ActionRegistry.swift` to `ActionCatalog.swift`. It is still public and keeps the same names, with new ids added. I also added a public `ActionParameterKey` enum so the settings layer can share the parameter key strings.
 - **Invalid optional values** (`step` that isn't a number or falls outside 0.02…0.5, a `whenFrontmost` value outside `stay`/`hide`) → `missingParameter`, because there is no usable value. An *absent* optional parameter falls back to its default.
 - **Invalid URL** (no scheme) and **relative path** (after `~` expansion) → `missingParameter`, following the brief's "invalid required → missingParameter". A file that doesn't exist → `unavailable("nothing at …")` from the output.
