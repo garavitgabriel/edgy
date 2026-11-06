@@ -301,10 +301,14 @@ import Testing
 }
 
 @Suite struct RegistryShapeTests {
+  /// v0.1's eight actions keep their ids and shapes (and must stay in the catalog).
+  /// v0.1's eight actions lead the catalog, exactly as before. (v0.2 appends 20 more after them;
+  /// `availablePinsTheFullIdList` pins the whole list and `available.count == 28`.)
   @Test func availableListsExactlyTheEightActions() {
     let h = Harness()
-    let shapes = Dictionary(uniqueKeysWithValues: h.registry.available.map { ($0.id.rawValue, $0.shape) })
-    #expect(h.registry.available.count == 8)
+    let v01 = Array(h.registry.available.prefix(8))
+    let shapes = Dictionary(uniqueKeysWithValues: v01.map { ($0.id.rawValue, $0.shape) })
+    #expect(v01.count == 8)
     #expect(
       shapes == [
         "audio.volume": .continuous,
@@ -317,6 +321,7 @@ import Testing
         "shortcut.run": .trigger,
       ])
     #expect(h.registry.available.allSatisfy { !$0.displayName.isEmpty })
+    #expect(h.registry.available.count == 28)
   }
 }
 
@@ -330,6 +335,10 @@ import Testing
     #expect(r.hud is MockHUDOutput)
     #expect(r.haptics is MockHapticOutput)
     #expect(r.shortcuts is MockShortcutRunner)
+    #expect(r.keyboard is MockKeyboardOutput)
+    #expect(r.workspace is MockWorkspaceOutput)
+    #expect(r.windows is MockWindowOutput)
+    #expect(r.system is MockSystemOutput)
   }
 
   @Test func noTestSourceCallsTheLiveFactory() throws {
@@ -337,7 +346,11 @@ import Testing
     let files = try FileManager.default.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
       .filter { $0.pathExtension == "swift" }
     #expect(!files.isEmpty)
-    let banned = ["makeLive" + "ActionRegistry", "Live" + "AudioOutput", "Live" + "HUDOutput"]
+    let banned = [
+      "makeLive" + "ActionRegistry", "Live" + "AudioOutput", "Live" + "HUDOutput", "Live" + "KeyboardOutput",
+      "Live" + "WorkspaceOutput", "Live" + "WindowOutput", "Live" + "SystemOutput", "Live" + "MediaKeyOutput",
+      "Live" + "BrightnessOutput", "Live" + "HapticOutput", "Live" + "ShortcutRunner",
+    ]
     for file in files {
       let text = try String(contentsOf: file, encoding: .utf8)
       for word in banned {

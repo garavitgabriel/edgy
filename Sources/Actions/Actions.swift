@@ -13,8 +13,10 @@ public enum ActionsInfo {
 /// Building the registry has no side effects: every output connects or loads on first use.
 /// The returned object is an `ActionRegistry`; the app can cast to it to update `settings`.
 public func makeLiveActionRegistry(settings: AppSettings) -> ActionPerforming {
-  ActionRegistry(
+  let keyboard = LiveKeyboardOutput()
+  return ActionRegistry(
     settings: settings, audio: LiveAudioOutput(), display: LiveBrightnessOutput(),
     media: LiveMediaKeyOutput(), hud: LiveHUDOutput(), haptics: LiveHapticOutput(),
-    shortcuts: LiveShortcutRunner())
+    shortcuts: LiveShortcutRunner(), keyboard: keyboard, workspace: LiveWorkspaceOutput(),
+    windows: LiveWindowOutput(), system: LiveSystemOutput(keyboard: keyboard))
 }

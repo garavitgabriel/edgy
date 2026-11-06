@@ -1,4 +1,6 @@
+import CoreGraphics
 import EdgyCore
+import Foundation
 
 @testable import Actions
 
@@ -83,6 +85,64 @@ final class MockShortcutRunner: ShortcutRunner {
   func run(name: String) { ran.append(name) }
 }
 
+final class MockKeyboardOutput: KeyboardOutput {
+  private(set) var posted: [String] = []
+  var failure: OutputError?
+  func post(_ combo: KeyCombo) throws {
+    if let failure { throw failure }
+    posted.append(combo.description)
+  }
+}
+
+final class MockWorkspaceOutput: WorkspaceOutput {
+  enum Call: Equatable {
+    case activate(String)
+    case hide(String)
+    case openURL(URL)
+    case openFile(URL)
+  }
+  var frontmost: String?
+  var installed: Set<String> = []
+  var existingFiles: Set<String> = []
+  private(set) var calls: [Call] = []
+
+  func isFrontmost(bundleID: String) -> Bool { frontmost == bundleID }
+  func activate(bundleID: String) throws {
+    guard installed.contains(bundleID) else { throw OutputError("no app installed with bundle ID \(bundleID)") }
+    calls.append(.activate(bundleID))
+  }
+  func hide(bundleID: String) { calls.append(.hide(bundleID)) }
+  func open(url: URL) throws { calls.append(.openURL(url)) }
+  func open(file: URL) throws {
+    guard existingFiles.contains(file.path) else { throw OutputError("nothing at \(file.path)") }
+    calls.append(.openFile(file))
+  }
+}
+
+final class MockWindowOutput: WindowOutput {
+  /// The focused window; `nil` → no window.
+  var window: WindowSnapshot? = WindowSnapshot(
+    id: WindowID(pid: 42, token: 1), frame: CGRect(x: 100, y: 100, width: 800, height: 600),
+    visibleFrame: CGRect(x: 0, y: 25, width: 1440, height: 875))
+  private(set) var setFrames: [CGRect] = []
+  private(set) var minimized: [WindowID] = []
+
+  func focusedWindow() throws -> WindowSnapshot {
+    guard let window else { throw OutputError("the frontmost app has no focused window") }
+    return window
+  }
+  func setFrame(_ frame: CGRect, of window: WindowID) throws {
+    setFrames.append(frame)
+    if self.window?.id == window { self.window?.frame = frame }
+  }
+  func minimize(_ window: WindowID) throws { minimized.append(window) }
+}
+
+final class MockSystemOutput: SystemOutput {
+  private(set) var commands: [SystemCommand] = []
+  func perform(_ command: SystemCommand) throws { commands.append(command) }
+}
+
 /// A registry wired entirely to recording mocks.
 struct Harness {
   let audio = MockAudioOutput()
@@ -91,12 +151,16 @@ struct Harness {
   let hud = MockHUDOutput()
   let haptics = MockHapticOutput()
   let shortcuts = MockShortcutRunner()
+  let keyboard = MockKeyboardOutput()
+  let workspace = MockWorkspaceOutput()
+  let windows = MockWindowOutput()
+  let system = MockSystemOutput()
   let registry: ActionRegistry
 
   init(settings: AppSettings = .defaults) {
     registry = ActionRegistry(
       settings: settings, audio: audio, display: display, media: media, hud: hud, haptics: haptics,
-      shortcuts: shortcuts)
+      shortcuts: shortcuts, keyboard: keyboard, workspace: workspace, windows: windows, system: system)
   }
 
   func trigger(_ id: ActionID, _ parameters: [String: String] = [:]) throws {
