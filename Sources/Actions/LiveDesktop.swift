@@ -1,0 +1,236 @@
+import AppKit
+import ApplicationServices
+import CoreGraphics
+import EdgyCore
+import Foundation
+
+// MARK: - Keyboard
+
+/// Posts key combos as hardware-like key events to the HID event tap: each modifier key goes
+/// down in turn, then the key, then everything comes back up in reverse. Pressing the modifier
+/// keys themselves (not just flagging the key event) is what some system shortcuts need to
+/// match. Needs Accessibility.
+final class LiveKeyboardOutput: KeyboardOutput {
+  func post(_ combo: KeyCombo) throws {
+    guard let code = KeyCodes.byName[combo.key] else {
+      throw OutputError("no key code for \"\(combo.key)\"")
+    }
+    guard let source = CGEventSource(stateID: .hidSystemState) else {
+      throw OutputError("cannot create a keyboard event source")
+    }
+    let modifiers = KeyCombo.Modifier.allCases.filter(combo.modifiers.contains).compactMap {
+      KeyCodes.modifiers[$0]
+    }
+    var events: [CGEvent] = []
+    var held: CGEventFlags = []
+    func add(_ code: CGKeyCode, down: Bool, flags: CGEventFlags) throws {
+      guard let event = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: down) else {
+        throw OutputError("cannot create a key event")
+      }
+      event.flags = flags
+      events.append(event)
+    }
+    for modifier in modifiers {
+      held.insert(modifier.flag)
+      try add(modifier.code, down: true, flags: held)
+    }
+    let keyFlags = KeyCodes.flags(for: combo)
+    try add(code, down: true, flags: keyFlags)
+    try add(code, down: false, flags: keyFlags)
+    for modifier in modifiers.reversed() {
+      held.remove(modifier.flag)
+      try add(modifier.code, down: false, flags: held)
+    }
+    for event in events { event.post(tap: .cghidEventTap) }
+  }
+}
+
+// MARK: - Workspace
+
+/// Apps, URLs and files through `NSWorkspace` / `NSRunningApplication`. Checks that can fail
+/// (app installed, file exists) run on the caller's thread so the error reaches the registry;
+/// the launch itself is handed to the system and returns immediately.
+final class LiveWorkspaceOutput: WorkspaceOutput {
+  func isFrontmost(bundleID: String) -> Bool {
+    NSWorkspace.shared.frontmostApplication?.bundleIdentifier == bundleID
+  }
+
+  func activate(bundleID: String) throws {
+    if let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
+      running.unhide()
+      running.activate()
+      return
+    }
+    guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+      throw OutputError("no app installed with bundle ID \(bundleID)")
+    }
+    let configuration = NSWorkspace.OpenConfiguration()
+    configuration.activates = true
+    NSWorkspace.shared.openApplication(at: url, configuration: configuration) { _, error in
+      if let error {
+        actionsLog.error("open app \(bundleID, privacy: .public) failed: \(error, privacy: .public)")
+      }
+    }
+  }
+
+  func hide(bundleID: String) {
+    for app in NSRunningApplication.runningApplications(withBundleIdentifier: bundleID) { app.hide() }
+  }
+
+  func open(url: URL) throws {
+    guard NSWorkspace.shared.urlForApplication(toOpen: url) != nil else {
+      throw OutputError("no app opens \(url.scheme ?? "this kind of") URLs")
+    }
+    NSWorkspace.shared.open(url, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+      if let error { actionsLog.error("open URL failed: \(error, privacy: .public)") }
+    }
+  }
+
+  func open(file: URL) throws {
+    guard FileManager.default.fileExists(atPath: file.path) else {
+      throw OutputError("nothing at \(file.path)")
+    }
+    NSWorkspace.shared.open(file, configuration: NSWorkspace.OpenConfiguration()) { _, error in
+      if let error { actionsLog.error("open file failed: \(error, privacy: .public)") }
+    }
+  }
+}
+
+// MARK: - Windows
+
+/// The frontmost app's focused window through the Accessibility API. AX positions are already
+/// top-left-origin global coordinates; the screen's visible frame comes from `NSScreen`
+/// (bottom-left origin) and is flipped with `WindowGeometry.flip`. Needs Accessibility.
+final class LiveWindowOutput: WindowOutput {
+  /// Windows handed out by `focusedWindow`, so later calls act on the same element.
+  private var elements: [WindowID: AXUIElement] = [:]
+
+  func focusedWindow() throws -> WindowSnapshot {
+    guard AXIsProcessTrusted() else { throw OutputError("Accessibility permission not granted") }
+    guard let app = NSWorkspace.shared.frontmostApplication else { throw OutputError("no frontmost app") }
+    let appElement = AXUIElementCreateApplication(app.processIdentifier)
+    var value: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(appElement, kAXFocusedWindowAttribute as CFString, &value) == .success,
+      let value, CFGetTypeID(value) == AXUIElementGetTypeID()
+    else { throw OutputError("the frontmost app has no focused window") }
+    let window = value as! AXUIElement
+    let frame = try Self.frame(of: window)
+    let id = WindowID(pid: app.processIdentifier, token: Int(bitPattern: UInt(CFHash(window))))
+    elements = elements.filter { $0.key.pid == id.pid }
+    elements[id] = window
+    return WindowSnapshot(id: id, frame: frame, visibleFrame: try Self.visibleFrame(containing: frame))
+  }
+
+  func setFrame(_ frame: CGRect, of window: WindowID) throws {
+    let element = try element(window)
+    // Size, position, size: the second size lands correctly when the first was limited by the
+    // old position running off the screen edge.
+    try Self.set(kAXSizeAttribute, size: frame.size, on: element)
+    try Self.set(kAXPositionAttribute, point: frame.origin, on: element)
+    try Self.set(kAXSizeAttribute, size: frame.size, on: element)
+  }
+
+  func minimize(_ window: WindowID) throws {
+    let status = AXUIElementSetAttributeValue(
+      try element(window), kAXMinimizedAttribute as CFString, kCFBooleanTrue)
+    guard status == .success else { throw OutputError("cannot minimize the window (\(status.rawValue))") }
+  }
+
+  private func element(_ window: WindowID) throws -> AXUIElement {
+    guard let element = elements[window] else { throw OutputError("the window is gone") }
+    return element
+  }
+
+  private static func frame(of window: AXUIElement) throws -> CGRect {
+    var position = CGPoint.zero
+    var size = CGSize.zero
+    var raw: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(window, kAXPositionAttribute as CFString, &raw) == .success,
+      let raw, CFGetTypeID(raw) == AXValueGetTypeID(),
+      AXValueGetValue(raw as! AXValue, .cgPoint, &position)
+    else { throw OutputError("cannot read the window position") }
+    var rawSize: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(window, kAXSizeAttribute as CFString, &rawSize) == .success,
+      let rawSize, CFGetTypeID(rawSize) == AXValueGetTypeID(),
+      AXValueGetValue(rawSize as! AXValue, .cgSize, &size)
+    else { throw OutputError("cannot read the window size") }
+    return CGRect(origin: position, size: size)
+  }
+
+  private static func set(_ attribute: String, point: CGPoint, on element: AXUIElement) throws {
+    var point = point
+    guard let value = AXValueCreate(.cgPoint, &point),
+      AXUIElementSetAttributeValue(element, attribute as CFString, value) == .success
+    else { throw OutputError("cannot move the window") }
+  }
+
+  private static func set(_ attribute: String, size: CGSize, on element: AXUIElement) throws {
+    var size = size
+    guard let value = AXValueCreate(.cgSize, &size),
+      AXUIElementSetAttributeValue(element, attribute as CFString, value) == .success
+    else { throw OutputError("cannot resize the window") }
+  }
+
+  /// The visible frame, in top-left coordinates, of the screen holding most of `frame`.
+  private static func visibleFrame(containing frame: CGRect) throws -> CGRect {
+    let screens = NSScreen.screens
+    guard let primary = screens.first else { throw OutputError("no screen") }
+    let height = primary.frame.height
+    func overlap(_ screen: NSScreen) -> CGFloat {
+      let shared = WindowGeometry.flip(screen.frame, primaryHeight: height).intersection(frame)
+      return shared.isNull ? 0 : shared.width * shared.height
+    }
+    let best = screens.max { overlap($0) < overlap($1) } ?? primary
+    return WindowGeometry.flip(best.visibleFrame, primaryHeight: height)
+  }
+}
+
+// MARK: - System
+
+/// Mission Control family, Spaces, lock and display sleep, each by the sturdiest public route:
+///
+/// - Mission Control / App Windows / Show Desktop: run the system Mission Control app's
+///   executable (no argument / `2` / `1`). It works whatever the user's keyboard shortcuts or
+///   hot corners are, and needs no permission.
+/// - Spaces left / right: post ctrl+left / ctrl+right. There is no public API to switch Spaces,
+///   so this depends on the system "Move left/right a space" shortcuts being enabled and unchanged.
+/// - Lock Screen: post ctrl+cmd+q, the system Lock Screen shortcut (same dependency). The
+///   alternatives either need a private framework or only lock when "require password
+///   immediately" is set.
+/// - Sleep Display: `pmset displaysleepnow`, public and permission-free. Whether waking needs a
+///   password follows the user's own security settings.
+final class LiveSystemOutput: SystemOutput {
+  static let missionControl = URL(
+    fileURLWithPath: "/System/Applications/Mission Control.app/Contents/MacOS/Mission Control")
+  static let pmset = URL(fileURLWithPath: "/usr/bin/pmset")
+
+  private let keyboard: KeyboardOutput
+
+  init(keyboard: KeyboardOutput) { self.keyboard = keyboard }
+
+  func perform(_ command: SystemCommand) throws {
+    switch command {
+    case .missionControl: try Self.launch(Self.missionControl, [])
+    case .appWindows: try Self.launch(Self.missionControl, ["2"])
+    case .showDesktop: try Self.launch(Self.missionControl, ["1"])
+    case .spaceLeft: try keyboard.post(KeyCombo(modifiers: [.ctrl], key: "left"))
+    case .spaceRight: try keyboard.post(KeyCombo(modifiers: [.ctrl], key: "right"))
+    case .lockScreen: try keyboard.post(KeyCombo(modifiers: [.ctrl, .cmd], key: "q"))
+    case .sleepDisplay: try Self.launch(Self.pmset, ["displaysleepnow"])
+    }
+  }
+
+  /// Starts a tool and returns without waiting for it.
+  private static func launch(_ tool: URL, _ arguments: [String]) throws {
+    let process = Process()
+    process.executableURL = tool
+    process.arguments = arguments
+    process.standardOutput = FileHandle.nullDevice
+    process.standardError = FileHandle.nullDevice
+    do {
+      try process.run()
+    } catch {
+      throw OutputError("cannot run \(tool.lastPathComponent): \(error.localizedDescription)")
+    }
+  }
+}
