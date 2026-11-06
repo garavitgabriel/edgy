@@ -1,4 +1,5 @@
 import AppKit
+import ApplicationServices
 import EdgyRuntime
 import ServiceManagement
 
@@ -27,6 +28,23 @@ final class WorkspaceFrontmostAppProvider: FrontmostAppProviding, @unchecked Sen
 
   private func set(_ bundleID: String?) {
     lock.withLock { current = bundleID }
+  }
+}
+
+/// Live Accessibility check. `AXIsProcessTrusted` answers yes or no, so this never reports `.unknown`.
+@MainActor
+final class AccessibilityPermissionChecker: PermissionChecking {
+  var accessibility: PermissionState { AXIsProcessTrusted() ? .granted : .denied }
+}
+
+enum AccessibilitySettings {
+  static let paneURL = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!
+
+  /// Opens System Settings → Privacy & Security → Accessibility.
+  @MainActor static func open(logger: EdgyLogging) {
+    if !NSWorkspace.shared.open(paneURL) {
+      logger.log(.error, "Could not open the Accessibility settings pane")
+    }
   }
 }
 
