@@ -52,7 +52,7 @@ verification: pass
 ## Needs Gabriel
 - Run `scripts/smoke-actions.sh` (steps 9–16 are new). Check in particular:
   - the TextEdit document opens and cmd+b reaches it
-  - snap left / right / restore lands correctly, including on a second display if you have one
+  - snap left / right / restore lands correctly, including on a second display if you have one. If restore does nothing after a snap, look first at the `CFHash`-based window identity.
   - Mission Control, App Windows and Show Desktop open and close with the executable-argument approach (`2` and `1` are the least certain part)
   - Spaces move with the synthesized ctrl+arrow
 - Actions that depend on a system keyboard shortcut being enabled and unchanged (System Settings → Keyboard → Keyboard Shortcuts):
