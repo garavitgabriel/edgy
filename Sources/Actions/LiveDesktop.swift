@@ -189,9 +189,11 @@ final class LiveWindowOutput: WindowOutput {
 
 /// Mission Control family, Spaces, lock and display sleep, each by the sturdiest public route:
 ///
-/// - Mission Control / App Windows / Show Desktop: run the system Mission Control app's
-///   executable (no argument / `2` / `1`). It works whatever the user's keyboard shortcuts or
-///   hot corners are, and needs no permission.
+/// - Mission Control / App Windows / Show Desktop: ask the Dock directly through
+///   `CoreDockSendNotification`, a private function in ApplicationServices resolved by name at
+///   runtime. Independent of keyboard shortcuts and hot corners. Running the Mission Control
+///   app's executable as a child process did nothing on macOS 27 (hardware test 2026-11-06),
+///   so it is only the fallback when the function can't be found.
 /// - Spaces left / right: post ctrl+left / ctrl+right. There is no public API to switch Spaces,
 ///   so this depends on the system "Move left/right a space" shortcuts being enabled and unchanged.
 /// - Lock Screen: post ctrl+cmd+q, the system Lock Screen shortcut (same dependency). The
@@ -210,13 +212,33 @@ final class LiveSystemOutput: SystemOutput {
 
   func perform(_ command: SystemCommand) throws {
     switch command {
-    case .missionControl: try Self.launch(Self.missionControl, [])
-    case .appWindows: try Self.launch(Self.missionControl, ["2"])
-    case .showDesktop: try Self.launch(Self.missionControl, ["1"])
+    case .missionControl: try Self.dock("com.apple.expose.awake", fallbackArguments: [])
+    case .appWindows: try Self.dock("com.apple.expose.front.awake", fallbackArguments: ["2"])
+    case .showDesktop: try Self.dock("com.apple.showdesktop.awake", fallbackArguments: ["1"])
     case .spaceLeft: try keyboard.post(KeyCombo(modifiers: [.ctrl], key: "left"))
     case .spaceRight: try keyboard.post(KeyCombo(modifiers: [.ctrl], key: "right"))
     case .lockScreen: try keyboard.post(KeyCombo(modifiers: [.ctrl, .cmd], key: "q"))
     case .sleepDisplay: try Self.launch(Self.pmset, ["displaysleepnow"])
+    }
+  }
+
+  private typealias SendDockNotification = @convention(c) (CFString, Int32) -> Void
+
+  /// Resolved once; `nil` when the function isn't there on this macOS.
+  private static let sendDockNotification: SendDockNotification? = {
+    let path = "/System/Library/Frameworks/ApplicationServices.framework/ApplicationServices"
+    guard let handle = dlopen(path, RTLD_LAZY), let symbol = dlsym(handle, "CoreDockSendNotification") else {
+      actionsLog.notice("CoreDockSendNotification unavailable; Mission Control actions use the app fallback")
+      return nil
+    }
+    return unsafeBitCast(symbol, to: SendDockNotification.self)
+  }()
+
+  private static func dock(_ notification: String, fallbackArguments: [String]) throws {
+    if let send = sendDockNotification {
+      send(notification as CFString, 0)
+    } else {
+      try launch(missionControl, fallbackArguments)
     }
   }
 
