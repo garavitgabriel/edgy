@@ -317,6 +317,28 @@ import Testing
     #expect(try h.onDisk() == .defaults)
   }
 
+  @Test func externalEditMidDragWinsOnDisk() throws {
+    let h = try EditorHarness()
+    h.editor.beginContinuousEdit("edgeWidth")
+    try h.editor.updateGestureSettings { $0.edgeWidthMM = 14 }
+    var handEdited = EdgyConfig.defaults
+    handEdited.app.hud = .none
+    try ConfigStore.encode(handEdited).write(to: h.store.fileURL, options: .atomic)
+
+    h.editor.adoptExternal(handEdited)
+    #expect(!h.editor.isEditingContinuously)
+    #expect(h.editor.config == handEdited)
+    #expect(try h.onDisk() == handEdited)
+    h.scheduler.advance(by: 10)
+    #expect(try h.onDisk() == handEdited)
+
+    // Two steps: the drag, then the external edit.
+    try h.editor.undo()
+    #expect(h.editor.config.gestures.edgeWidthMM == 14)
+    try h.editor.undo()
+    #expect(h.editor.config == .defaults)
+  }
+
   @Test func reloadFromDiskAdoptsTheFile() throws {
     let h = try EditorHarness()
     var handEdited = EdgyConfig.defaults

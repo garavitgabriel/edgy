@@ -251,6 +251,10 @@ public final class SettingsEditor {
   /// records one undo step if anything changed. If the final save fails the step is still
   /// recorded (memory and engine already hold the value) and the error is rethrown.
   public func endContinuousEdit() throws {
+    try closeContinuousEdit(save: true)
+  }
+
+  private func closeContinuousEdit(save: Bool) throws {
     guard let (_, start) = continuous else { return }
     continuous = nil
     pendingSave?.cancel()
@@ -259,6 +263,7 @@ public final class SettingsEditor {
     pushUndo(start)
     redoStack.removeAll()
     notify(.continuousEditEnded, previous: config)
+    guard save else { return }
     do {
       try store.save(config)
     } catch {
@@ -296,8 +301,10 @@ public final class SettingsEditor {
   /// Adopts a config changed outside the editor (the file watcher, Reload Config) as a new undoable
   /// step. It is not saved back. A config equal to the current one is ignored, so the editor's own
   /// saves never come back as external changes. Errors in it are kept and exposed, never dropped.
+  /// A drag in progress is closed as its own undo step but not saved: the file now holds the
+  /// external edit, and saving the drag's value would overwrite it.
   public func adoptExternal(_ external: EdgyConfig) {
-    try? endContinuousEdit()
+    try? closeContinuousEdit(save: false)
     guard external != config else { return }
     pushUndo(config)
     redoStack.removeAll()
