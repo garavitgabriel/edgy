@@ -5,6 +5,7 @@ protocol StatusMenuHandler: AnyObject {
   func toggleEnabled()
   func pauseForOneHour()
   func resumeNow()
+  func grantAccessibility()
   func openConfigFile()
   func reloadConfig()
   func showAbout()
@@ -18,6 +19,10 @@ final class StatusMenu: NSObject {
     var enabled: Bool
     var pausedUntil: Date?
     var configPath: String
+    /// Accessibility isn't granted (yet): offer the way to grant it.
+    var needsAccessibility: Bool
+    /// The engine sees a built-in or external trackpad.
+    var hasTrackpad: Bool
   }
 
   private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -35,6 +40,15 @@ final class StatusMenu: NSObject {
     item.button?.toolTip = active ? "Edgy is on" : "Edgy is off"
 
     let menu = NSMenu()
+    if state.needsAccessibility {
+      menu.addItem(entry("Grant Accessibility…", #selector(grantAccessibility)))
+    }
+    if !state.hasTrackpad {
+      let none = NSMenuItem(title: "No trackpad found", action: nil, keyEquivalent: "")
+      none.isEnabled = false
+      menu.addItem(none)
+    }
+    if state.needsAccessibility || !state.hasTrackpad { menu.addItem(.separator()) }
     let enabled = entry("Enabled", #selector(toggleEnabled))
     enabled.state = state.enabled ? .on : .off
     menu.addItem(enabled)
@@ -73,6 +87,7 @@ final class StatusMenu: NSObject {
   @objc private func toggleEnabled() { handler?.toggleEnabled() }
   @objc private func pauseForOneHour() { handler?.pauseForOneHour() }
   @objc private func resumeNow() { handler?.resumeNow() }
+  @objc private func grantAccessibility() { handler?.grantAccessibility() }
   @objc private func openConfigFile() { handler?.openConfigFile() }
   @objc private func reloadConfig() { handler?.reloadConfig() }
   @objc private func showAbout() { handler?.showAbout() }

@@ -6,6 +6,40 @@ public protocol FrontmostAppProviding: AnyObject, Sendable {
   var frontmostBundleID: String? { get }
 }
 
+/// A snapshot of what the engine is doing, for the menu and the settings window.
+public struct EngineStatus: Equatable, Sendable {
+  /// Touch input started and not stopped.
+  public var running: Bool
+  public var paused: Bool
+  /// When a timed pause ends, if the pauser said so.
+  public var pausedUntil: Date?
+  /// `AppSettings.enabled` of the applied config.
+  public var enabled: Bool
+  /// Connected multitouch devices, sorted by id.
+  public var devices: [TouchDeviceInfo]
+  /// Why the last `start()` failed; cleared by a successful start.
+  public var lastStartError: String?
+
+  public init(
+    running: Bool = false, paused: Bool = false, pausedUntil: Date? = nil, enabled: Bool = true,
+    devices: [TouchDeviceInfo] = [], lastStartError: String? = nil
+  ) {
+    self.running = running
+    self.paused = paused
+    self.pausedUntil = pausedUntil
+    self.enabled = enabled
+    self.devices = devices
+    self.lastStartError = lastStartError
+  }
+
+  public var deviceCount: Int { devices.count }
+  public var deviceKinds: Set<TouchDeviceInfo.Kind> { Set(devices.map(\.kind)) }
+  /// A built-in or external trackpad is connected.
+  public var hasTrackpad: Bool { devices.contains { $0.kind == .builtInTrackpad || $0.kind == .externalTrackpad } }
+  /// Gestures are being turned into actions right now.
+  public var isActive: Bool { running && !paused && enabled }
+}
+
 /// Wires touch input → gesture recognizer → router → actions, and drives the pointer guard.
 ///
 /// All mutable state, the recognizer, the router and the pointer guard are touched only on `queue`.
@@ -29,6 +63,10 @@ public final class Engine: @unchecked Sendable {
   private var paused = false
   private var guardEngaged = false
   private var lastGuardEngage: Double?
+  private var pausedUntil: Date?
+  private var lastStartError: String?
+  private var lastStatus: EngineStatus?
+  private var statusHandler: (@Sendable (EngineStatus) -> Void)?
 
   public init(
     touchSource: TouchSource, recognizer: GestureRecognizing, actions: ActionPerforming,
@@ -49,6 +87,17 @@ public final class Engine: @unchecked Sendable {
 
   public var isPaused: Bool { onQueue { paused } }
 
+  public var status: EngineStatus { onQueue { makeStatus() } }
+
+  /// Calls `handler` on the engine queue whenever `status` changes (start, stop, pause, resume,
+  /// device hot-plug, enabled toggled). Replaces any previous handler.
+  public func onStatusChange(_ handler: @escaping @Sendable (EngineStatus) -> Void) {
+    onQueue {
+      statusHandler = handler
+      lastStatus = makeStatus()
+    }
+  }
+
   public func start() throws {
     let alreadyRunning = onQueue { () -> Bool in
       if running { return true }
@@ -68,8 +117,16 @@ public final class Engine: @unchecked Sendable {
           self.queue.async { self.setDevices(devices) }
         })
     } catch {
-      onQueue { running = false }
+      onQueue {
+        running = false
+        lastStartError = String(describing: error)
+        publishStatus()
+      }
       throw error
+    }
+    onQueue {
+      lastStartError = nil
+      publishStatus()
     }
   }
 
@@ -78,18 +135,27 @@ public final class Engine: @unchecked Sendable {
     onQueue {
       running = false
       quiesce()
+      publishStatus()
     }
   }
 
-  public func pause() {
+  /// Stops turning gestures into actions. `until` is recorded for `status` only: the caller owns
+  /// the timer that calls `resume()`.
+  public func pause(until: Date? = nil) {
     onQueue {
       paused = true
+      pausedUntil = until
       quiesce()
+      publishStatus()
     }
   }
 
   public func resume() {
-    onQueue { paused = false }
+    onQueue {
+      paused = false
+      pausedUntil = nil
+      publishStatus()
+    }
   }
 
   /// Adopt a new config: in-flight gestures are dropped and the next frame uses the new context.
@@ -98,6 +164,7 @@ public final class Engine: @unchecked Sendable {
       self.config = config
       router.actions.apply(settings: config.app)
       quiesce()
+      publishStatus()
     }
   }
 
@@ -136,6 +203,20 @@ public final class Engine: @unchecked Sendable {
   private func setDevices(_ list: [TouchDeviceInfo]) {
     devices = Dictionary(list.map { ($0.id, $0) }, uniquingKeysWith: { _, last in last })
     logger.log(.info, "Touch devices: \(list.map { "\($0.kind.rawValue)#\($0.id)" }.joined(separator: ", "))")
+    publishStatus()
+  }
+
+  private func makeStatus() -> EngineStatus {
+    EngineStatus(
+      running: running, paused: paused, pausedUntil: pausedUntil, enabled: config.app.enabled,
+      devices: devices.values.sorted { $0.id < $1.id }, lastStartError: lastStartError)
+  }
+
+  private func publishStatus() {
+    let status = makeStatus()
+    guard status != lastStatus else { return }
+    lastStatus = status
+    statusHandler?(status)
   }
 
   /// While a claim lasts, re-engage this often so the guard's safety timeout never ends a long slide.

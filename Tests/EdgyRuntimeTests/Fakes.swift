@@ -25,6 +25,8 @@ final class FakeTouchSource: TouchSource, @unchecked Sendable {
   private let state = Locked<(devices: [TouchDeviceInfo], onFrame: (@Sendable (TouchFrame) -> Void)?)>(([], nil))
   private let changed = Locked<(@Sendable ([TouchDeviceInfo]) -> Void)?>(nil)
   let stopCount = Locked(0)
+  /// When set, `start` throws it.
+  let startError = Locked<Error?>(nil)
 
   init(devices: [TouchDeviceInfo]) { state.value.devices = devices }
 
@@ -34,6 +36,7 @@ final class FakeTouchSource: TouchSource, @unchecked Sendable {
     onFrame: @escaping @Sendable (TouchFrame) -> Void,
     onDevicesChanged: @escaping @Sendable ([TouchDeviceInfo]) -> Void
   ) throws {
+    if let error = startError.value { throw error }
     state.value.onFrame = onFrame
     changed.value = onDevicesChanged
   }
