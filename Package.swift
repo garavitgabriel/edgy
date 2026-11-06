@@ -31,5 +31,6 @@ let package = Package(
       resources: [.copy("Fixtures")]),
     .testTarget(name: "ActionsTests", dependencies: ["Actions"]),
     .testTarget(name: "EdgyRuntimeTests", dependencies: ["EdgyRuntime"]),
+    .testTarget(name: "IntegrationTests", dependencies: ["Actions", "EdgyRuntime"]),
   ]
 )
