@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Manual smoke test for the live action outputs. HUMAN-RUN ONLY — never from CI or an agent.
 #
-# It changes real volume, mute, brightness, media playback, the HUD and haptics, asking before
-# each step and restoring prior values at the end (also on Ctrl-C).
+# It changes real volume, mute, brightness, media playback, the HUD and haptics, then drives the
+# v0.2 catalog: opens a TextEdit document, sends it shortcuts, snaps its window, opens a URL,
+# shows Mission Control and switches Spaces. It asks before each step and restores prior values
+# at the end (levels also on Ctrl-C); it closes the document it opened.
 #
-# Media keys need Accessibility for your terminal app (System Settings → Privacy & Security →
+# Media keys, key shortcuts and window snapping need Accessibility for your terminal app (System Settings → Privacy & Security →
 # Accessibility). Haptics need a Force Touch trackpad; keep a finger resting on it to feel them.
 set -euo pipefail
 
@@ -26,6 +28,7 @@ swiftc -swift-version 6 -parse-as-library -emit-library -static -module-name Act
   -o "$WORK/libActions.a" "$ROOT"/Sources/Actions/*.swift
 
 cat >"$WORK/main.swift" <<'SWIFT'
+import AppKit
 import EdgyCore
 import Foundation
 
@@ -52,9 +55,13 @@ let audio = LiveAudioOutput()
 let display = LiveBrightnessOutput()
 let hud = LiveHUDOutput()
 let haptics = LiveHapticOutput()
+let keyboard = LiveKeyboardOutput()
+let workspace = LiveWorkspaceOutput()
+let windows = LiveWindowOutput()
 let registry = ActionRegistry(
   settings: .defaults, audio: audio, display: display, media: LiveMediaKeyOutput(), hud: hud,
-  haptics: haptics, shortcuts: LiveShortcutRunner())
+  haptics: haptics, shortcuts: LiveShortcutRunner(), keyboard: keyboard, workspace: workspace,
+  windows: windows, system: LiveSystemOutput(keyboard: keyboard))
 
 // Snapshot everything we might touch.
 let priorVolume = try? audio.outputVolume()
@@ -136,12 +143,88 @@ if ask("7. Show each HUD image directly (volume half, muted, brightness half)?")
 }
 if ask("8. Feel haptics: 8 ticks then one strong tick (rest a finger on the trackpad)?") {
   for _ in 0..<8 {
-    haptics.tick()
+    haptics.tick(strength: 6)
     settle(0.15)
   }
-  haptics.strongTick()
+  haptics.strongTick(strength: 6)
   settle()
 }
+
+@MainActor func fire(_ id: ActionID, _ parameters: [String: String] = [:]) {
+  check(id.rawValue) {
+    try registry.perform(id, input: .trigger, context: ActionContext(frontmostBundleID: nil, parameters: parameters))
+  }
+}
+
+let textEdit = "com.apple.TextEdit"
+let textEditWasRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: textEdit).isEmpty
+var openedDocument = false
+if ask("9. Open a fresh TextEdit document (app.open, then keyboard.shortcut cmd+n)?") {
+  fire("app.open", ["bundleID": textEdit, "whenFrontmost": "stay"])
+  settle(2.0)
+  fire("keyboard.shortcut", ["keys": "cmd+n"])
+  settle(1.0)
+  openedDocument = true
+  print("  Is a new, empty TextEdit window in front?")
+}
+if openedDocument, ask("10. Send cmd+b to it (bold toggles on; type a letter to see it)?") {
+  fire("keyboard.shortcut", ["keys": "cmd+b"])
+  settle(2.0)
+  fire("keyboard.shortcut", ["keys": "cmd+b"])
+  print("  Sent cmd+b twice (on, then off again).")
+}
+if ask("11. Snap the front window left, then right, then restore (needs Accessibility)?") {
+  fire("window.leftHalf")
+  settle(1.2)
+  fire("window.rightHalf")
+  settle(1.2)
+  fire("window.restore")
+  settle()
+  print("  Did it fill the left half, the right half, then go back where it started?")
+}
+if ask("12. Slide-to-repeat: 4 presses of cmd+= then 4 of cmd+- in the front window (zoom in/out)?") {
+  let zoom = ["upKeys": "cmd+=", "downKeys": "cmd+-"]
+  for (i, d) in ([Double](repeating: 0.0625, count: 4) + [Double](repeating: -0.0625, count: 4)).enumerated() {
+    let phase: GestureEvent.Phase = i == 0 ? .began : .changed
+    check("slideSteps") {
+      try registry.perform(
+        "keyboard.slideSteps", input: .delta(d, phase: phase),
+        context: ActionContext(frontmostBundleID: nil, parameters: zoom))
+    }
+    settle(0.25)
+  }
+}
+if openedDocument, ask("13. Close the TextEdit document without saving (asks for Automation permission once)?") {
+  let close = Process()
+  close.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+  close.arguments = ["-e", "tell application id \"\(textEdit)\" to close front document saving no"]
+  try? close.run()
+  close.waitUntilExit()
+  if !textEditWasRunning {
+    for app in NSRunningApplication.runningApplications(withBundleIdentifier: textEdit) { app.terminate() }
+  }
+}
+if ask("14. Open https://example.com in the default browser (close the tab yourself afterwards)?") {
+  fire("url.open", ["url": "https://example.com"])
+  settle(1.0)
+}
+if ask("15. Mission Control, App Windows and Show Desktop (each toggled on, then off again)?") {
+  for id: ActionID in ["system.missionControl", "system.appWindows", "system.showDesktop"] {
+    fire(id)
+    settle(1.8)
+    fire(id)
+    settle(1.2)
+  }
+  print("  Did each one appear and then go away?")
+}
+if ask("16. Spaces: move one Space left, then back right (needs at least two Spaces and the system shortcuts on)?") {
+  fire("spaces.left")
+  settle(1.5)
+  fire("spaces.right")
+  settle(1.5)
+  print("  If nothing moved, check Keyboard Shortcuts → Mission Control → Move left/right a space.")
+}
+print("\nNot run here: system.lockScreen and system.sleepDisplay (they end the session). Bind them and try by hand.")
 
 restore()
 SWIFT
