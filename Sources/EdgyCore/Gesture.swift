@@ -13,6 +13,23 @@ public enum Zone: Codable, Hashable, Sendable {
 
 public enum SwipeDirection: String, Codable, Sendable { case up, down, left, right }
 
+extension Zone {
+  /// Whether this zone can produce `gesture`. Corners are too small to slide or swipe in;
+  /// edges swipe only along their own axis (left/right edges: up/down; top/bottom: left/right).
+  public func supports(_ gesture: GestureKind) -> Bool {
+    switch (self, gesture) {
+    case (.corner, .tap), (.corner, .doubleTap), (.corner, .longPress): return true
+    case (.corner, _): return false
+    case (.edge, .slide), (.edge, .tap), (.edge, .doubleTap), (.edge, .longPress): return true
+    case (.edge(let edge, _, _), .swipe(let direction)):
+      switch edge {
+      case .left, .right: return direction == .up || direction == .down
+      case .top, .bottom: return direction == .left || direction == .right
+      }
+    }
+  }
+}
+
 public enum GestureKind: Codable, Hashable, Sendable {
   /// Continuous movement along the edge axis.
   case slide

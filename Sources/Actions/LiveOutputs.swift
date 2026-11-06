@@ -176,18 +176,35 @@ final class LiveHapticOutput: HapticOutput, @unchecked Sendable {
   private var actuator: TrackpadActuator?
   private var actuatorUnavailable = false
 
-  func tick(strength: Int) { play(Self.pattern(for: strength), fallback: .alignment) }
-  func strongTick(strength: Int) { play(Self.pattern(for: strength), fallback: .levelChange) }
+  /// Gap between the two pulses of a click. Short enough to read as one "click", long enough
+  /// for a finger to feel two distinct pulses (the actuator's own pulse is ~10–20 ms).
+  static let clickGap: DispatchTimeInterval = .milliseconds(45)
 
-  private func play(_ pattern: Int32, fallback: NSHapticFeedbackManager.FeedbackPattern) {
-    queue.async {
+  func tick(strength: Int) { play(Self.pattern(for: strength), fallback: .alignment) }
+
+  /// A click is a double pulse so it reads differently from a slide tick at the same strength.
+  func strongTick(strength: Int) {
+    let pattern = Self.pattern(for: strength)
+    play(pattern, fallback: .levelChange)
+    play(pattern, fallback: nil, after: Self.clickGap)
+  }
+
+  private func play(
+    _ pattern: Int32, fallback: NSHapticFeedbackManager.FeedbackPattern?, after delay: DispatchTimeInterval? = nil
+  ) {
+    let work: @Sendable () -> Void = {
       let played = self.actuate(pattern)
       actionsLog.info(
         "haptic pattern \(pattern, privacy: .public): \(played ? "actuator" : "fallback", privacy: .public)")
-      if played { return }
+      guard !played, let fallback else { return }
       DispatchQueue.main.async {
         NSHapticFeedbackManager.defaultPerformer.perform(fallback, performanceTime: .now)
       }
+    }
+    if let delay {
+      queue.asyncAfter(deadline: .now() + delay, execute: work)
+    } else {
+      queue.async(execute: work)
     }
   }
 

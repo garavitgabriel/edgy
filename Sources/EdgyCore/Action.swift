@@ -29,17 +29,69 @@ public struct ActionContext: Sendable {
   }
 }
 
+/// Groups actions in the settings UI's action picker.
+public enum ActionCategory: String, Codable, CaseIterable, Sendable {
+  case sound, display, media, system, windows, apps, keyboard, shortcuts
+}
+
+/// One value an action reads from `Binding.parameters`. The settings layer uses these to build
+/// the right control and to validate a binding before it is saved.
+public struct ActionParameter: Sendable, Hashable {
+  public enum Kind: Sendable, Hashable {
+    /// Free text (e.g. a Shortcut name).
+    case text
+    /// A key combination in `KeyCombo` string form, e.g. `"cmd+shift+4"`.
+    case keyCombo
+    /// An application bundle identifier, e.g. `"com.apple.Safari"`.
+    case appBundleID
+    /// An absolute URL with a scheme (`https:`, `mailto:`, an app scheme...).
+    case url
+    /// An absolute file or folder path; `~` is expanded by the action.
+    case filePath
+    /// A decimal number within `range`.
+    case number(ClosedRange<Double>)
+    /// One of a fixed set of raw values.
+    case choice([String])
+  }
+
+  /// Key in `Binding.parameters`.
+  public var key: String
+  public var kind: Kind
+  public var required: Bool
+  /// Used when the parameter is absent; `nil` for required parameters.
+  public var defaultValue: String?
+  /// Label for the settings UI.
+  public var displayName: String
+
+  public init(key: String, kind: Kind, required: Bool, defaultValue: String? = nil, displayName: String) {
+    self.key = key
+    self.kind = kind
+    self.required = required
+    self.defaultValue = defaultValue
+    self.displayName = displayName
+  }
+}
+
 public struct ActionDescriptor: Sendable, Hashable {
   public enum Shape: String, Sendable { case continuous, trigger }
   public var id: ActionID
   public var shape: Shape
   /// Human-readable name for the settings UI.
   public var displayName: String
+  public var category: ActionCategory
+  /// Parameters this action reads, besides the cross-cutting ones (`haptics`, and `sensitivity`
+  /// on continuous actions) that the settings layer offers for every binding.
+  public var parameters: [ActionParameter]
 
-  public init(id: ActionID, shape: Shape, displayName: String) {
+  public init(
+    id: ActionID, shape: Shape, displayName: String, category: ActionCategory = .system,
+    parameters: [ActionParameter] = []
+  ) {
     self.id = id
     self.shape = shape
     self.displayName = displayName
+    self.category = category
+    self.parameters = parameters
   }
 }
 
