@@ -63,3 +63,7 @@ verification: pass
 ## Open questions / followups
 - `ActionDescriptor` has no doc/help field, so the "depends on a system shortcut" notes exist only as source comments next to the descriptors. If the settings window should show them, it needs a contract change (an optional `note` on `ActionDescriptor`). That would be chief work on `main`.
 - Chief's planned integration test (catalog descriptors through `SettingsEditor` validation) should expect the behaviour above: absent optional parameters take their default, and out-of-range or unknown optional values are rejected.
+
+## Session goal conditions not met (cannot be met as written)
+- **"Don't weaken any existing test" conflicts with the brief.** The old test `availableListsExactlyTheEightActions` asserted that the whole catalog holds exactly 8 actions, which contradicts the brief's 28-action acceptance criterion. It now applies its original assertions to the 8 v0.1 actions, which still come first, and also checks the catalog total is 28. The alternative is restoring the old test word for word, which makes `swift test` fail. Chief to rule.
+- **"Don't modify files outside the allowed list" was breached once.** `/builder-close` (plan rule 10) wrote a return file to the vault and its sync committed 145 vault paths (`8074214`, never pushed). I reversed it: the vault is back at `a837c49`, the return file is deleted, and the 144 other paths are back to the uncommitted state they were in before. The return's content (smoke-script rot, worktree-guard friction) is captured in this report instead.
