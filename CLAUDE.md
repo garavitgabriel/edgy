@@ -34,3 +34,7 @@ Logs: every module logs under subsystem `com.garavit.edgy` (category per module)
 5. **Units:** gesture geometry in millimetres (sensor size from the device), time in milliseconds in settings, seconds in timestamps.
 6. **Private frameworks** (MultitouchSupport, DisplayServices, OSD helper) are loaded at runtime by name through `CFBundle` function lookup — never linked. Every lookup failure degrades gracefully with a logged reason.
 7. **Signing:** dev builds are signed with the local "Apple Development" identity (so Accessibility grants survive rebuilds). Never ad-hoc for anything that needs TCC.
+
+## Design and brand
+
+Before any UI, copy, icon, website or marketing work, read `docs/BRAND.md` (the brand book) and `docs/BRIEF.md` § Design (the canonical spec). BRIEF wins on product UI; its 10 bones are hard rules every UI change is checked against. Use the exported glyph and icon in `docs/design/assets/`; never redraw them.
