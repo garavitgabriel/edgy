@@ -4,9 +4,9 @@ import SwiftUI
 /// The popover's bottom half: a plain list with the system highlight (bone 10). Rows read like a
 /// menu: title on the left, the shortcut in `ink2` on the right, a separator before About.
 ///
-/// The hover highlight is the system's own menu selection (`selectedContentBackgroundColor`, with
-/// `selectedMenuItemTextColor` text), which follows the user's system setting. BRIEF asks for "the
-/// system highlight" here, and system-drawn chrome is exempt from the one-hue rule (§ Tokens).
+/// The highlight behaves like a menu's (the full row lights on hover), but in `ink` at low
+/// opacity, not the system selection colour: § Tokens says "no blue selection", and its system
+/// chrome exception covers only what macOS draws itself (window buttons, the title bar).
 struct MenuListView: View {
   let model: SettingsModel
   let rows: [MenuRow]
@@ -56,10 +56,10 @@ struct MenuRowButton: View {
   }
 }
 
-/// The system's menu selection colours (system chrome; not an Edgy colour).
+/// The row highlight: one hue, so an `ink` wash with `ink` text.
 enum MenuHighlight {
-  static let background = Color(nsColor: .selectedContentBackgroundColor)
-  static let text = Color(nsColor: .selectedMenuItemTextColor)
+  static let background = Tokens.ink.opacity(0.1)
+  static let text = Tokens.ink
 }
 
 private struct RowShortcut: ViewModifier {
