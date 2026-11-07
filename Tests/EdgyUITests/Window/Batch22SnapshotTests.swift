@@ -8,10 +8,11 @@ import Testing
 @testable import EdgyUI
 
 extension View {
-  /// Window shots show the exported small app icon (the app gets it from its bundled `.icns`; the
-  /// test host's own icon is a generic one).
+  /// Window shots show the exported V3 app icon at the title bar's 26 pt (the 32 pt @2x drawing,
+  /// under 128 px: the small drawing). The app gets it from its bundled `.icns`; the test host's
+  /// own icon is a generic one.
   func withExportedAppIcon() -> some View {
-    let url = Snapshot.repoRoot.appendingPathComponent("docs/design/assets/AppIcon.iconset/icon_16x16@2x.png")
+    let url = Snapshot.repoRoot.appendingPathComponent("docs/design/assets/AppIcon.iconset/icon_32x32@2x.png")
     return environment(\.edgyAppIcon, NSImage(contentsOf: url))
   }
 }

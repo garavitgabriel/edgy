@@ -36,11 +36,11 @@ enum SplitPlan {
     return result
   }
 
-  /// The segment that holds the selected segment's centre after the split.
+  /// The selection after a split or merge: the first part, the one that keeps the bindings
+  /// (chief, 2026-11-07, same ruling as critique 22 answer 3). Corners stay as they are.
   static func selection(after zone: Zone, segments: Int) -> Zone {
-    guard case .edge(let edge, let segment, let count) = zone, count > 0 else { return zone }
-    let centre = (Double(segment) + 0.5) / Double(count)
-    return .edge(edge, segment: min(Int(centre * Double(segments)), segments - 1), segments: segments)
+    guard case .edge(let edge, _, let count) = zone, count > 0, segments > 0 else { return zone }
+    return .edge(edge, segment: firstSegment(edge: edge, segments: segments), segments: segments)
   }
 }
 
@@ -342,7 +342,7 @@ extension SettingsModel {
   }
 
   /// "Split into N": re-lays the selected edge's bindings (see `SplitPlan`) as one undo step and
-  /// keeps the selection on the part under the old one.
+  /// selects the first part, the one that keeps the bindings.
   func split(_ zone: Zone, into segments: Int) {
     guard case .edge(let edge, _, let count) = zone, count != segments,
       ConfigValidator.segmentCounts.contains(segments), canSplit

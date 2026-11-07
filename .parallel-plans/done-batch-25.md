@@ -30,6 +30,8 @@ All shots are in `docs/design/build-shots/batch-25/`, each as `-light.png` + `-d
 | 4.2 | Plate centred under the mirror | ✔ | `OnboardingView.tryIt`: a centred zero-width slot. Shot: `step2-rejected` (the plate's centre is on the mirror's) |
 | 5 | Overlay copy: past tense + object; plain triggers bare | ✔ | Already on main (`PlateContent.runTitle`). Locked by `Overlay/Batch25OverlayTests.parameterRunsArePastTenseWithTheirObject`: "Opened Quillpad", "Pressed ⇧⌘ 4", "Ran Morning lights", "Play/Pause". Shot: `plate-component`, every plate over a white and a black document half (`componentOverLightAndDarkDocuments`) |
 | 6 | Onboarding step 2 counts by `decisionSerial` | ✔ | The baseline is the serial, and new decisions are the last `min(serial − baseline, recent.count)`. The observer watches `decisionSerial`. `newDecisions(seen:current:)` and its test are removed. Tests: `OnboardingTests.newDecisionsCountBySerial`, `newDecisionsBySerialAcrossTheWrappedCap`, `identicalSlidesAfterTheBaselineCount`; the existing `slidesBeforeTryItOpensDoNotCount` and `theBaselineSurvivesTheCappedFeed` still pass. |
+| 7 | Chief follow-up 1: merge `main` (f1a6f01); the title bar shows the app icon only (BRIEF § Window identity (a), the owner's ruling) | ✔ | `WindowIdentity`: the V3 icon at `Tokens.titleIconSize` (26). It starts `Tokens.titleIconLeading` (12) after the last traffic light (`WindowMetrics.titleBarLeading = trafficLightsTrailing 72 + 12`) and shares the tab pill's centre line in the title-bar row. A `titleIconOutline` 0.5 pt continuous outline follows the icon tile (system icon grid), light only (the token is clear in dark). Tooltip and accessibility label "Edgy"; not a button, no hover wash; no wordmark. Snapshots inject the exported V3 `icon_32x32@2x.png` (64 px, the small drawing). Test: b25 `titleBarIsTheAppIconOnly`. Shots: `batch-25/title-bar-zoom` (2× zoom: outline in light, none in dark, icon centred with the pill) and `batch-25/window-identity`. Every window shot that shows the title bar was re-shot by the full run (batches 14, 16, 21, 22, 25). |
+| 8 | Chief follow-up 2: after a split or a merge, the selection goes to the first part | ✔ | `SplitPlan.selection(after:segments:)` returns `firstSegment`. Test: b25 `splitSelectsTheFirstPart` (whole → thirds selects the upper third, which holds the rows; 3 → 2 → 1 stays on the first part; bottom edge → left; corners unchanged). The existing selection assertions in `InspectorTests` still hold unchanged. |
 
 ## Bones checklist (BRIEF § Bones)
 
@@ -57,7 +59,8 @@ All shots are in `docs/design/build-shots/batch-25/`, each as `-light.png` + `-d
 ## Decisions I made (and why)
 
 - The split note names halves and thirds by the zone's words ("Upper third", BRIEF's example) and quarters by heading ("Part 2"). The inspector headings stay "Top third".
-- Selection after a split still follows the old selection's centre. The ruling doesn't cover it, so a whole edge split in three selects the empty middle third. Flag this if you'd rather it select the first part.
+- Selection after a split: resolved by the chief (item 8). It now goes to the first part.
+- Traffic-light end is taken as 72 pt (the unified title bar's standard buttons), so the icon starts at 84 pt, where the old identity started. This needs confirming on the device.
 - The "generic icon" test is an Info.plist + Resources check, not a pixel comparison with the system's generic icon: it's deterministic and needs no rendering.
 - The split preview hides the previewed edge's labels entirely (opacity 0, 120 ms) rather than half-fading them, so the 50% divider never crosses text.
 
@@ -65,7 +68,8 @@ All shots are in `docs/design/build-shots/batch-25/`, each as `-light.png` + `-d
 
 - A real app's icon at 14 pt on tabs and chips, and an iconless app installed on the device (G1).
 - The hover line's width in the real popover.
+- The title-bar icon: 12 pt after the real traffic lights, and the light outline against real glass.
 
 ## Open questions
 
-- Should a split select the first part (where the bindings now live) instead of the part under the old centre?
+- None.

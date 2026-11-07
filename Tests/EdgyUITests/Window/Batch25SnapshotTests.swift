@@ -243,4 +243,51 @@ struct Batch25SnapshotTests {
     #expect(model.splitNote(for: .edge(.right), parts: 3)?.hasSuffix("the other two start empty.") == true)
     try window(model, "window-split-hover-right-thirds")
   }
+
+  // MARK: Chief follow-up: title-bar identity and selection after a split
+
+  /// BRIEF § Window identity (a), the owner's ruling on device: the icon only, 26 pt, 12 pt after
+  /// the last traffic light, centred on the tab pill.
+  @Test func titleBarIsTheAppIconOnly() throws {
+    #expect(WindowIdentity.iconSize == Tokens.titleIconSize && Tokens.titleIconSize == 26)
+    #expect(WindowMetrics.titleBarLeading == WindowMetrics.trafficLightsTrailing + Tokens.titleIconLeading)
+    #expect(WindowIdentity.label == "Edgy")
+    let model = PreviewFixtures.model()
+    model.selectedZone = .edge(.right)
+    try window(model, "window-identity")
+    // Zoomed on the title bar: the window's own top row, cropped to the leading half.
+    let bar = SettingsWindowView(model: model, apps: IconApps.list).withExportedAppIcon()
+      .frame(
+        width: SettingsWindowView.minimumSize.width, height: SettingsWindowView.minimumSize.height,
+        alignment: .topLeading
+      )
+      .frame(width: 520, height: WindowMetrics.tabBarHeight, alignment: .topLeading)
+      .clipped()
+      .scaleEffect(2, anchor: .topLeading)
+      .frame(width: 1040, height: 2 * WindowMetrics.tabBarHeight, alignment: .topLeading)
+    try Snapshot.write(bar, folder: Self.folder, name: "title-bar-zoom")
+  }
+
+  /// After a split or a merge the selection goes to the first part, the one that keeps the
+  /// bindings (chief, 2026-11-07, same ruling as critique 22 answer 3).
+  @Test func splitSelectsTheFirstPart() {
+    #expect(SplitPlan.selection(after: .edge(.right), segments: 3) == .edge(.right, segment: 2, segments: 3))
+    #expect(SplitPlan.selection(after: .edge(.bottom), segments: 3) == .edge(.bottom, segment: 0, segments: 3))
+    #expect(
+      SplitPlan.selection(after: .edge(.left, segment: 0, segments: 4), segments: 2)
+        == .edge(.left, segment: 1, segments: 2))
+    #expect(SplitPlan.selection(after: .edge(.top, segment: 2, segments: 3), segments: 1) == .edge(.top))
+    #expect(SplitPlan.selection(after: .corner(.topLeft), segments: 2) == .corner(.topLeft))
+    let model = PreviewFixtures.model()
+    model.selectedZone = .edge(.right)
+    model.split(.edge(.right), into: 3)
+    #expect(model.selectedZone == .edge(.right, segment: 2, segments: 3))
+    // The selected part is the one with the bindings.
+    #expect(!model.inspectorRows(for: model.selectedZone!).isEmpty)
+    // Back to fewer parts: the first part again.
+    model.split(.edge(.right, segment: 0, segments: 3), into: 2)
+    #expect(model.selectedZone == .edge(.right, segment: 1, segments: 2))
+    model.split(.edge(.right, segment: 1, segments: 2), into: 1)
+    #expect(model.selectedZone == .edge(.right))
+  }
 }

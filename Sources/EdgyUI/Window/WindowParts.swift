@@ -39,8 +39,10 @@ enum WindowMetrics {
   static let tabBarHeight: CGFloat = 52
   static let footerHeight: CGFloat = 56
   static let stripHeight: CGFloat = 36
-  /// Leading room for the window's traffic-light buttons (the tabs share the title bar).
-  static let titleBarLeading: CGFloat = 84
+  /// Where the window's last traffic light ends (the unified title bar's standard buttons).
+  static let trafficLightsTrailing: CGFloat = 72
+  /// The title bar's leading content (the app icon) starts 12 pt after the last traffic light.
+  static let titleBarLeading: CGFloat = trafficLightsTrailing + Tokens.titleIconLeading
   static let gutter: CGFloat = 24
   static let tabInset: CGFloat = 3
   static let markSize: CGFloat = 16
@@ -218,23 +220,36 @@ extension EnvironmentValues {
   }
 }
 
-/// § Window identity and Advanced (a): after the traffic lights, the app icon at 18 pt and the
-/// wordmark "Edgy" (13 semibold `ink`), 8 pt apart. No larger mark, no tagline, no second hue.
+/// § Window identity and Advanced (a), the owner's ruling on device: the app icon only, no
+/// wordmark. 26 pt (the tab pill's height, so it renders from the small drawing), 12 pt after the
+/// last traffic light, centred on the tab pill's centre (the shared title-bar row centres both).
+/// A 0.5 pt `titleIconOutline` around the tile in light mode only (the token is clear in dark).
+/// Tooltip and accessibility label "Edgy"; not clickable, no hover wash.
 struct WindowIdentity: View {
   @Environment(\.edgyAppIcon) private var injected
 
-  static let iconSize: CGFloat = 18
-  static let spacing: CGFloat = 8
+  static let iconSize = Tokens.titleIconSize
+  static let label = "Edgy"
+  /// The tile inside the icon canvas on the system's app-icon grid: inset 100/1024 per side,
+  /// corner 185.4/824 of the tile (a continuous rounded rectangle). The outline follows it.
+  static let tileInset: CGFloat = 100.0 / 1024.0
+  static let tileCorner: CGFloat = 185.4 / 824.0
+
+  static var tileSide: CGFloat { iconSize * (1 - 2 * tileInset) }
 
   var body: some View {
-    HStack(spacing: Self.spacing) {
-      Image(nsImage: injected ?? NSApplication.shared.applicationIconImage)
-        .resizable().interpolation(.high).aspectRatio(contentMode: .fit)
-        .frame(width: Self.iconSize, height: Self.iconSize)
-        .accessibilityHidden(true)
-      Text("Edgy").font(Tokens.font(Tokens.typeBody, semibold: true)).foregroundStyle(Tokens.ink)
-    }
-    .accessibilityElement(children: .combine)
+    Image(nsImage: injected ?? NSApplication.shared.applicationIconImage)
+      .resizable().interpolation(.high).aspectRatio(contentMode: .fit)
+      .frame(width: Self.iconSize, height: Self.iconSize)
+      .overlay {
+        RoundedRectangle(cornerRadius: Self.tileSide * Self.tileCorner, style: .continuous)
+          .strokeBorder(Tokens.titleIconOutline, lineWidth: Tokens.titleIconOutlineWidth)
+          .frame(width: Self.tileSide, height: Self.tileSide)
+      }
+      .help(Self.label)
+      .accessibilityElement()
+      .accessibilityLabel(Self.label)
+      .accessibilityAddTraits(.isImage)
   }
 }
 
