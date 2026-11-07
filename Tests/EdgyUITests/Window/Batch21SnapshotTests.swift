@@ -196,7 +196,11 @@ struct Batch21SnapshotTests {
     var config = PreviewFixtures.demoConfig
     config.defaultProfile.bindings.append(
       Binding(zone: .corner(.bottomLeft), gesture: .doubleTap, action: "keyboard.backlightToggle"))
-    try popover("popover-unavailable-unmapped", model: InspectorFixtures.model(config: config))
+    let model = InspectorFixtures.model(config: config)
+    model.simulate(
+      EngineStatus(
+        running: true, paused: false, pausedUntil: nil, enabled: true, devices: [PreviewFixtures.externalPad]))
+    try popover("popover-unavailable-unmapped", model: model)
   }
 
   @Test func popoverPausedPlusTestMode() throws {
