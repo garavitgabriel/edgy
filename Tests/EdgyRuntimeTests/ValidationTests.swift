@@ -182,7 +182,10 @@ import Testing
           action: "fake.everything", parameters: [key: value]))
     }
     config.appProfiles["bad id"] = Profile(bindings: [])
-    let found = Set(validator.validate(config).map(\.code))
+    // On a Mac where one bound action (the defaults' next-track swipe) can't work.
+    let onThisMac = ConfigValidator(
+      catalog: FakeCatalog.descriptors, availability: ["media.next": .unavailable(reason: "test")])
+    let found = Set(onThisMac.validate(config).map(\.code))
     #expect(found == Set(ValidationIssue.Code.allCases))
   }
 }

@@ -46,7 +46,8 @@ public struct ValidationIssue: Hashable, Sendable, CustomStringConvertible {
   public enum Code: String, CaseIterable, Sendable {
     /// The action id is not in the catalog.
     case unknownAction
-    /// A continuous action on a non-slide gesture, or a trigger action on a slide.
+    /// The action's shape doesn't fit the gesture: continuous ↔ slide only, hold ↔ long-press
+    /// only, trigger ↔ any gesture but a slide.
     case shapeMismatch
     /// `Zone.supports(gesture)` is false (e.g. a slide in a corner).
     case gestureNotSupported
@@ -79,6 +80,10 @@ public struct ValidationIssue: Hashable, Sendable, CustomStringConvertible {
     case invalidProfileID
     /// A gesture setting outside `GestureSettingsLimits` (warning: the editor clamps on edit).
     case settingOutOfRange
+    /// The action can't work on this Mac (`ActionAvailability.unavailable`, e.g. brightness with
+    /// no built-in display and no controllable monitor). Warning: the binding is kept so it works
+    /// again when the hardware comes back; `limited` actions are not flagged.
+    case actionUnavailable
   }
 
   public var severity: Severity
@@ -179,14 +184,31 @@ public struct ConfigValidator: Sendable {
   public static let segmentCounts = 1...4
 
   public let catalog: [ActionDescriptor]
+  /// What each action can do on this Mac, as of when the validator was made. Ids not in the map
+  /// count as `.available`.
+  public let availability: [ActionID: ActionAvailability]
   private let byID: [ActionID: ActionDescriptor]
 
-  public init(catalog: [ActionDescriptor]) {
+  public init(catalog: [ActionDescriptor], availability: [ActionID: ActionAvailability] = [:]) {
     self.catalog = catalog
+    self.availability = availability
     self.byID = Dictionary(catalog.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
   }
 
   public func descriptor(for id: ActionID) -> ActionDescriptor? { byID[id] }
+
+  /// `availability[id]`, `.available` when unknown.
+  public func availability(of id: ActionID) -> ActionAvailability { availability[id] ?? .available }
+
+  /// Whether an action of `shape` can be bound to `gesture`: continuous ↔ slide, hold ↔
+  /// long-press, trigger ↔ everything but a slide.
+  public static func shape(_ shape: ActionDescriptor.Shape, fits gesture: GestureKind) -> Bool {
+    switch shape {
+    case .continuous: return gesture == .slide
+    case .hold: return gesture == .longPress
+    case .trigger: return gesture != .slide
+    }
+  }
 
   /// Problems with one binding on its own (action, shape, zone, segment, parameters).
   public func validate(_ binding: Binding, in profile: ProfileRef = .default) -> [ValidationIssue] {
@@ -208,8 +230,8 @@ public struct ConfigValidator: Sendable {
       add(.error, .unknownAction)
       return issues
     }
-    let isSlide = binding.gesture == .slide
-    if (descriptor.shape == .continuous) != isSlide { add(.error, .shapeMismatch) }
+    if !Self.shape(descriptor.shape, fits: binding.gesture) { add(.error, .shapeMismatch) }
+    if !availability(of: binding.action).isUsable { add(.warning, .actionUnavailable) }
 
     for parameter in descriptor.parameters {
       let value = binding.parameters[parameter.key]

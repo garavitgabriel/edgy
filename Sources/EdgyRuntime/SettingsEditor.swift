@@ -72,7 +72,8 @@ public final class SettingsEditor {
   public private(set) var config: EdgyConfig
   /// Validation issues of `config`, refreshed on every change.
   public private(set) var issues: [ValidationIssue]
-  public let validator: ConfigValidator
+  /// Rebuilt by `refreshAvailability()`; otherwise fixed for the editor's life.
+  public private(set) var validator: ConfigValidator
 
   public var canUndo: Bool { !undoStack.isEmpty || isEditingContinuously && config != continuous?.start }
   public var canRedo: Bool { !redoStack.isEmpty }
@@ -82,6 +83,8 @@ public final class SettingsEditor {
   private let scheduler: Scheduling
   private let logger: EdgyLogging
   private let applyConfig: @MainActor (EdgyConfig) -> Void
+  /// Answers `availability(of:)`; `nil` = everything available.
+  private let availabilitySource: ActionPerforming?
   private var undoStack: [EdgyConfig] = []
   private var redoStack: [EdgyConfig] = []
   private var continuous: (key: String, start: EdgyConfig)?
@@ -91,13 +94,17 @@ public final class SettingsEditor {
   /// - Parameters:
   ///   - config: the config already loaded and running (it is not re-saved or re-applied).
   ///   - catalog: `ActionPerforming.available`.
+  ///   - actions: the registry asked for `availability(of:)` (usually the one `catalog` came
+  ///     from); `nil` = everything available.
   ///   - apply: hands a committed config to the engine.
   public init(
     config: EdgyConfig, catalog: [ActionDescriptor], store: SettingsPersisting, scheduler: Scheduling,
+    actions: ActionPerforming? = nil,
     logger: EdgyLogging = SystemLogger(category: "settings"), apply: @escaping @MainActor (EdgyConfig) -> Void
   ) {
     self.config = config
-    self.validator = ConfigValidator(catalog: catalog)
+    self.availabilitySource = actions
+    self.validator = ConfigValidator(catalog: catalog, availability: Self.snapshot(catalog: catalog, from: actions))
     self.store = store
     self.scheduler = scheduler
     self.logger = logger
@@ -147,6 +154,35 @@ public final class SettingsEditor {
 
   public func supportedGestures(for zone: Zone) -> [GestureKind] {
     ConfigValidator.supportedGestures(for: zone)
+  }
+
+  /// Whether `id` can work on this Mac right now: asks the registry (live, not the snapshot the
+  /// validator uses). `.available` when the editor was made without an availability source.
+  public func availability(of id: ActionID) -> ActionAvailability {
+    availabilitySource?.availability(of: id) ?? .available
+  }
+
+  /// Re-reads availability for the whole catalog (after a display or keyboard is attached or
+  /// removed) so `issues` and later validation see it. Changes no config; no observer call.
+  public func refreshAvailability() {
+    validator = ConfigValidator(
+      catalog: validator.catalog,
+      availability: Self.snapshot(catalog: validator.catalog, from: availabilitySource))
+    issues = validator.validate(config)
+  }
+
+  /// `base` (the built-in preset by default) adjusted to this Mac: bindings whose action is
+  /// unavailable here get the `MachineDefaults` substitute or are dropped. Pure; nothing is saved.
+  public func machineDefaults(from base: EdgyConfig = .defaults) -> EdgyConfig {
+    MachineDefaults.build(from: base, catalog: validator.catalog, availability: availability(of:)).config
+  }
+
+  private static func snapshot(catalog: [ActionDescriptor], from actions: ActionPerforming?)
+    -> [ActionID: ActionAvailability]
+  {
+    guard let actions else { return [:] }
+    return Dictionary(
+      catalog.map { ($0.id, actions.availability(of: $0.id)) }, uniquingKeysWith: { first, _ in first })
   }
 
   /// Issues `binding` would have if set in `ref` now, including overlap warnings against the
