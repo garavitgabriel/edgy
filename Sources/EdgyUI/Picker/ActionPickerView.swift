@@ -196,6 +196,6 @@ struct PickerRow: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .disabled(!enabled)
+    .allowsHitTesting(enabled)  // not `.disabled`: that fades `ink2` below 4.5:1
   }
 }

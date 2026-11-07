@@ -140,7 +140,7 @@ struct LabeledParameter<Control: View>: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: 2) {
-      HStack(alignment: .firstTextBaseline, spacing: 12) {
+      HStack(alignment: .center, spacing: 12) {
         Text(label).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
           .frame(minHeight: ParameterRowsView.rowHeight, alignment: .leading)
         Spacer(minLength: 8)
@@ -513,12 +513,14 @@ struct NumberParameterField: View {
       }
       .tint(Tokens.ink)
       .controlSize(.small)
-      .frame(width: Self.width)
+      // The slider gives way so the value (and Reset) always read in full on one line.
+      .frame(minWidth: 70, maxWidth: Self.width)
+      .layoutPriority(-1)
       Text(valueText(stored, isAbsent: raw == nil))
         .font(Tokens.font(Tokens.typeBody)).foregroundStyle(changed ? Tokens.ink : Tokens.ink2)
-        .frame(minWidth: 44, alignment: .trailing)
+        .lineLimit(1).fixedSize().frame(minWidth: 44, alignment: .trailing)
       if parameter?.fallback != nil, raw != nil {
-        TextAction(title: "Reset") { model.setParameter(key, to: nil, in: row) }
+        TextAction(title: "Reset") { model.setParameter(key, to: nil, in: row) }.fixedSize()
       }
     }
   }
