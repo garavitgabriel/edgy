@@ -74,6 +74,9 @@ struct MirrorPad: View {
   var message: MirrorMessage?
   /// `nil` = not interactive (mini mirror, preset mirror).
   var onSelect: ((Zone) -> Void)?
+  /// Publish zone and mirror bounds for the action picker (batch 15's `PickerAnchorKey`). The
+  /// settings mirror only.
+  var publishesPickerAnchors = false
 
   /// Fully faded per BRIEF: "The mirror fades to 40%".
   static let fadedOpacity = 0.4
@@ -106,6 +109,7 @@ struct MirrorPad: View {
       if let message { messageView(message, size: size) }
     }
     .frame(width: size.width, height: size.height, alignment: .topLeading)
+    .modifier(PickerMirrorAnchor(enabled: publishesPickerAnchors))
   }
 
   // MARK: Slab
@@ -154,7 +158,7 @@ struct MirrorPad: View {
     }
     .frame(width: rect.width, height: rect.height)
     .anchorPreference(key: ZoneAnchorKey.self, value: .bounds) { [zone.zone: $0] }
-    .pickerAnchor(for: zone.zone)
+    .modifier(PickerZoneAnchor(zone: zone.zone, enabled: publishesPickerAnchors))
     .offset(x: rect.minX, y: rect.minY)
     .allowsHitTesting(false)
   }
@@ -323,6 +327,27 @@ struct MirrorPad: View {
       .foregroundStyle(Tokens.ink)
       .multilineTextAlignment(.center)
       .frame(width: size.width, height: size.height)
+  }
+}
+
+/// `.pickerAnchor(for:)` on a zone's drawn bar or tile, when the mirror hosts the picker.
+struct PickerZoneAnchor: ViewModifier {
+  var zone: Zone
+  var enabled: Bool
+
+  func body(content: Content) -> some View {
+    if enabled { content.pickerAnchor(for: zone) } else { content }
+  }
+}
+
+/// `.pickerMirrorBounds()` for the whole pad, when the mirror hosts the picker. Published from a
+/// background sibling, not on the pad itself: `anchorPreference` replaces its subtree's value for
+/// the key, so wrapping the pad would erase every zone's `.pickerAnchor(for:)`.
+struct PickerMirrorAnchor: ViewModifier {
+  var enabled: Bool
+
+  func body(content: Content) -> some View {
+    if enabled { content.background(Color.clear.pickerMirrorBounds()) } else { content }
   }
 }
 

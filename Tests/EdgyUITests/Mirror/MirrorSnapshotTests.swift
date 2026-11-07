@@ -69,6 +69,18 @@ struct MirrorSnapshotTests {
     try shoot(PadMirrorView(model: PreviewFixtures.model(config: config)), "pad-split-bottom4-long-label")
   }
 
+  /// Render B's state: the window with the picker open on the bottom edge, anchored to the
+  /// mirror's bar through `.pickerAnchor(for:)`.
+  @Test func windowWithPickerOnBottomEdge() throws {
+    let model = PreviewFixtures.model()
+    model.selectedZone = .edge(.bottom)
+    model.picking = PickerTarget(zone: .edge(.bottom), gesture: .tap)
+    let urls = try Snapshot.write(
+      SettingsWindowView(model: model), folder: Self.folder, name: "window-picker-bottom",
+      size: SettingsWindowView.minimumSize)
+    #expect(urls.count == 2)
+  }
+
   @Test func wayfareTab() throws {
     let model = PreviewFixtures.model()
     model.selectedProfile = .app(PreviewFixtures.wayfare)
