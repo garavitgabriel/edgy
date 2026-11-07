@@ -381,10 +381,11 @@ import Testing
 
     try h.editor.updateAppSettings { $0.enabled = false }
     try h.editor.setBinding(Binding(zone: .edge(.bottom), gesture: .tap, action: "audio.mute"), in: .default)
-    #expect(h.editor.issues.map(\.code) == [.unknownAction])
+    // (v0.4: the bottom tap also gets a `tapWaitsForDoubleTap` info note; notes aren't problems.)
+    #expect(h.editor.issues.filter { $0.severity != .info }.map(\.code) == [.unknownAction])
 
     try h.editor.removeBinding(BindingKey(zone: .edge(.top), gesture: .tap), from: .default)
-    #expect(h.editor.issues.isEmpty)
+    #expect(h.editor.issues.filter { $0.severity != .info }.isEmpty)
 
     // A new error is still refused.
     #expect(throws: SettingsEditorError.self) {
@@ -411,10 +412,11 @@ import Testing
 
     #expect(
       h.editor.compatibleActions(zone: .edge(.left), gesture: .slide).map(\.id) == [
-        "display.brightness", "audio.volume",
+        "display.brightness", "audio.volume", .doNothing,
       ])
     let cornerTap = h.editor.compatibleActions(zone: .corner(.topLeft), gesture: .tap)
-    #expect(cornerTap.count == 7)
+    // 7 catalog triggers + "Do nothing" last (v0.4).
+    #expect(cornerTap.count == 8)
     #expect(cornerTap.allSatisfy { $0.shape == .trigger })
     #expect(h.editor.compatibleActions(zone: .corner(.topLeft), gesture: .slide).isEmpty)
 

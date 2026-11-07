@@ -37,9 +37,11 @@ extension GestureKind {
 extension ConfigValidator {
   /// The catalog grouped by `ActionCategory` in `allCases` order, each group sorted by display
   /// name. Empty categories are left out.
+  /// "Do nothing" is left out: it isn't an action of any category, and `compatibleActions` offers it
+  /// last for every slot.
   public var catalogByCategory: [ActionGroup] {
     ActionCategory.allCases.compactMap { category in
-      let actions = catalog.filter { $0.category == category }.sorted(by: Self.byName)
+      let actions = catalog.filter { $0.category == category && $0.id != .doNothing }.sorted(by: Self.byName)
       return actions.isEmpty ? nil : ActionGroup(category: category, actions: actions)
     }
   }
@@ -47,11 +49,17 @@ extension ConfigValidator {
   /// Actions that can be bound to `gesture` on `zone`: continuous ones for a slide, triggers and
   /// holds for a long-press, triggers for everything else, none when the zone can't produce the
   /// gesture. Sorted by display name. Unavailable actions are included (the UI greys them out
-  /// with `availability(of:)`).
+  /// with `availability(of:)`). "Do nothing" comes last for every supported slot: the catalog's
+  /// descriptor when it has one, else `doNothingFallback`.
   public func compatibleActions(zone: Zone, gesture: GestureKind) -> [ActionDescriptor] {
     guard zone.supports(gesture) else { return [] }
-    return catalog.filter { Self.shape($0.shape, fits: gesture) }.sorted(by: Self.byName)
+    let actions = catalog.filter { $0.id != .doNothing && Self.shape($0.shape, fits: gesture) }
+    return actions.sorted(by: Self.byName) + [descriptor(for: .doNothing) ?? Self.doNothingFallback]
   }
+
+  /// Stand-in for the "Do nothing" entry when the catalog doesn't list one.
+  public static let doNothingFallback = ActionDescriptor(
+    id: .doNothing, shape: .trigger, displayName: "Do Nothing", category: .system)
 
   /// Gestures `zone` can produce, in display order.
   public static func supportedGestures(for zone: Zone) -> [GestureKind] {
