@@ -28,7 +28,9 @@ let package = Package(
     .executableTarget(name: "EdgyDisplaysCLI", dependencies: ["Displays"]),
     // SwiftUI surfaces (settings window, mirror, inspector, picker, popover, overlay, onboarding),
     // hosted in AppKit by EdgyApp. Design spec: docs/BRIEF.md § Design.
-    .target(name: "EdgyUI", dependencies: ["EdgyCore", "EdgyRuntime", "Gestures", "Actions"]),
+    .target(
+      name: "EdgyUI", dependencies: ["EdgyCore", "EdgyRuntime", "Gestures", "Actions"],
+      resources: [.copy("Glyph/Assets")]),
     // Menu-bar app shell: config store, router wiring, bundling.
     .executableTarget(
       name: "EdgyApp", dependencies: ["EdgyCore", "EdgyRuntime", "TouchKit", "Gestures", "Actions", "EdgyUI"]),

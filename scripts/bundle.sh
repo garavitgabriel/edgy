@@ -17,6 +17,11 @@ rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/Edgy" "$APP/Contents/MacOS/Edgy"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
+cp "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
+# SwiftPM resource bundles (e.g. EdgyUI's glyph PDFs); Bundle.module finds them in Contents/Resources.
+for bundle in "$BIN_DIR"/*.bundle; do
+  [[ -e "$bundle" ]] && cp -R "$bundle" "$APP/Contents/Resources/"
+done
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
 
 echo "==> Signing"
