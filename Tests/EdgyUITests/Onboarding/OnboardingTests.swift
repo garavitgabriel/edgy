@@ -69,6 +69,15 @@ enum OnboardingFixtures {
     for _ in 0..<20 { await Task.yield() }
   }
 
+  /// Yields until `condition` holds (bounded), so a loaded machine can't race the hop.
+  static func settle(until condition: () -> Bool) async {
+    var attempts = 0
+    while !condition(), attempts < 2_000 {
+      await Task.yield()
+      attempts += 1
+    }
+  }
+
   /// A state moved to `step` the way a user gets there (Skip for now, a slide, Continue).
   static func state(at step: OnboardingState.Step, model: SettingsModel, actions: OnboardingActions = .none)
     -> OnboardingState
@@ -167,7 +176,7 @@ enum OnboardingFixtures {
     #expect(!state.canContinue)
 
     model.simulate(OnboardingFixtures.decisions([OnboardingFixtures.rightSlide]))
-    await OnboardingFixtures.settle()
+    await OnboardingFixtures.settle { state.slideRecognized }
     #expect(state.slideRecognized)
     #expect(state.canContinue)
     // Read, not taken: the overlay's channel is untouched.
