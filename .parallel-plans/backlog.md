@@ -17,3 +17,7 @@ Items found in testing or left open by builders, to fold into a future round.
 
 ## Hardware not yet run
 - MacBook Pro: keyboard backlight, built-in brightness HUD, `scripts/smoke-displays.sh`, smoke-actions steps 17–28 (MBP was unreachable over SSH 2026-11-07).
+
+## From batch 20 (2026-11-07)
+- `GestureContext.swipeZones` so the stricter swipe threshold applies only on edges that also have a swipe (today: every slide edge).
+- Tune slide feel / hold stillness against real traces (scenarios 30–34 in scripts/record-traces.md).
