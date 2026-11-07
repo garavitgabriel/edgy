@@ -76,7 +76,9 @@ private struct ParameterRow: View {
           fallback: ParameterEditor.sensitivityDefault, format: .percent)
       }
     case .action(let parameter):
-      LabeledParameter(label: ActionNaming.parameterLabel(parameter, action: row.binding.action)) {
+      LabeledParameter(
+        label: ActionNaming.parameterLabel(parameter, action: row.binding.action), help: parameter.helpText
+      ) {
         control(for: parameter)
       }
     }
@@ -113,7 +115,8 @@ private struct ParameterRow: View {
       NumberParameterField(
         model: model, row: row, key: parameter.key, range: range,
         fallback: parameter.defaultValue.flatMap(Double.init) ?? range.lowerBound,
-        format: parameter.key == "maxSeconds" ? .seconds : .percent)
+        format: parameter.unit != nil ? .plain : parameter.key == "maxSeconds" ? .seconds : .percent,
+        parameter: parameter)
     case .choice(let choices):
       ChoiceParameterField(
         choices: ActionNaming.orderedChoices(choices, parameter: parameter.key), parameter: parameter.key,
@@ -131,14 +134,22 @@ private struct ParameterRow: View {
 /// Label left (13, `ink2`), control right, one 28 pt row.
 struct LabeledParameter<Control: View>: View {
   var label: String
+  /// The one helper line under the row (13, `ink2`), only when the parameter has one.
+  var help: String? = nil
   @ViewBuilder var control: Control
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: 12) {
-      Text(label).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
-        .frame(minHeight: ParameterRowsView.rowHeight, alignment: .leading)
-      Spacer(minLength: 8)
-      control
+    VStack(alignment: .leading, spacing: 2) {
+      HStack(alignment: .firstTextBaseline, spacing: 12) {
+        Text(label).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
+          .frame(minHeight: ParameterRowsView.rowHeight, alignment: .leading)
+        Spacer(minLength: 8)
+        control
+      }
+      if let help {
+        Text(help).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
+          .fixedSize(horizontal: false, vertical: true)
+      }
     }
   }
 }
@@ -465,9 +476,11 @@ struct ShortcutNameField: View {
 
 // MARK: - Number, choice, haptics
 
-/// A slider with its value as text on the right, in proportional figures. One drag = one undo step.
+/// A slider with its value (and unit) as text on the right, in proportional figures. The value is
+/// `ink2` at its default and `ink` once changed; a parameter with an app-wide `fallback` reads
+/// "Default (500 ms)" until changed, then offers Reset. One drag = one undo step.
 struct NumberParameterField: View {
-  enum Format { case percent, seconds }
+  enum Format { case percent, seconds, plain }
 
   @Bindable var model: SettingsModel
   var row: InspectorRow
@@ -475,11 +488,14 @@ struct NumberParameterField: View {
   var range: ClosedRange<Double>
   var fallback: Double
   var format: Format
+  var parameter: ActionParameter? = nil
 
-  static let width: CGFloat = 150
+  static let width: CGFloat = 130
 
   var body: some View {
-    let stored = row.binding.parameters[key].flatMap(Double.init) ?? fallback
+    let raw = row.binding.parameters[key].flatMap(Double.init)
+    let stored = raw ?? baseValue
+    let changed = raw != nil && raw != baseValue
     HStack(spacing: 8) {
       Slider(
         value: SwiftUI.Binding(
@@ -496,10 +512,26 @@ struct NumberParameterField: View {
       .tint(Tokens.ink)
       .controlSize(.small)
       .frame(width: Self.width)
-      Text(Self.label(stored, format: format))
-        .font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink)
-        .frame(width: 44, alignment: .trailing)
+      Text(valueText(stored, isAbsent: raw == nil))
+        .font(Tokens.font(Tokens.typeBody)).foregroundStyle(changed ? Tokens.ink : Tokens.ink2)
+        .frame(minWidth: 44, alignment: .trailing)
+      if parameter?.fallback != nil, raw != nil {
+        TextAction(title: "Reset") { model.setParameter(key, to: nil, in: row) }
+      }
     }
+  }
+
+  /// The value when the parameter is absent: the app-wide setting it falls back to, else its default.
+  var baseValue: Double {
+    switch parameter?.fallback {
+    case .longPressMS: return model.editor.config.gestures.longPressMS
+    case nil: return fallback
+    }
+  }
+
+  func valueText(_ value: Double, isAbsent: Bool) -> String {
+    let text = Self.label(value, format: format, parameter: parameter)
+    return parameter?.fallback != nil && isAbsent ? "Default (\(text))" : text
   }
 
   static func text(for value: Double) -> String {
@@ -507,11 +539,17 @@ struct NumberParameterField: View {
     return rounded == rounded.rounded() ? String(Int(rounded)) : String(rounded)
   }
 
-  /// "150%" (no space before %), "120 s".
-  static func label(_ value: Double, format: Format) -> String {
+  /// "150%" (no space before %), "120 s", "8 mm", or the parameter's zero label ("Off").
+  static func label(_ value: Double, format: Format, parameter: ActionParameter? = nil) -> String {
+    if value == 0, let zero = parameter?.zeroLabel { return zero }
+    if let unit = parameter?.unit {
+      let number = value == value.rounded() ? String(Int(value)) : String(format: "%.1f", value)
+      return unit == "%" ? "\(number)%" : "\(number) \(unit)"
+    }
     switch format {
     case .percent: return "\(Int((value * 100).rounded()))%"
     case .seconds: return "\(Int(value.rounded())) s"
+    case .plain: return text(for: value)
     }
   }
 }

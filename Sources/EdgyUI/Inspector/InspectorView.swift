@@ -204,8 +204,9 @@ struct BindingRowView: View {
     guard row.source != .inherited, row.source != .turnedOff else { return [] }
     let descriptor = model.editor.validator.descriptor(for: row.binding.action)
     return model.inspectorIssues(for: row.id).compactMap { issue in
+      guard issue.severity != .info else { return nil }  // notes have their own lines
       switch issue.code {
-      case .tapWaitsForDoubleTap, .overlappingZones, .missingParameter: return nil
+      case .overlappingZones, .missingParameter: return nil
       default:
         let parameter = descriptor?.parameters.first { $0.key == issue.parameter }
         let text = IssueCopy.message(
@@ -222,43 +223,130 @@ struct RowMenu: View {
   @Bindable var model: SettingsModel
   var row: InspectorRow
 
-  var body: some View {
-    Menu {
-      Button("Change action…") { model.picking = PickerTarget(zone: row.binding.zone, gesture: row.gesture) }
-      switch row.source {
-      case nil, .appOnly:
-        Button("Remove gesture") { model.remove(row) }
-      case .inherited, .overridden, .turnedOff:
-        Button("Turn off here") { model.turnOff(row) }.disabled(row.source == .turnedOff)
-        Button("Revert to Default") { model.revert(row) }.disabled(row.source == .inherited)
-      }
-    } label: {
-      Image(systemName: "ellipsis").foregroundStyle(Tokens.ink2)
+  /// The items, in order, with whether each applies.
+  static func items(for source: EffectiveBinding.Source?) -> [(title: String, enabled: Bool)] {
+    switch source {
+    case nil, .appOnly: return [("Change action…", true), ("Remove gesture", true)]
+    case .inherited, .overridden, .turnedOff:
+      return [
+        ("Change action…", true), ("Turn off here", source != .turnedOff),
+        ("Revert to Default", source != .inherited),
+      ]
     }
-    .menuStyle(.borderlessButton)
-    .menuIndicator(.hidden)
-    .fixedSize()
+  }
+
+  var body: some View {
+    let drafts = model.inspectorDrafts
+    // A popover list, not a system `Menu`, so a note's fix can open it (BRIEF: "opens its … menu").
+    Button {
+      drafts.openMenu = row.id
+    } label: {
+      Image(systemName: "ellipsis").foregroundStyle(Tokens.ink2).frame(width: 20, height: 20)
+        .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
     .accessibilityLabel("More for \(GestureNaming.name(row.gesture))")
+    .popover(
+      isPresented: SwiftUI.Binding(
+        get: { drafts.openMenu == row.id }, set: { if !$0, drafts.openMenu == row.id { drafts.openMenu = nil } }),
+      arrowEdge: .bottom
+    ) {
+      VStack(alignment: .leading, spacing: 2) {
+        ForEach(Self.items(for: row.source), id: \.title) { item in
+          Button {
+            drafts.openMenu = nil
+            perform(item.title)
+          } label: {
+            Text(item.title).font(Tokens.font(Tokens.typeBody))
+              .foregroundStyle(item.enabled ? Tokens.ink : Tokens.ink2)
+              .frame(maxWidth: .infinity, minHeight: 24, alignment: .leading).contentShape(Rectangle())
+          }
+          .buttonStyle(.plain)
+          .disabled(!item.enabled)
+        }
+      }
+      .padding(8)
+      .frame(width: 180)
+    }
+  }
+
+  private func perform(_ title: String) {
+    switch title {
+    case "Change action…": model.picking = PickerTarget(zone: row.binding.zone, gesture: row.gesture)
+    case "Remove gesture": model.remove(row)
+    case "Turn off here": model.turnOff(row)
+    default: model.revert(row)
+    }
   }
 }
 
-/// Bone 7: the informational tap-waits note with its one fix.
+/// Bone 7 pattern: informational notes (info icon, `ink2`) with their one inline fix. The tap-waits
+/// note, batch 20's slide-plus-swipes note, and any other `.info` code by its detail.
 private struct TapNotes: View {
   @Bindable var model: SettingsModel
   var zone: Zone
   var rows: [InspectorRow]
 
   var body: some View {
-    let notes = rows.filter { $0.gesture == .tap }.flatMap { row in
-      model.inspectorIssues(for: row.id).filter { $0.code == .tapWaitsForDoubleTap }.map { (row, $0) }
-    }
-    let longPressFree = !rows.contains { $0.gesture == .longPress && $0.source != .turnedOff }
-    ForEach(Array(notes.enumerated()), id: \.offset) { _, note in
-      IssueLine(style: .info, text: IssueCopy.tapWaits(ms: note.1.detail ?? "300")) {
-        if longPressFree {
-          TextAction(title: IssueCopy.useLongPress) { model.useLongPressInstead(for: note.0.id) }
+    let notes = model.interactionNotes(for: zone, rows: rows)
+    VStack(alignment: .leading, spacing: 10) {
+      ForEach(Array(notes.enumerated()), id: \.offset) { _, note in
+        IssueLine(style: .info, text: note.text) {
+          if let fix = note.fix {
+            TextAction(title: fix.title) { model.apply(fix) }
+          }
         }
       }
+    }
+  }
+}
+
+/// One informational note and its fix.
+struct InteractionNote: Equatable {
+  enum Fix: Equatable {
+    case useLongPress(BindingKey)
+    /// Select the swipe row and open its "…" menu (nothing is removed automatically).
+    case openMenu(BindingKey)
+
+    var title: String {
+      switch self {
+      case .useLongPress: return IssueCopy.useLongPress
+      case .openMenu: return IssueCopy.moveSwipes
+      }
+    }
+  }
+
+  var text: String
+  var fix: Fix?
+}
+
+extension SettingsModel {
+  /// Info notes on this zone's bindings, said once each.
+  func interactionNotes(for zone: Zone, rows: [InspectorRow]) -> [InteractionNote] {
+    let issues = rows.flatMap { inspectorIssues(for: $0.id) }.filter { $0.severity == .info }
+    let longPressFree = !rows.contains { $0.gesture == .longPress && $0.source != .turnedOff }
+    var notes: [InteractionNote] = []
+    for issue in issues {
+      guard let text = IssueCopy.note(for: issue), !notes.contains(where: { $0.text == text }) else { continue }
+      var fix: InteractionNote.Fix?
+      if issue.code == .tapWaitsForDoubleTap, longPressFree, let key = issue.binding {
+        fix = .useLongPress(key)
+      } else if issue.code.rawValue == IssueCopy.slideAndSwipesCode,
+        let swipe = rows.first(where: { if case .swipe = $0.gesture { return true } else { return false } })
+      {
+        fix = .openMenu(swipe.id)
+      }
+      notes.append(InteractionNote(text: text, fix: fix))
+    }
+    return notes
+  }
+
+  func apply(_ fix: InteractionNote.Fix) {
+    switch fix {
+    case .useLongPress(let key): useLongPressInstead(for: key)
+    case .openMenu(let key):
+      selectedZone = key.zone
+      inspectorDrafts.openMenu = key
     }
   }
 }

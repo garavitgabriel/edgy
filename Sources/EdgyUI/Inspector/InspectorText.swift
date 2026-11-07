@@ -188,6 +188,24 @@ enum IssueCopy {
       return "Not available on this Mac."
     case .tapWaitsForDoubleTap: return issue.detail.map(tapWaits)
     case .overlappingZones, .invalidProfileID, .settingOutOfRange: return nil
+    // Codes added after this batch (e.g. batch 20's notes) still say something.
+    default: return note(for: issue)
+    }
+  }
+
+  // MARK: Interaction notes (bone 7 pattern: info icon, `ink2`, one inline fix)
+
+  /// Batch 20's slide-plus-swipes note (BRIEF § Binding parameters → Slide feel and hold timing).
+  static let slideAndSwipesCode = "slideAndSwipes"
+  static let slideAndSwipes = "Quick slides can look like swipes here, so swipes need a clearer flick on this edge."
+  static let moveSwipes = "Move swipes to another edge"
+
+  /// Copy for an info note: the known ones by code, any other info code by its `detail`.
+  static func note(for issue: ValidationIssue) -> String? {
+    switch issue.code.rawValue {
+    case ValidationIssue.Code.tapWaitsForDoubleTap.rawValue: return issue.detail.map(tapWaits)
+    case slideAndSwipesCode: return slideAndSwipes
+    default: return issue.severity == .info ? issue.detail : nil
     }
   }
 

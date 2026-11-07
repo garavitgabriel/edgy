@@ -57,6 +57,8 @@ final class InspectorDrafts {
   var drafts: [Key: Binding] = [:]
   /// The field to focus when the inspector next draws (the picker hands off to it).
   var focus: Key?
+  /// The row whose "…" menu is open (a note's fix can open it).
+  var openMenu: BindingKey?
 
   private static let table = NSMapTable<SettingsModel, InspectorDrafts>.weakToStrongObjects()
 
