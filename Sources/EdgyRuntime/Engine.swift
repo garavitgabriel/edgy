@@ -387,7 +387,10 @@ public final class Engine: @unchecked Sendable {
       let zone = feed.landing[key].flatMap {
         LiveFeedState.zone(at: $0, device: device, settings: context.settings, enabled: context.enabledZones)
       }
-      feed.decisions.append(.rejected(contactID: contactID, zone: zone, reason: reason, deviceID: frame.deviceID))
+      feed.decisions.append(
+        .rejected(
+          contactID: contactID, zone: zone, reason: reason, deviceID: frame.deviceID,
+          measure: output.rejectionMeasures[contactID]))
     }
   }
 
