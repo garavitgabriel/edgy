@@ -242,7 +242,8 @@ struct BindingRowView: View {
     }
   }
 
-  private var name: String { model.actionName(row.binding.action, withEllipsis: true) }
+  // The catalog name: the "…" that means "it will ask for something" belongs to the picker (critique 21).
+  private var name: String { model.actionName(row.binding.action) }
   private var needs: String? { model.needsLabel(row.binding) }
 
   /// The action as text: one line, whole, when inline; else up to two lines at word boundaries.

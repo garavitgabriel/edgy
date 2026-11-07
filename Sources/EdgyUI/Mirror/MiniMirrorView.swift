@@ -110,8 +110,8 @@ public struct MiniMirrorView: View {
         .transition(.opacity)
       }
       .animation(MirrorMotion.padSwitch, value: device?.id)
-      HoverLine(text: Self.hoverLine(hovered.flatMap { zone in zones.first { $0.zone == zone } }))
-        .frame(width: geometry.size.width, alignment: .leading)
+      HoverLine(
+        text: Self.hoverLine(hovered.flatMap { zone in zones.first { $0.zone == zone } }), width: geometry.size.width)
     }
     .onChange(of: model.liveTouches, initial: true) { _, new in
       // Remember only frames with a zone touch: a lifted pointer touch never lingers (bone 2).
@@ -129,29 +129,33 @@ public struct MiniMirrorView: View {
 /// jumps; a line too long for the width clips with the 12 pt fade (bone 10).
 struct HoverLine: View {
   var text: String
+  /// The mirror's width: the line never runs past it.
+  var width: CGFloat
 
-  var body: some View {
-    ViewThatFits(in: .horizontal) {
-      line
-      line.frame(maxWidth: .infinity, alignment: .leading).clipped()
-        .mask(
-          GeometryReader { proxy in
-            LinearGradient(
-              stops: [
-                .init(color: .black, location: 0),
-                .init(color: .black, location: max(0, 1 - MirrorPad.labelFade / max(proxy.size.width, 1))),
-                .init(color: .clear, location: 1),
-              ], startPoint: .leading, endPoint: .trailing)
-          })
-    }
-    .frame(height: 16, alignment: .leading)
-    .accessibilityHidden(text.isEmpty)
+  static let height: CGFloat = 16
+
+  /// Whether `text` is wider than `width` at 13 pt (then its end fades over 12 pt).
+  static func overflows(_ text: String, width: CGFloat) -> Bool {
+    let font = NSFont.systemFont(ofSize: Tokens.typeBody)
+    return (text as NSString).size(withAttributes: [.font: font]).width > width
   }
 
-  private var line: some View {
+  var body: some View {
+    let fade = Self.overflows(text, width: width)
     Text(text.isEmpty ? " " : text)
       .font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
       .lineLimit(1).fixedSize()
+      .frame(width: width, height: Self.height, alignment: .leading)
+      .clipped()
+      .mask(
+        LinearGradient(
+          stops: [
+            .init(color: .black, location: 0),
+            .init(color: .black, location: fade ? max(0, 1 - MirrorPad.labelFade / max(width, 1)) : 1),
+            .init(color: fade ? .clear : .black, location: 1),
+          ], startPoint: .leading, endPoint: .trailing)
+      )
+      .accessibilityHidden(text.isEmpty)
   }
 }
 
