@@ -332,11 +332,3 @@ import Testing
     #expect(KeyComboText.display("fn+ctrl+f5") == "fn ⌃ F5")
   }
 }
-
-@Test func slideIconFollowsTheEdge() {
-  #expect(GestureIcon.isHorizontal(.edge(.top)))
-  #expect(GestureIcon.isHorizontal(.edge(.bottom, segment: 1, segments: 2)))
-  #expect(!GestureIcon.isHorizontal(.edge(.right)))
-  #expect(!GestureIcon.isHorizontal(.corner(.topLeft)))
-  #expect(!GestureIcon.isHorizontal(nil))
-}

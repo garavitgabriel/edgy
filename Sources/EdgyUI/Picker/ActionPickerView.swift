@@ -29,10 +29,6 @@ public struct ActionPickerView: View {
   }
 
   public var body: some View {
-    content.environment(\.gestureIconHorizontal, GestureIcon.isHorizontal(model.picking?.zone))
-  }
-
-  @ViewBuilder private var content: some View {
     let _ = model.revision
     if let target = model.picking {
       let gesture = target.gesture ?? chosenGesture
@@ -63,7 +59,7 @@ public struct ActionPickerView: View {
             chosenGesture = gesture
           } label: {
             HStack(spacing: 10) {
-              GestureIcon(gesture: gesture)
+              GestureIcon(gesture: gesture, zone: zone)
               Text(GestureNaming.name(gesture)).foregroundStyle(Tokens.ink)
               Spacer()
             }
