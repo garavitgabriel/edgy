@@ -120,6 +120,22 @@ struct MirrorSnapshotTests {
     try shoot(MiniMirrorView(model: model), "mini-last-touch")
   }
 
+  /// The popover while Wayfare is in front: its effective zones (app-only hold corner, left edge off).
+  @Test func miniActiveAppProfile() throws {
+    let model = PreviewFixtures.model()
+    model.simulate(MirrorFixtures.touch(0.97, 0.05, .claimed))
+    try shoot(MiniMirrorView(model: model, frontmostApp: PreviewFixtures.wayfare), "mini-wayfare-active")
+  }
+
+  /// Two pads attached: a touch on the built-in pad switches the mirror's outline to its proportions.
+  @Test func padSwitchedToBuiltIn() throws {
+    let model = PreviewFixtures.model()
+    model.simulate(
+      EngineStatus(running: true, enabled: true, devices: [PreviewFixtures.externalPad, PreviewFixtures.builtInPad]))
+    model.simulate(MirrorFixtures.touch(0.97, 0.5, .claimed, device: PreviewFixtures.builtInPad.id))
+    try shoot(PadMirrorView(model: model), "pad-switched-to-built-in")
+  }
+
   @Test func miniNoTrackpad() throws {
     let model = PreviewFixtures.model()
     MirrorFixtures.noTrackpad(model)

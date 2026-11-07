@@ -42,7 +42,7 @@ public struct PadMirrorView: View {
       .id(device?.id)
       .transition(.opacity)
     }
-    .animation(.easeInOut(duration: 0.15), value: device?.id)
+    .animation(MirrorMotion.padSwitch, value: device?.id)
     .onChange(of: device, initial: true) { _, new in
       if let new { lastKnownSize = new.sensorSizeMM }
     }
@@ -55,4 +55,10 @@ public struct PadMirrorView: View {
     case .paused, .appOff, .disabled, .normal: return nil
     }
   }
+}
+
+/// Mirror motion (bone 10: "When it switches, the outline cross-fades (150 ms)").
+enum MirrorMotion {
+  static let padSwitchSeconds = 0.15
+  static let padSwitch = Animation.easeInOut(duration: padSwitchSeconds)
 }

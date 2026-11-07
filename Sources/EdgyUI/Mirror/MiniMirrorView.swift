@@ -1,3 +1,4 @@
+import AppKit
 import EdgyCore
 import EdgyRuntime
 import SwiftUI
@@ -9,24 +10,44 @@ import SwiftUI
 /// where it was. States: no trackpad (dashed outline at the default proportion with "No trackpad
 /// connected", no zones), paused, disabled, off in the frontmost app (faded to 40%; the popover
 /// says the words).
+///
+/// **Active profile.** `MiniMirrorView(model:)` follows the frontmost app itself: it reads it on
+/// appear and on every app activation (`NSWorkspace.didActivateApplicationNotification`, read
+/// only), ignoring Edgy's own activations, and draws `effectiveBindings(forApp:)` for it, which is
+/// Default for an app without a profile. `MiniMirrorView(model:frontmostApp:)` pins the app instead
+/// (tests, previews, or a host that already knows it).
 public struct MiniMirrorView: View {
   @Bindable var model: SettingsModel
-  /// The app whose profile is in effect, `nil` = Default. See blockers-batch-14 #1.
-  let frontmostApp: String?
+  /// `nil` = follow the frontmost app; `.some(app)` = pinned (`.some(nil)` = Default).
+  let pinnedApp: String??
+  @State private var observedApp: String?
   @State private var lastTouches: [LiveTouch] = []
   @State private var lastKnownSize: Size2D?
 
+  /// Follows the frontmost app: the mirror shows the profile in effect right now.
   public init(model: SettingsModel) {
-    self.init(model: model, frontmostApp: nil)
+    self.model = model
+    pinnedApp = nil
   }
 
-  /// The mini mirror for the profile in effect while `frontmostApp` is in front.
+  /// The mini mirror for the profile in effect while `frontmostApp` is in front (`nil` = Default).
   public init(model: SettingsModel, frontmostApp: String?) {
     self.model = model
-    self.frontmostApp = frontmostApp
+    pinnedApp = .some(frontmostApp)
+  }
+
+  /// The app whose profile the mirror draws.
+  var activeApp: String? { pinnedApp ?? observedApp }
+
+  /// The frontmost app after an activation: Edgy's own activation (opening its window or
+  /// popover) keeps the app that was in front before.
+  static func frontmost(afterActivating activated: String?, own: String?, previous: String?) -> String? {
+    guard let activated, activated != own else { return previous }
+    return activated
   }
 
   public var body: some View {
+    let frontmostApp = activeApp
     let state = model.mirrorState(forApp: frontmostApp)
     let device = model.mirroredDevice
     let sizeMM =
@@ -44,7 +65,19 @@ public struct MiniMirrorView: View {
       .id(device?.id)
       .transition(.opacity)
     }
-    .animation(.easeInOut(duration: 0.15), value: device?.id)
+    .animation(MirrorMotion.padSwitch, value: device?.id)
+    .onAppear {
+      guard pinnedApp == nil else { return }
+      observedApp = Self.frontmost(
+        afterActivating: NSWorkspace.shared.frontmostApplication?.bundleIdentifier, own: Bundle.main.bundleIdentifier,
+        previous: observedApp)
+    }
+    .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)) {
+      guard pinnedApp == nil else { return }
+      let app = $0.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+      observedApp = Self.frontmost(
+        afterActivating: app?.bundleIdentifier, own: Bundle.main.bundleIdentifier, previous: observedApp)
+    }
     .onChange(of: model.liveTouches, initial: true) { _, new in
       if !new.isEmpty { lastTouches = new }
     }
