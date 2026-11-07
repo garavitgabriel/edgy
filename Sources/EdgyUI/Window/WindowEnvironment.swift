@@ -4,24 +4,73 @@ import SwiftUI
 /// The config file failed to decode or validate on reload (BRIEF § Issue states). Edgy keeps
 /// running the last working settings and the window turns read-only until the file is fixed.
 ///
-/// Until batch 13's `SettingsEditor.configProblem` lands, the app feeds this through
-/// `\.windowConditions`; afterwards the chief maps the editor's value onto it (see
-/// `blockers-batch-16.md`).
+/// A thin wrapper over the runtime's `EdgyRuntime.ConfigProblem` (the one source of the parser's
+/// message and line) plus the file's name, which only the app knows. The app feeds it through
+/// `\.windowConditions` and `MenuBarState.configProblem`; without one, the popover wraps
+/// `editor.configProblem` as "config.json". `init(fileName:line:message:)` stays for EdgyApp.
 public struct ConfigProblem: Hashable, Sendable {
+  public var problem: EdgyRuntime.ConfigProblem
   public var fileName: String
-  public var line: Int?
-  public var message: String
 
-  public init(fileName: String = "config.json", line: Int?, message: String) {
-    self.fileName = fileName
-    self.line = line
-    self.message = message
+  public var line: Int? {
+    get { problem.line }
+    set { problem.line = newValue }
   }
 
-  /// "config.json has an error on line 14: <parser message>. Edgy kept the last working settings."
+  public var message: String {
+    get { problem.message }
+    set { problem.message = newValue }
+  }
+
+  public init(_ problem: EdgyRuntime.ConfigProblem, fileName: String = "config.json") {
+    self.problem = problem
+    self.fileName = fileName
+  }
+
+  public init(fileName: String = "config.json", line: Int?, message: String) {
+    self.init(EdgyRuntime.ConfigProblem(message: message, line: line), fileName: fileName)
+  }
+
+  /// "config.json has an error on line 14, column 3: Unexpected character ‘x’. Edgy kept the last
+  /// working settings." The parser's own "around line N, column M" is folded into the lead so the
+  /// line is named once; straight quotes become typographic ones.
   public var sentence: String {
-    let place = line.map { " on line \($0)" } ?? ""
-    return "\(fileName) has an error\(place): \(message). Edgy kept the last working settings."
+    var text = message.trimmingCharacters(in: .whitespacesAndNewlines)
+    var line = self.line
+    var column: Int?
+    let pattern = #"\s*,?\s*(?:around|at|on)\s+line\s+(\d+)(?:,\s*column\s+(\d+))?"#
+    if let regex = try? NSRegularExpression(pattern: pattern, options: [.caseInsensitive]),
+      let match = regex.firstMatch(in: text, range: NSRange(text.startIndex..., in: text)),
+      let range = Range(match.range, in: text)
+    {
+      if line == nil, let r = Range(match.range(at: 1), in: text) { line = Int(text[r]) }
+      if let r = Range(match.range(at: 2), in: text) { column = Int(text[r]) }
+      text.removeSubrange(range)
+    }
+    while text.hasSuffix(".") { text.removeLast() }
+    text = Self.typographic(text)
+    var place = line.map { " on line \($0)" } ?? ""
+    if line != nil, let column { place += ", column \(column)" }
+    return "\(fileName) has an error\(place): \(text). Edgy kept the last working settings."
+  }
+
+  /// 'x' → ‘x’, don't → don’t.
+  static func typographic(_ text: String) -> String {
+    var result = ""
+    var previous: Character?
+    for character in text {
+      if character == "'" {
+        let opens = previous == nil || previous!.isWhitespace || "([{".contains(previous!)
+        result.append(opens ? "‘" : "’")
+      } else if character == "\"" {
+        let opens = previous == nil || previous!.isWhitespace || "([{".contains(previous!)
+        result.append(opens ? "“" : "”")
+      } else {
+        result.append(character)
+      }
+      previous = character
+    }
+    return result
   }
 }
 

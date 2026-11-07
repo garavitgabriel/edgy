@@ -24,12 +24,50 @@ enum ParameterEditor: Equatable, Identifiable {
   static let sensitivityRange: ClosedRange<Double> = 0.25...4
   static let sensitivityDefault = 1.0
 
-  static func editors(for descriptor: ActionDescriptor?) -> [ParameterEditor] {
+  /// The rows in order: the action's parameters ("Let go after" last of them, batch-15 design
+  /// answer 2), then sensitivity on continuous actions, then "Press time" on a long-press whose
+  /// action has no `holdMS` of its own (`ConfigValidator.pressTimeParameter`), then haptics.
+  static func editors(for descriptor: ActionDescriptor?, gesture: GestureKind? = nil) -> [ParameterEditor] {
     guard let descriptor, descriptor.id != .doNothing else { return [] }
-    var editors = descriptor.parameters.map(ParameterEditor.action)
+    var parameters = descriptor.parameters
+    if let index = parameters.firstIndex(where: { $0.key == "maxSeconds" }) {
+      parameters.append(parameters.remove(at: index))
+    }
+    var editors = parameters.map(ParameterEditor.action)
     if descriptor.shape == .continuous { editors.append(.sensitivity) }
+    let pressTime = ConfigValidator.pressTimeParameter
+    if gesture == .longPress, !parameters.contains(where: { $0.key == pressTime.key }) {
+      editors.append(.action(pressTime))
+    }
     editors.append(.haptics)
     return editors
+  }
+
+  /// The label a row shows in the label column (`nil` for checkbox rows, which carry their own).
+  func columnLabel(action: ActionID) -> String? {
+    switch self {
+    case .haptics: return nil
+    case .sensitivity: return "Sensitivity"
+    case .action(let parameter):
+      return ActionNaming.isOnOff(parameter) ? nil : ActionNaming.parameterLabel(parameter, action: action)
+    }
+  }
+}
+
+/// The parameter rows' alignment: a row's label lines up with its control's field, not with the
+/// field and the message hanging under it.
+extension VerticalAlignment {
+  private enum ParameterRowAlignment: AlignmentID {
+    static func defaultValue(in d: ViewDimensions) -> CGFloat { d[VerticalAlignment.center] }
+  }
+
+  static let parameterRow = VerticalAlignment(ParameterRowAlignment.self)
+}
+
+extension View {
+  /// Marks this view (a field) as what its row's label lines up with.
+  func parameterRowField() -> some View {
+    alignmentGuide(.parameterRow) { d in d[VerticalAlignment.center] }
   }
 }
 
@@ -43,16 +81,28 @@ struct ParameterRowsView: View {
 
   static let indent: CGFloat = 24
   static let rowHeight: CGFloat = 28
+  /// The label column never grows past this; labels stay on one line.
+  static let maxLabelWidth: CGFloat = 170
 
   var body: some View {
     let descriptor = model.editor.validator.descriptor(for: row.binding.action)
-    let editors = ParameterEditor.editors(for: descriptor)
+    let editors = ParameterEditor.editors(for: descriptor, gesture: row.gesture)
+    let labelWidth = Self.labelWidth(editors.compactMap { $0.columnLabel(action: row.binding.action) })
     VStack(alignment: .leading, spacing: 4) {
       ForEach(Array(editors.enumerated()), id: \.element.id) { index, editor in
-        ParameterRow(model: model, row: row, editor: editor, autofocus: autofocus && index == 0)
+        ParameterRow(
+          model: model, row: row, editor: editor, labelWidth: labelWidth, autofocus: autofocus && index == 0)
       }
     }
     .padding(.leading, Self.indent)
+  }
+
+  /// One label column per binding, as wide as its longest label (so every control and slider
+  /// track under one binding starts at the same x), capped at `maxLabelWidth`.
+  static func labelWidth(_ labels: [String]) -> CGFloat {
+    let font = NSFont.systemFont(ofSize: Tokens.typeBody)
+    let widest = labels.map { ceil(($0 as NSString).size(withAttributes: [.font: font]).width) }.max() ?? 0
+    return min(widest + 2, maxLabelWidth)
   }
 }
 
@@ -60,6 +110,7 @@ private struct ParameterRow: View {
   @Bindable var model: SettingsModel
   var row: InspectorRow
   var editor: ParameterEditor
+  var labelWidth: CGFloat
   var autofocus: Bool
 
   var body: some View {
@@ -70,14 +121,38 @@ private struct ParameterRow: View {
       }
       .frame(minHeight: ParameterRowsView.rowHeight)
     case .sensitivity:
-      LabeledParameter(label: "Sensitivity") {
+      LabeledParameter(label: "Sensitivity", labelWidth: labelWidth) {
         NumberParameterField(
           model: model, row: row, key: "sensitivity", range: ParameterEditor.sensitivityRange,
           fallback: ParameterEditor.sensitivityDefault, format: .percent)
       }
+    case .action(let parameter) where ActionNaming.isOnOff(parameter):
+      // On/off (`speedUp`): a checkbox with its helper line (BRIEF § Slide feel).
+      let isOn = (row.binding.parameters[parameter.key] ?? parameter.defaultValue ?? "off") == "on"
+      VStack(alignment: .leading, spacing: 2) {
+        Toggle(
+          isOn: SwiftUI.Binding(
+            get: { isOn },
+            set: { on in
+              let value = on ? "on" : "off"
+              model.setParameter(parameter.key, to: value == parameter.defaultValue ? nil : value, in: row)
+            })
+        ) {
+          Text(ActionNaming.parameterLabel(parameter, action: row.binding.action))
+            .font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink)
+        }
+        .toggleStyle(.checkbox)
+        .tint(Tokens.ink)
+        .frame(minHeight: ParameterRowsView.rowHeight)
+        if let help = ActionNaming.parameterHelp(parameter) {
+          Text(help).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
+            .fixedSize(horizontal: false, vertical: true)
+        }
+      }
     case .action(let parameter):
       LabeledParameter(
-        label: ActionNaming.parameterLabel(parameter, action: row.binding.action), help: parameter.helpText
+        label: ActionNaming.parameterLabel(parameter, action: row.binding.action), labelWidth: labelWidth,
+        help: ActionNaming.parameterHelp(parameter)
       ) {
         control(for: parameter)
       }
@@ -131,26 +206,47 @@ private struct ParameterRow: View {
   }
 }
 
-/// Label left (13, `ink2`), control right, one 28 pt row.
+/// Label left (13, `ink2`, one line, in the binding's label column), control right, one 28 pt
+/// row. The label lines up with the control's field; a validation message hangs below it.
 struct LabeledParameter<Control: View>: View {
   var label: String
+  /// The label column's width (`ParameterRowsView.labelWidth`); `nil` sizes to the label.
+  var labelWidth: CGFloat? = nil
   /// The one helper line under the row (13, `ink2`), only when the parameter has one.
   var help: String? = nil
   @ViewBuilder var control: Control
 
+  /// The least a control gets beside its label before the label moves above it.
+  static var controlMinWidth: CGFloat { 140 }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 2) {
-      HStack(alignment: .center, spacing: 12) {
-        Text(label).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
-          .frame(minHeight: ParameterRowsView.rowHeight, alignment: .leading)
-        Spacer(minLength: 8)
-        control
+      // A label never breaks mid-word: when label and control don't fit one 28 pt row, the label
+      // takes its own line above the control (chief, 2026-11-07, from the live window).
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .parameterRow, spacing: 8) {
+          labelText
+            .lineLimit(1)
+            .fixedSize()
+            .frame(minWidth: labelWidth, minHeight: ParameterRowsView.rowHeight, alignment: .leading)
+          control.frame(minWidth: Self.controlMinWidth, maxWidth: .infinity, alignment: .trailing)
+        }
+        VStack(alignment: .leading, spacing: 2) {
+          labelText.fixedSize(horizontal: false, vertical: true)
+          control.frame(maxWidth: .infinity, alignment: .trailing)
+        }
       }
       if let help {
         Text(help).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
           .fixedSize(horizontal: false, vertical: true)
       }
     }
+  }
+}
+
+extension LabeledParameter {
+  fileprivate var labelText: some View {
+    Text(label).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
   }
 }
 
@@ -195,12 +291,13 @@ struct KeyRecorderField: View {
       Button {
         controller.isRecording ? controller.cancel() : controller.start()
       } label: {
-        label.frame(width: Self.width, alignment: .leading).fieldChrome(
+        label.frame(maxWidth: Self.width, alignment: .leading).fieldChrome(
           active: controller.isRecording, ring: Tokens.accent
         )
         .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
+      .parameterRowField()
       .focusable()
       .focusEffectDisabled()
       .focused($focused)
@@ -210,7 +307,7 @@ struct KeyRecorderField: View {
         return .handled
       }
       .accessibilityLabel(controller.isRecording ? "Press keys" : displayText ?? "Click to record")
-      FieldError(text: controller.error).frame(width: Self.width + 16)
+      FieldError(text: controller.error).frame(maxWidth: Self.width + 16)
     }
     .onAppear {
       guard autostart else { return }
@@ -278,7 +375,7 @@ struct AppChooserField: View {
         Image(systemName: "chevron.up.chevron.down").foregroundStyle(Tokens.ink2)
       }
       .font(Tokens.font(Tokens.typeBody))
-      .frame(width: Self.width)
+      .frame(maxWidth: Self.width)
       .fieldChrome()
       .contentShape(Rectangle())
     }
@@ -323,7 +420,9 @@ struct AppListView: View {
     VStack(alignment: .leading, spacing: 8) {
       SearchField(text: $query, prompt: "Search apps").focused($searching)
       ScrollView {
-        LazyVStack(alignment: .leading, spacing: 2) {
+        // A plain VStack: the same app sits in both sections, and a lazy stack keyed by the app
+        // alone drew the repeat as an empty row.
+        VStack(alignment: .leading, spacing: 2) {
           section("Running", filtered.filter(\.isRunning))
           section("All apps", filtered)
         }
@@ -334,11 +433,13 @@ struct AppListView: View {
     .onAppear { searching = true }
   }
 
+  /// Section headers are 13 semibold `ink2`: 11 pt is for the action picker's group headers only
+  /// (batch-15 design answer 3).
   @ViewBuilder private func section(_ title: String, _ apps: [InstalledApp]) -> some View {
     if !apps.isEmpty {
-      Text(title).font(Tokens.font(Tokens.typeSmall, semibold: true)).foregroundStyle(Tokens.ink2)
+      Text(title).font(Tokens.font(Tokens.typeBody, semibold: true)).foregroundStyle(Tokens.ink2)
         .padding(.top, 6)
-      ForEach(apps) { app in
+      ForEach(apps, id: \.bundleID) { app in
         Button {
           choose(app)
         } label: {
@@ -388,17 +489,27 @@ struct TextParameterField: View {
   var body: some View {
     VStack(alignment: .trailing, spacing: 4) {
       HStack(spacing: 6) {
+        // The field takes the room left; a long path is cut in the middle so the file's name shows.
         TextField("", text: $text, prompt: Text(placeholder).foregroundStyle(Tokens.ink2))
           .textFieldStyle(.plain)
           .font(Tokens.font(Tokens.typeBody))
           .foregroundStyle(Tokens.ink)
+          .lineLimit(1)
+          .truncationMode(.middle)
           .focused($focused)
           .onSubmit(apply)
-          .frame(width: choosesPath ? Self.width - 70 : Self.width)
+          .frame(maxWidth: choosesPath ? .infinity : Self.width)
           .fieldChrome(active: focused)
-        if choosesPath { TextAction(title: "Choose…", semibold: false, action: choosePath) }
+        if choosesPath {
+          // A real bordered button that never wraps (§ Binding parameters: "plus a Choose… button").
+          Button("Choose…", action: choosePath)
+            .buttonStyle(.bordered)
+            .font(Tokens.font(Tokens.typeBody))
+            .fixedSize()
+        }
       }
-      FieldError(text: error).frame(width: Self.width + 16)
+      .parameterRowField()
+      FieldError(text: error).frame(maxWidth: choosesPath ? .infinity : Self.width + 16)
     }
     .onChange(of: focused) { _, now in if !now { apply() } }
     .onAppear { if autofocus { focused = true } }
@@ -493,6 +604,8 @@ struct NumberParameterField: View {
   var parameter: ActionParameter? = nil
 
   static let width: CGFloat = 130
+  /// The value column: fixed, so every slider track under a binding ends at the same x.
+  static let valueWidth: CGFloat = 56
 
   var body: some View {
     let raw = row.binding.parameters[key].flatMap(Double.init)
@@ -518,7 +631,7 @@ struct NumberParameterField: View {
       .layoutPriority(-1)
       Text(valueText(stored, isAbsent: raw == nil))
         .font(Tokens.font(Tokens.typeBody)).foregroundStyle(changed ? Tokens.ink : Tokens.ink2)
-        .lineLimit(1).fixedSize().frame(minWidth: 44, alignment: .trailing)
+        .lineLimit(1).fixedSize().frame(minWidth: Self.valueWidth, alignment: .trailing)
       if parameter?.fallback != nil, raw != nil {
         TextAction(title: "Reset") { model.setParameter(key, to: nil, in: row) }.fixedSize()
       }

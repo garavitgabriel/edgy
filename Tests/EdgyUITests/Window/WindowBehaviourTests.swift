@@ -129,7 +129,7 @@ struct AppProfileFlowTests {
     #expect(AppProfileStart.allCases.map(\.title) == ["Default, with changes", "A copy of Default", "Empty"])
     #expect(
       AppProfileStart.allCases.map(\.detail) == [
-        "Follows Default; change only what's different.", "Starts the same, then goes its own way.",
+        "Follows Default; change only what’s different.", "Starts the same, then goes its own way.",
         "Nothing mapped until you add it.",
       ])
   }
@@ -204,7 +204,7 @@ struct WindowStateTests {
   @Test func brokenConfigSentenceIsBRIEFs() {
     #expect(
       problem.sentence
-        == "config.json has an error on line 14: expected ',' after a value. Edgy kept the last working settings.")
+        == "config.json has an error on line 14: expected ‘,’ after a value. Edgy kept the last working settings.")
   }
 
   @Test func overlapLineNamesBothPartsAndShowSelectsTheOther() throws {

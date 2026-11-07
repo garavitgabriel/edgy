@@ -122,8 +122,10 @@ import Testing
     let model = InspectorFixtures.model()
     model.selectedProfile = .app(PreviewFixtures.wayfare)
     model.picking = PickerTarget(zone: .edge(.top), gesture: .swipe(.left))
+    // Empty search and the whole list, so the end shows: the disclosure, the separator, then
+    // "Do nothing here" (batch-15 must-fix 3).
     try write(
-      picker(model, query: "mi", height: 300), "picker-app-tab-do-nothing", size: CGSize(width: 320, height: 300))
+      picker(model, height: 1600), "picker-app-tab-do-nothing", size: CGSize(width: 320, height: 1600))
   }
 
   @Test func pickerAddGesture() throws {
@@ -172,7 +174,8 @@ import Testing
     try recorder("param-recorder-recording", stored: nil, hold: true, state: [.listening(held: [.ctrl, .opt])])
     try recorder("param-recorder-fn-result", stored: "fn", hold: true, state: [])
     try recorder(
-      "param-recorder-error", stored: "cmd+k", hold: false,
+      // The field keeps the refused input, "⌘" alone (§ Issue states), beside its message.
+      "param-recorder-error", stored: "cmd", hold: false,
       state: [.listening(held: [.fn]), .recorded(KeyCombo(modifiers: [.fn])!)])
   }
 

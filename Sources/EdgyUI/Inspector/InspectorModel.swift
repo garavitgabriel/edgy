@@ -59,6 +59,10 @@ final class InspectorDrafts {
   var focus: Key?
   /// The row whose "…" menu is open (a note's fix can open it).
   var openMenu: BindingKey?
+  /// The one open binding (§ Binding parameters: "Only one binding is open at a time"): the row
+  /// the user clicked or the one just set from the picker. `SettingsModel.openBinding(in:rows:)`
+  /// resolves it (and the automatic open for an empty required parameter).
+  var open: Key?
 
   private static let table = NSMapTable<SettingsModel, InspectorDrafts>.weakToStrongObjects()
 
@@ -123,6 +127,29 @@ extension SettingsModel {
     }
     let order = GestureKind.all
     return rows.sorted { (order.firstIndex(of: $0.gesture) ?? 99) < (order.firstIndex(of: $1.gesture) ?? 99) }
+  }
+
+  /// The one binding of `zone` whose parameter rows show (§ Binding parameters):
+  /// - none while the picker is open on this zone (the popover is what's being set; a new gesture
+  ///   has no row yet);
+  /// - else the row the user clicked or just set from the picker (`InspectorDrafts.open`);
+  /// - else the first binding with an empty required parameter, which opens automatically;
+  /// - else none. Inherited and turned-off rows never open (they have no parameters of their own).
+  func openBinding(in zone: Zone, rows: [InspectorRow]) -> BindingKey? {
+    if let picking, picking.zone == zone { return nil }
+    let openable = rows.filter(\.showsParameters)
+    if let open = inspectorDrafts.open, open.profile == inspectorProfile,
+      openable.contains(where: { $0.id == open.binding })
+    {
+      return open.binding
+    }
+    return openable.first { needsParameters($0.binding) }?.id
+  }
+
+  /// Opens `key`'s parameter rows (closing any other) and the pad picker for it: a row click.
+  func openRow(_ key: BindingKey) {
+    inspectorDrafts.open = InspectorDrafts.Key(profile: inspectorProfile, binding: key)
+    picking = PickerTarget(zone: key.zone, gesture: key.gesture)
   }
 
   /// Gestures `zone` can take that have no row yet ("Add gesture…" offers these).
@@ -215,6 +242,8 @@ extension SettingsModel {
     }
     inspectorDrafts.drafts[draftKey] = nil
     picking = nil
+    // The binding just set from the picker is the open one.
+    inspectorDrafts.open = draftKey
     let descriptor = editor.validator.descriptor(for: action)
     if let descriptor, !descriptor.parameters.isEmpty { inspectorDrafts.focus = draftKey }
     if needsParameters(binding) {

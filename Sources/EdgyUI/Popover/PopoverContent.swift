@@ -45,9 +45,12 @@ public enum MenuRow: CaseIterable, Hashable, Sendable {
   /// How long **Pause for 1 hour** pauses.
   public static let pauseDuration: TimeInterval = 3600
 
-  /// The rows to show. "Pause for 1 hour" is hidden while paused (§ System states).
+  /// The rows to show. "Pause for 1 hour" is hidden while paused (§ System states). The config
+  /// file rows are gone from the list (chief, 2026-11-07: everything is set in the UI and the file
+  /// watcher reloads on save); "Open config file" stays only as recovery in the broken-config
+  /// block. The cases stay for the app's own menu commands.
   public static func visible(paused: Bool) -> [MenuRow] {
-    allCases.filter { !(paused && $0 == .pause) }
+    allCases.filter { $0 != .openConfigFile && $0 != .reloadConfig && !(paused && $0 == .pause) }
   }
 
   @MainActor
@@ -116,7 +119,9 @@ public enum PopoverTop: Equatable, Sendable {
 public struct PopoverMirror: Equatable, Sendable {
   /// No trackpad: a dashed pad outline at the default proportion with "No trackpad connected".
   public var noTrackpad: Bool
-  /// Faded to 40%: Enabled is off, or Edgy is off in the frontmost app (§ App profiles).
+  /// Faded to 40%: Enabled is off, Paused (batch-17 design answer 3: one value everywhere), or Edgy
+  /// is off in the frontmost app (§ App profiles). The popover applies it once; the mini mirror
+  /// doesn't fade again.
   public var faded: Bool
   /// The paused line under the mini mirror, with **Resume**.
   public var pausedUntil: Date?
@@ -127,9 +132,10 @@ public struct PopoverMirror: Equatable, Sendable {
     _ = model.revision
     let engine = model.engineStatus
     let config = model.editor.config
-    let offInFront = state.frontmostBundleID.map { config.appProfiles[$0]?.disabled == true } ?? false
+    let offInFront = state.frontmost(model: model).map { config.appProfiles[$0]?.disabled == true } ?? false
     return PopoverMirror(
-      noTrackpad: !engine.hasTrackpad, faded: !config.app.enabled || offInFront, pausedUntil: engine.pausedUntil,
+      noTrackpad: !engine.hasTrackpad, faded: !config.app.enabled || offInFront || engine.paused,
+      pausedUntil: engine.pausedUntil,
       paused: engine.paused)
   }
 }
@@ -139,7 +145,7 @@ public enum PopoverCopy {
   public static let noAccessibility = WindowCopy.noAccessibility
   public static let noAccessibilityDetail = "Touches still show in Test Mode."
   public static let noTrackpad = "No trackpad connected"
-  public static let dontRunActions = "Don't run actions"
+  public static let dontRunActions = "Don’t run actions"
 
   /// "Paused, 47 min left"; whole minutes; "less than a minute left" under one. The same rule as
   /// the window (`WindowCopy.paused`), so both say the same thing.

@@ -108,19 +108,21 @@ public struct ActionPickerView: View {
               }
             }
             if let title = catalog.othersTitle {
+              // A search expands the section too; the chevron follows what's shown.
+              let expanded = Self.othersExpanded(showOthers: showOthers, query: query)
               InspectorRule().padding(.vertical, 6)
               Button {
                 showOthers.toggle()
               } label: {
                 HStack(spacing: 6) {
-                  Image(systemName: showOthers ? "chevron.down" : "chevron.right").frame(width: 12)
+                  Image(systemName: expanded ? "chevron.down" : "chevron.right").frame(width: 12)
                   Text(title)
                 }
                 .font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
-                .padding(.horizontal, 8).frame(minHeight: 28).contentShape(Rectangle())
+                .padding(.horizontal, 8).frame(minHeight: PickerRow.height).contentShape(Rectangle())
               }
               .buttonStyle(.plain)
-              if showOthers || !query.isEmpty {
+              if expanded {
                 ForEach(catalog.others) { item in
                   PickerRow(item: item, isMarked: false, enabled: false) {}
                 }
@@ -144,6 +146,11 @@ public struct ActionPickerView: View {
     .onAppear { searchFocused = true }
   }
 
+  /// The disclosure is open when the user opened it or a search is typed.
+  static func othersExpanded(showOthers: Bool, query: String) -> Bool {
+    showOthers || !query.trimmingCharacters(in: .whitespaces).isEmpty
+  }
+
   private func move(_ step: Int, in ids: [ActionID], from current: ActionID?) -> KeyPress.Result {
     guard !ids.isEmpty else { return .ignored }
     let start = (highlighted ?? current).flatMap(ids.firstIndex(of:)) ?? (step > 0 ? -1 : ids.count)
@@ -161,6 +168,9 @@ struct PickerRow: View {
   var isMarked: Bool
   var enabled: Bool
   var action: () -> Void
+
+  /// A one-line row (batch-14 should-fix 2: about render B's density, so more actions fit).
+  static let height: CGFloat = 24
 
   init(item: PickerCatalog.Item, isMarked: Bool, enabled: Bool, action: @escaping () -> Void) {
     self.init(
@@ -188,8 +198,8 @@ struct PickerRow: View {
         }
       }
       .font(Tokens.font(Tokens.typeBody))
-      .frame(maxWidth: .infinity, minHeight: 28, alignment: .leading)
-      .padding(.horizontal, 8).padding(.vertical, 2)
+      .frame(maxWidth: .infinity, minHeight: Self.height, alignment: .leading)
+      .padding(.horizontal, 8).padding(.vertical, subtitle == nil ? 0 : 2)
       .background(
         RoundedRectangle(cornerRadius: Tokens.radiusControl).fill(isMarked ? Tokens.bar.opacity(0.4) : .clear)
       )

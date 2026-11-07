@@ -143,13 +143,26 @@ func drawnBarsSitInsideTheirZoneAndClearTheCornerTiles(segments: Int) {
   #expect(builtInPadMM == PreviewFixtures.builtInPad.sensorSizeMM)
 }
 
-@MainActor @Test func defaultLabelsReadAsInTheRender() {
+/// The catalog's own spelling of Play/Pause (the UI follows it, whatever it is).
+@MainActor func playPause(_ model: SettingsModel) -> String {
+  model.mirrorCatalog["media.playPause"]?.displayName ?? "?"
+}
+
+@MainActor @Test func defaultLabelsReadAsInTheRender() throws {
   let model = PreviewFixtures.model()
   let zones = Dictionary(uniqueKeysWithValues: model.mirrorZones(forApp: nil).map { ($0.zone, $0) })
-  #expect(zones[.edge(.bottom)]?.label == "Tracks and Play/Pause")
+  // Names are the catalog's, never re-spelled (batch-14 ruling 6).
+  #expect(zones[.edge(.bottom)]?.label == "Tracks and \(playPause(model))")
   #expect(zones[.edge(.right)]?.label == "Volume")
   #expect(zones[.edge(.left)]?.label == "Brightness")
-  #expect(zones[.corner(.topLeft)]?.label == "Mic off")
+  // The full name, and on the pad's corner tab its short name, as in render A (bone 3 rule (b)).
+  #expect(zones[.corner(.topLeft)]?.label == "Microphone Mute")
+  let pad = MirrorPad(
+    geometry: MirrorGeometry(
+      sensorSizeMM: PreviewFixtures.externalPad.sensorSizeMM, settings: .defaults,
+      pointsPerMM: Tokens.mirrorPointsPerMM), zones: Array(zones.values), selected: nil)
+  let micOff = try #require(zones[.corner(.topLeft)])
+  #expect(pad.fittedLabel(micOff, placement: pad.labelPlacement(micOff)).text == "Mic off")
   #expect(zones[.corner(.topRight)]?.label == "Mute")
   #expect(zones[.corner(.topRight)]?.symbol == "speaker.slash")
   #expect(zones[.edge(.top)]?.style == .unmapped)
@@ -195,7 +208,7 @@ func drawnBarsSitInsideTheirZoneAndClearTheCornerTiles(segments: Int) {
     uniqueKeysWithValues: model.mirrorZones(forApp: PreviewFixtures.wayfare).map { ($0.zone, $0) })
   let bottom = zones[.edge(.bottom)]
   #expect(bottom?.overridden == true)
-  #expect(bottom?.label == "Keyboard Shortcut, Next Track and Play/Pause")
+  #expect(bottom?.label == "Keyboard Shortcut, Next Track and \(playPause(model))")
   #expect(zones[.edge(.left)]?.style == .offHere)
   #expect(zones[.edge(.left)]?.label == "Off here")
   #expect(zones[.edge(.right)]?.overridden == false)
@@ -247,7 +260,7 @@ func drawnBarsSitInsideTheirZoneAndClearTheCornerTiles(segments: Int) {
   let model = PreviewFixtures.model(config: MirrorFixtures.splitConfig)
   let zones = Dictionary(uniqueKeysWithValues: model.mirrorZones(forApp: nil).map { ($0.zone, $0) })
   #expect(zones[.edge(.bottom, segment: 0, segments: 2)]?.label == "Tracks")
-  #expect(zones[.edge(.bottom, segment: 1, segments: 2)]?.label == "Play/Pause")
+  #expect(zones[.edge(.bottom, segment: 1, segments: 2)]?.label == playPause(model))
   #expect(zones[.edge(.right, segment: 0, segments: 3)]?.label == "Volume")
   #expect(zones[.edge(.right, segment: 1, segments: 3)]?.style == .unmapped)
   #expect(zones[.edge(.right, segment: 2, segments: 3)]?.label == "Show Desktop")
