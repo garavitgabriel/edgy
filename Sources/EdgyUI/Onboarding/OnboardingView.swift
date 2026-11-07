@@ -78,18 +78,19 @@ public struct OnboardingView: View {
     }
   }
 
-  /// The mirror and, under its right edge, the plate slot. A landed slide draws nothing here: the
-  /// system's own volume indicator carries the level wherever the system puts it (bone 8, ruling
-  /// 4). A rejected touch shows the one dark plate (bone 9, ruling 3): the struck contact on the
-  /// mirror and "Ignored: …" beside it. The slot is always reserved, so the mirror never moves.
+  /// The mirror and, under it, the plate slot. A landed slide draws nothing here: the system's
+  /// own volume indicator carries the level wherever the system puts it (bone 8, ruling 4). A
+  /// rejected touch shows the one dark plate (bone 9, ruling 3): the struck contact on the mirror
+  /// and "Ignored: …" under it, centred on the mirror (critique 24, design answer 2). The slot is
+  /// always reserved, so the mirror never moves.
   private var tryIt: some View {
-    VStack(alignment: .trailing, spacing: OnboardingMetrics.plateGap) {
+    VStack(alignment: .center, spacing: OnboardingMetrics.plateGap) {
       OnboardingMirror(model: model, onlyTaughtZone: true)
-      // A zero-width slot at the mirror's right edge: the plate (wider than the mirror) hangs
-      // from it without widening the stack, so the mirror never moves when a plate appears.
+      // A zero-width slot on the mirror's centre line: the plate (wider than the mirror) hangs
+      // centred from it without widening the stack, so the mirror never moves when a plate appears.
       Color.clear
         .frame(width: 0, height: OnboardingMetrics.plateSlotHeight)
-        .overlay(alignment: .topTrailing) {
+        .overlay(alignment: .top) {
           if let plate = state.rejection {
             PlateView(plate)
               .fixedSize()

@@ -173,7 +173,9 @@ struct Batch22SnapshotTests {
   @Test func miniHoverLineCopy() {
     let model = InspectorFixtures.model()
     let bottom = model.mirrorZones(forApp: nil, unavailableAsUnmapped: true).first { $0.zone == .edge(.bottom) }
-    #expect(MiniMirrorView.hoverLine(bottom) == "Bottom edge: Previous Track, Next Track, Play/Pause")
+    // Before the ruling (critique 22, design answer 1: the hover line shortens the zone name):
+    // #expect(MiniMirrorView.hoverLine(bottom) == "Bottom edge: Previous Track, Next Track, Play/Pause")
+    #expect(MiniMirrorView.hoverLine(bottom) == "Bottom: Previous Track, Next Track, Play/Pause")
     #expect(MiniMirrorView.hoverLine(nil) == "")
     #expect(bottom?.actions.count == 3)
   }
