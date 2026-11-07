@@ -420,11 +420,14 @@ Primary: **Continue**. One line in `ink2` under the rows: "You can change any of
 ### Window identity and Advanced (spec, 2026-11-07, from the owner's hardware notes)
 
 **Brand in the window.** The owner said: "I don't see any logo or anything to recognize our app when open." Decision: **(a) + (c)**.
-- **(a) Title bar:** after the traffic lights, at the leading edge, the **app icon at 18 pt** and the wordmark **"Edgy"** (13 semibold, `ink`), 8 pt apart, vertically centred on the traffic lights.
-  - The tabs stay centred in the window, and the Enabled switch stays at the right.
-  - No larger mark, no tagline, no second hue. The icon brings its own rust dot only at ≥128 px, so at 18 pt it's the monochrome-on-stone small drawing.
+- **(a) Title bar: the app icon only** (owner's ruling on device, 2026-11-07, replacing "18 pt icon + Edgy wordmark": the word added nothing and the small icon read as a pale square).
+  - **Size:** **26 pt**, the height of the profile-tab pill. At that size it renders from the small drawing (under 128 px, no rust dot).
+  - **Position:** 12 pt after the last traffic light, at the title bar's leading edge. Its **vertical centre lines up with the tab pill's centre**, not the traffic lights'.
+  - **No wordmark.** On hover, a standard tooltip reads "Edgy", and the accessibility label is "Edgy". It isn't clickable and has no hover wash.
+  - **Edge:** in light mode, a 0.5 pt `rgba(59,34,25,.18)` outline so the pale tile separates from the light glass. In dark mode there's no outline (the pale tile already separates). No shadow beyond the icon's own.
+  - Use the **V3 "Lit strip"** icon. The pale-square impression came from a pre-V3 build; re-judge on the rebuilt app.
 - **(c) Dock and app switcher:** while the Settings window (or onboarding) is open, Edgy shows in the Dock and the app switcher with its real icon. When the last window closes, it goes back to menu-bar only.
-- The glyph alone (b) was rejected: it's a status symbol, not an identity, and it still carries the open "CI" question.
+- The glyph alone (b) was rejected: it's a status symbol, not an identity.
 
 **Advanced… is a quiet text button in the footer.**
 - **Keep it in the footer:** it is app-wide like Haptics, Launch at login and HUD, so it belongs in their row, not in the title bar (that's for identity and the global switch) and not as a tab (tabs are profiles).
