@@ -85,14 +85,18 @@ public struct OnboardingView: View {
   private var tryIt: some View {
     VStack(alignment: .trailing, spacing: OnboardingMetrics.plateGap) {
       OnboardingMirror(model: model, onlyTaughtZone: true)
-      ZStack(alignment: .topTrailing) {
-        if let plate = state.rejection {
-          PlateView(plate)
-            .transition(.opacity)
+      // A zero-width slot at the mirror's right edge: the plate (wider than the mirror) hangs
+      // from it without widening the stack, so the mirror never moves when a plate appears.
+      Color.clear
+        .frame(width: 0, height: OnboardingMetrics.plateSlotHeight)
+        .overlay(alignment: .topTrailing) {
+          if let plate = state.rejection {
+            PlateView(plate)
+              .fixedSize()
+              .transition(.opacity)
+          }
         }
-      }
-      .frame(height: OnboardingMetrics.plateSlotHeight, alignment: .topTrailing)
-      .animation(OnboardingMotion.plate, value: state.rejection)
+        .animation(OnboardingMotion.plate, value: state.rejection)
     }
   }
 
