@@ -51,7 +51,7 @@ public protocol DisplayBrightnessControlling: AnyObject, Sendable {
 
 // FROZEN FACTORY SIGNATURE. Building it has no side effects; probing happens on first use.
 public func makeLiveDisplayBrightness() -> DisplayBrightnessControlling {
-  UnavailableDisplayBrightness()
+  LiveDisplayBrightness(environment: .live())
 }
 
 /// Placeholder until the Displays batch lands: reports no controllable displays.
