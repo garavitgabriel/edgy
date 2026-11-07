@@ -16,6 +16,45 @@ public enum SettingsEditorError: Error, Equatable {
   case profileExists(String)
   case profileNotFound(ProfileRef)
   case invalidBundleID(String)
+  /// The config file on disk is broken (`SettingsEditor.configProblem`): edits are refused so
+  /// nothing silently overwrites the user's hand edit. Fix the file, or
+  /// `replaceFileWithCurrentSettings()`.
+  case readOnly(ConfigProblem)
+}
+
+/// The config file stopped decoding or validating when it was reloaded. Edgy keeps running the
+/// last working settings (`SettingsEditor.config`) until the file is fixed or replaced.
+public struct ConfigProblem: Hashable, Sendable {
+  /// What's wrong: the parser's message ("Unexpected character 'x' around line 14, column 3."),
+  /// or the first validation error.
+  public var message: String
+  /// The line in the file, when the parser reported one (1-based).
+  public var line: Int?
+
+  public init(message: String, line: Int? = nil) {
+    self.message = message
+    self.line = line
+  }
+
+  /// From a load error: `ConfigStoreError.malformed` / `.unsupportedSchemaVersion`, or anything else.
+  public init(error: Error) {
+    switch error {
+    case ConfigStoreError.malformed(let reason, _):
+      self.init(message: reason, line: Self.line(in: reason))
+    case ConfigStoreError.unsupportedSchemaVersion(let found, let supported, _):
+      self.init(message: "schemaVersion \(found) isn't supported (this version of Edgy reads \(supported))")
+    case SettingsEditorError.invalid(let issues):
+      self.init(message: issues.first.map(String.init(describing:)) ?? "invalid settings")
+    default:
+      self.init(message: String(describing: error), line: Self.line(in: String(describing: error)))
+    }
+  }
+
+  /// "… line 14 …" → 14.
+  static func line(in message: String) -> Int? {
+    guard let range = message.range(of: #"line \d+"#, options: .regularExpression) else { return nil }
+    return Int(message[range].dropFirst(5))
+  }
 }
 
 /// What one editor update did. Observers get one per committed change.
@@ -35,6 +74,9 @@ public struct SettingsChange: Sendable {
     /// came or went). `config == previous`; `issues` (and what `availability(of:)` answers) may
     /// differ, so a window redraws its greyed-out actions and warnings. Not an undo step.
     case availability
+    /// `configProblem` appeared, changed or cleared. `config == previous` unless a fixed file
+    /// was adopted at the same time (then the cause is `.external`).
+    case configProblem
   }
 
   public var cause: Cause
@@ -74,6 +116,11 @@ public final class SettingsEditor {
   public static let continuousSaveDelay: TimeInterval = 0.25
 
   public private(set) var config: EdgyConfig
+  /// Set while the config file on disk is broken (it stopped decoding or validating on reload).
+  /// `config` keeps the last working settings and keeps running; every edit, undo and redo throws
+  /// `SettingsEditorError.readOnly`. Clears when a reload reads a good file again, or after
+  /// `replaceFileWithCurrentSettings()`.
+  public private(set) var configProblem: ConfigProblem?
   /// Validation issues of `config`, refreshed on every change.
   public private(set) var issues: [ValidationIssue]
   /// Rebuilt by `refreshAvailability()`; otherwise fixed for the editor's life.
@@ -375,6 +422,58 @@ public final class SettingsEditor {
     try commit(next)
   }
 
+  // MARK: Display check ("Did this screen change brightness?")
+
+  /// Whether to ask about the external display with this `DisplayInfo.key`: not confirmed, not
+  /// turned off, and asked fewer than `displayCheckMaxAsks` times.
+  public func displayCheckDue(key: String) -> Bool {
+    !config.app.confirmedDisplays.contains(key) && !config.app.unresponsiveDisplays.contains(key)
+      && config.app.displayCheckAsks[key, default: 0] < Self.displayCheckMaxAsks
+  }
+
+  /// Unanswered, the question is asked at most this many times per display.
+  public static let displayCheckMaxAsks = 3
+
+  /// Records that the question was shown for `key` (the UI calls this when the plate appears).
+  /// Stops counting at `displayCheckMaxAsks`. One undo step.
+  public func countDisplayCheckAsk(key: String) throws {
+    try updateAppSettings {
+      $0.displayCheckAsks[key] = min($0.displayCheckAsks[key, default: 0] + 1, Self.displayCheckMaxAsks)
+    }
+  }
+
+  /// The user's answer for the display with this key. `responds` (Yes) → confirmed, never asked
+  /// again. Not (No, turn off for this display) → brightness skips it until `turnDisplayBackOn`.
+  /// One undo step.
+  public func answerDisplayCheck(key: String, responds: Bool) throws {
+    try updateAppSettings {
+      if responds {
+        $0.confirmedDisplays.insert(key)
+        $0.unresponsiveDisplays.remove(key)
+      } else {
+        $0.unresponsiveDisplays.insert(key)
+        $0.confirmedDisplays.remove(key)
+      }
+    }
+  }
+
+  /// "Turn back on": brightness drives the display again. It isn't confirmed, so the question may
+  /// come back (up to the remaining asks). One undo step.
+  public func turnDisplayBackOn(key: String) throws {
+    try updateAppSettings { $0.unresponsiveDisplays.remove(key) }
+  }
+
+  // MARK: Presets
+
+  /// Replaces the default profile with `preset`'s, adjusted to this Mac (`MachineDefaults`:
+  /// unavailable actions substituted or dropped). App settings, gesture tuning and app profiles
+  /// stay. One undo step.
+  public func applyPreset(_ preset: Presets.Preset) throws {
+    var next = config
+    next.defaultProfile = machineDefaults(from: preset.config).defaultProfile
+    try commit(next)
+  }
+
   /// Default profile → the built-in preset. Inheriting app profile → no overrides, enabled
   /// (everything inherited). Full-replace app profile → a copy of the current default profile's
   /// bindings, enabled (the same thing "add profile, copying default" gives).
@@ -432,6 +531,7 @@ public final class SettingsEditor {
 
   @discardableResult
   public func undo() throws -> Bool {
+    try refuseWhileBroken()
     try? endContinuousEdit()
     guard let target = undoStack.last else { return false }
     try store.save(target)
@@ -443,6 +543,7 @@ public final class SettingsEditor {
 
   @discardableResult
   public func redo() throws -> Bool {
+    try refuseWhileBroken()
     try? endContinuousEdit()
     guard let target = redoStack.last else { return false }
     try store.save(target)
@@ -456,21 +557,64 @@ public final class SettingsEditor {
 
   /// Adopts a config changed outside the editor (the file watcher, Reload Config) as a new undoable
   /// step. It is not saved back. A config equal to the current one is ignored, so the editor's own
-  /// saves never come back as external changes. Errors in it are kept and exposed, never dropped.
+  /// saves never come back as external changes. Errors already in the running config stay exposed;
+  /// a file that *introduces* validation errors is not adopted: the last working config keeps
+  /// running and `configProblem` is set (the window turns read-only). A good file clears it.
   /// A drag in progress is closed as its own undo step but not saved: the file now holds the
   /// external edit, and saving the drag's value would overwrite it.
   public func adoptExternal(_ external: EdgyConfig) {
     try? closeContinuousEdit(save: false)
-    guard external != config else { return }
+    let before = Set(issues.filter(\.isError))
+    let introduced = validator.validate(external).filter { $0.isError && !before.contains($0) }
+    guard introduced.isEmpty else {
+      reportConfigProblem(SettingsEditorError.invalid(introduced))
+      return
+    }
+    let hadProblem = configProblem != nil
+    configProblem = nil
+    guard external != config else {
+      if hadProblem { notify(.configProblem, previous: config) }
+      return
+    }
     pushUndo(config)
     redoStack.removeAll()
     set(external, cause: .external)
     logIssues()
   }
 
-  /// Re-reads the file and adopts it. Throws the store's load error (the current config stays).
+  /// Re-reads the file and adopts it. A file that doesn't load sets `configProblem` and rethrows
+  /// the store's error; one that doesn't validate sets it and throws `.invalid`. Either way the
+  /// current config stays and keeps running.
   public func reloadFromDisk() throws {
-    adoptExternal(try store.load())
+    let loaded: EdgyConfig
+    do {
+      loaded = try store.load()
+    } catch {
+      reportConfigProblem(error)
+      throw error
+    }
+    adoptExternal(loaded)
+    if let configProblem { throw SettingsEditorError.readOnly(configProblem) }
+  }
+
+  /// The file watcher couldn't load the file (`ConfigStore.startWatching(onChange:onFailure:)`).
+  /// Keeps the running config, closes any drag without saving, and turns edits read-only.
+  public func reportConfigProblem(_ error: Error) {
+    try? closeContinuousEdit(save: false)
+    let problem = ConfigProblem(error: error)
+    logger.log(.error, "Config file is broken; keeping the last working settings: \(problem.message)")
+    guard problem != configProblem else { return }
+    configProblem = problem
+    notify(.configProblem, previous: config)
+  }
+
+  /// Writes the running config over the broken file and clears `configProblem` (the UI confirms
+  /// first). Not an undo step: the config itself doesn't change.
+  public func replaceFileWithCurrentSettings() throws {
+    try store.save(config)
+    guard configProblem != nil else { return }
+    configProblem = nil
+    notify(.configProblem, previous: config)
   }
 
   // MARK: Private
@@ -500,7 +644,12 @@ public final class SettingsEditor {
     try commit(next)
   }
 
+  private func refuseWhileBroken() throws {
+    if let configProblem { throw SettingsEditorError.readOnly(configProblem) }
+  }
+
   private func commit(_ next: EdgyConfig) throws {
+    try refuseWhileBroken()
     guard next != config else { return }
     let before = Set(issues.filter(\.isError))
     let introduced = validator.validate(next).filter { $0.isError && !before.contains($0) }
