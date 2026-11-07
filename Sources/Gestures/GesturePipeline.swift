@@ -7,7 +7,10 @@ import EdgyCore
 ///
 /// Event conventions:
 /// - Slides emit `.began` (delta 0), any number of `.changed`, then `.ended` (delta 0) on lift or
-///   `.cancelled` when misfire defense revokes the claim.
+///   `.cancelled` when misfire defense revokes the claim. A slide that has moved and then rests in
+///   the end band of its zone (`Tuning.endBandMM`) emits a `.changed` with delta 0 and `atEnd`
+///   -1 / +1 every frame until it moves again or lifts. Every event carries `zoneLengthMM`.
+/// - Long-press time is `context.longPressMSByZone[zone]` where set, else `settings.longPressMS`.
 /// - Tap, double-tap and swipe emit exactly one event, phase `.ended`.
 /// - Long-press emits `.began` the moment the hold is recognized (while the finger is down), then
 ///   exactly one of `.ended` (a member lifts) or `.cancelled` (misfire defense takes the touch away:
@@ -185,6 +188,27 @@ struct FrameStep {
     slideAllowed(candidate) ? tuning.swipeMaxDurationS : tuning.swipeOnlyMaxDurationS
   }
 
+  /// Whether `zone` has a slide bound explicitly (the context names it in `slideZones`). Such a
+  /// zone asks a clearer flick of a swipe (`Tuning.slideZoneFlickSpeedMMPerS`).
+  func slideBound(_ zone: Zone) -> Bool {
+    context.slideZones?.contains(zone) ?? false
+  }
+
+  func flickSpeed(_ zone: Zone) -> Double {
+    slideBound(zone) ? tuning.slideZoneFlickSpeedMMPerS : tuning.flickSpeedMMPerS
+  }
+
+  func swipeMinTravel(_ zone: Zone) -> Double {
+    slideBound(zone) ? tuning.slideZoneSwipeMinTravelMM : tuning.swipeMinTravelMM
+  }
+
+  /// The long-press time for `zone`, seconds: `context.longPressMSByZone[zone]` when set (and
+  /// finite, positive), else `settings.longPressMS`.
+  func longPressTime(_ zone: Zone) -> Double {
+    guard let ms = context.longPressMSByZone?[zone], ms.isFinite, ms > 0 else { return timing.longPress }
+    return ms / 1000
+  }
+
   var fingerLimit: Int { min(max(context.settings.fingers, 1), 2) }
 
   var typingNow: Bool {
@@ -326,6 +350,8 @@ struct FrameStep {
   /// More contacts than the gesture allows → reject. A gesture that already owns its fingers is
   /// revoked only by a contact that landed together with it (a multi-finger touch), by 3+
   /// contacts, or by another contact that moves (`foreignMotionMM`: someone is using the pointer).
+  /// A hold that has begun ignores the moving contact: the held finger is still, and pointing
+  /// with another finger while holding (push-to-talk) must not let go of the keys.
   mutating func enforceContactCount() {
     let active = state.tracks.values.filter { !$0.isPalm }
     guard active.count > fingerLimit else { return }
@@ -339,9 +365,11 @@ struct FrameStep {
       let landedTogether = active.contains {
         !candidate.members.contains($0.id) && abs($0.birthTime - candidate.birthTime) <= tuning.multiFingerWindowS
       }
-      let othersMoving = active.contains {
-        !candidate.members.contains($0.id) && distance($0.position, $0.origin) > tuning.foreignMotionMM
-      }
+      let othersMoving =
+        !candidate.longPressFired
+        && active.contains {
+          !candidate.members.contains($0.id) && distance($0.position, $0.origin) > tuning.foreignMotionMM
+        }
       if active.count >= 3 || landedTogether || othersMoving {
         rejectCandidate(key, .tooManyContacts, measure: measure)
       }
@@ -387,7 +415,9 @@ struct FrameStep {
         measure: RejectionMeasure(measured: candidate.maxTravel, limit: tuning.cornerMaxTravelMM, unit: .mm))
       return
     }
-    if now - candidate.birthTime >= timing.longPress && candidate.maxTravel <= tuning.longPressMaxTravelMM {
+    if now - candidate.birthTime >= longPressTime(candidate.zone)
+      && candidate.maxTravel <= tuning.longPressMaxTravelMM
+    {
       fireLongPress(candidate.key)
     }
   }
@@ -401,7 +431,7 @@ struct FrameStep {
     case .sliding:
       updateSlide(candidate.key, edge: edge)
       if let updated = self.candidate(candidate.key), !updated.longPressFired, !updated.slide.emittedMotion,
-        elapsed >= timing.longPress, updated.maxTravel <= tuning.longPressMaxTravelMM
+        elapsed >= longPressTime(candidate.zone), updated.maxTravel <= tuning.longPressMaxTravelMM
       {
         fireLongPress(candidate.key)
       }
@@ -423,7 +453,7 @@ struct FrameStep {
 
     if abs(along) >= tuning.alongClaimMM && abs(along) >= tuning.axisDominance * abs(inward) {
       let speed = abs(along) / max(elapsed, tuning.minimumIntervalS)
-      if speed >= tuning.flickSpeedMMPerS || !slideAllowed(candidate) {
+      if speed >= flickSpeed(candidate.zone) || !slideAllowed(candidate) {
         setPhase(candidate.key, .swipe)
       } else if slideFingersMatch {
         // Anchor at the landing point so the motion that earned the claim is emitted right away.
@@ -452,7 +482,7 @@ struct FrameStep {
       beginSlide(candidate.key, anchor: geometry.along(edge, candidate.current), moving: false)
       return
     }
-    if !candidate.longPressFired && elapsed >= timing.longPress
+    if !candidate.longPressFired && elapsed >= longPressTime(candidate.zone)
       && candidate.maxTravel <= tuning.longPressMaxTravelMM
     {
       fireLongPress(candidate.key)
@@ -497,7 +527,24 @@ struct FrameStep {
     state.candidates[index] = candidate
     if let delta {
       emit(candidate, .slide, phase: .changed, deltaMM: delta)
+    } else if !candidate.slide.moving && candidate.slide.emittedMotion {
+      // Resting after moving: at an end of the zone, say so every frame (end-of-edge stepping).
+      let end = endSide(candidate.zone, edge: edge, along: along)
+      if end != 0 { emit(candidate, .slide, phase: .changed, deltaMM: 0, atEnd: end) }
     }
+  }
+
+  /// -1 / +1 when `along` (mm on the edge) is within the end band of the low / high end of `zone`
+  /// (or past it), 0 otherwise. The band is `Tuning.endBandMM`, at most `endBandMaxFraction` of the
+  /// zone's length. Corners have no ends.
+  func endSide(_ zone: Zone, edge: Zone.Edge, along: Double) -> Int {
+    guard case .edge(_, let segment, _) = zone else { return 0 }
+    let length = geometry.zoneLength(zone)
+    let band = min(tuning.endBandMM, length * tuning.endBandMaxFraction)
+    let offset = along - Double(segment) * length
+    if offset >= length - band { return 1 }
+    if offset <= band { return -1 }
+    return 0
   }
 
   mutating func fireLongPress(_ key: Int) {
@@ -579,7 +626,7 @@ struct FrameStep {
     guard case .edge(let edge) = candidate.region, elapsed <= swipeLimit(candidate) else { return nil }
     let along = geometry.along(edge, candidate.current) - geometry.along(edge, candidate.origin)
     let inward = geometry.inward(edge, from: candidate.origin, to: candidate.current)
-    guard abs(along) >= tuning.swipeMinTravelMM, abs(along) >= tuning.axisDominance * abs(inward) else {
+    guard abs(along) >= swipeMinTravel(candidate.zone), abs(along) >= tuning.axisDominance * abs(inward) else {
       return nil
     }
     switch edge {
@@ -591,7 +638,7 @@ struct FrameStep {
   func isFlick(_ candidate: Candidate, elapsed: Double) -> Bool {
     guard case .edge(let edge) = candidate.region else { return false }
     let along = geometry.along(edge, candidate.current) - geometry.along(edge, candidate.origin)
-    return abs(along) / max(elapsed, tuning.minimumIntervalS) >= tuning.flickSpeedMMPerS
+    return abs(along) / max(elapsed, tuning.minimumIntervalS) >= flickSpeed(candidate.zone)
   }
 
   /// Why a swipe candidate that lifted didn't make a swipe, and the number behind it:
@@ -610,8 +657,8 @@ struct FrameStep {
     if elapsed > swipeLimit(candidate) {
       return (.tooFast, swipeTimeMeasure(candidate, elapsed: elapsed))
     }
-    if along < tuning.swipeMinTravelMM {
-      return (.tooFast, RejectionMeasure(measured: along, limit: tuning.swipeMinTravelMM, unit: .mm))
+    if along < swipeMinTravel(candidate.zone) {
+      return (.tooFast, RejectionMeasure(measured: along, limit: swipeMinTravel(candidate.zone), unit: .mm))
     }
     return (.tooFast, nil)
   }
@@ -712,16 +759,23 @@ struct FrameStep {
     }
   }
 
-  mutating func emit(_ candidate: Candidate, _ kind: GestureKind, phase: GestureEvent.Phase, deltaMM: Double) {
-    events.append(event(candidate, kind, phase: phase, deltaMM: deltaMM))
+  mutating func emit(
+    _ candidate: Candidate, _ kind: GestureKind, phase: GestureEvent.Phase, deltaMM: Double, atEnd: Int = 0
+  ) {
+    events.append(event(candidate, kind, phase: phase, deltaMM: deltaMM, atEnd: atEnd))
   }
 
-  func event(_ candidate: Candidate, _ kind: GestureKind, phase: GestureEvent.Phase, deltaMM: Double) -> GestureEvent {
-    GestureEvent(
+  /// Every event carries its zone's length (`zoneLengthMM`), so `delta * zoneLengthMM` is the
+  /// travel in millimetres; `atEnd` is non-zero only on a resting slide's `.changed` at an end.
+  func event(
+    _ candidate: Candidate, _ kind: GestureKind, phase: GestureEvent.Phase, deltaMM: Double, atEnd: Int = 0
+  ) -> GestureEvent {
+    let length = geometry.zoneLength(candidate.zone)
+    return GestureEvent(
       zone: candidate.zone, kind: kind, fingers: candidate.members.count, phase: phase,
-      delta: deltaMM / geometry.zoneLength(candidate.zone),
+      delta: deltaMM / length,
       position: geometry.position(in: candidate.zone, at: candidate.current),
-      timestamp: now, deviceID: frame.deviceID)
+      timestamp: now, deviceID: frame.deviceID, zoneLengthMM: length, atEnd: atEnd)
   }
 
   // MARK: - Lookup

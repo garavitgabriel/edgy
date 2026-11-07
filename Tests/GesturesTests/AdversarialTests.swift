@@ -65,16 +65,19 @@ extension Replay {
   #expect(cancel > 0.5 && cancel < 0.6)
 }
 
-@Test func thumbHoldingAPushToTalkCornerIsCancelledWhenAnotherFingerMoves() {
+@Test func thumbHoldingAPushToTalkCornerSurvivesAnotherFingerMoving() {
   // A hold bound to the bottom-left corner; the thumb has held it past 500 ms when the index
-  // finger starts moving the pointer. The claim would freeze that pointer, so the hold ends.
+  // finger starts moving the pointer. Batch 20 reversed this test's old expectation (the hold was
+  // cancelled): a hold that has begun survives another finger pointing, and the runtime releases
+  // the pointer guard so that finger moves the pointer. It ends when the thumb lifts.
   let run = replay(
     TraceBuilder([
       Stroke(id: 1, [(0, 4, 4), (1.4, 4, 4)]),
       Stroke(id: 2, [(0.7, 80, 50), (0.8, 80, 50), (1.2, 110, 65)]),
     ]).frames(), zones: Preset.zones.union([.corner(.bottomLeft)]), slideZones: Preset.slideZones,
     longPressZones: [.corner(.bottomLeft)])
-  #expect(holdPhases(run) == [.began, .cancelled])
+  #expect(holdPhases(run) == [.began, .ended])
+  #expect(run.reasons(1).isEmpty)
   expectHoldsArePaired(run)
   #expect(run.endsUnclaimed)
 }
