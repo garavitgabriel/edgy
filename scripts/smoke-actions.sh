@@ -5,7 +5,9 @@
 # v0.2 catalog: opens a TextEdit document, sends it shortcuts, snaps its window, opens a URL,
 # shows Mission Control and switches Spaces. v0.3 steps (17+): measures the fine level-key step,
 # checks the native volume HUD with headphones, drives the app switcher, holds a key, toggles
-# Dictation, the keyboard backlight, and snaps a full-screen window. It asks before each step and
+# Dictation, the keyboard backlight, and snaps a full-screen window. v0.4 steps (24+): fn-only
+# push-to-talk, the hold watchdog, the key recorder (needs Input Monitoring for your terminal
+# app), and the installed-apps and Shortcuts listings. It asks before each step and
 # restores prior values at the end (levels also on Ctrl-C); it closes the document it opened.
 #
 # Media keys, key shortcuts and window snapping need Accessibility for your terminal app (System Settings → Privacy & Security →
@@ -71,7 +73,7 @@ let registry = ActionRegistry(
   haptics: haptics, shortcuts: LiveShortcutRunner(), keyboard: keyboard, workspace: workspace,
   windows: windows, system: LiveSystemOutput(keyboard: keyboard), levelKeys: levelKeys,
   displays: makeLiveDisplayBrightness(), backlight: backlight, dictation: LiveDictationOutput(),
-  waiter: LiveTransitionWaiter())
+  waiter: LiveTransitionWaiter(), scheduler: LiveActionScheduler())
 let priorBacklight = backlight.isAvailable ? try? backlight.level() : nil
 
 // Snapshot everything we might touch.
@@ -313,6 +315,88 @@ if ask("23. Full-screen snap: put a window in full screen within 6 s; it should 
   fire("window.restore")
   settle()
   print("  Did it leave full screen, land on the left half, then go back to its normal (not full-screen) frame?")
+}
+// v0.4: modifier-only hold, the hold watchdog, and the picker models.
+
+/// Result of async work, filled from a background task while the main run loop keeps spinning
+/// (the key recorder's event tap is on the main run loop).
+final class Box<T>: @unchecked Sendable {
+  private let lock = NSLock()
+  private var stored: T?
+  var value: T? {
+    get { lock.lock(); defer { lock.unlock() }; return stored }
+    set { lock.lock(); stored = newValue; lock.unlock() }
+  }
+}
+
+@MainActor func waitFor<T: Sendable>(_ seconds: Double, _ work: @escaping @Sendable () async -> T) -> T? {
+  let box = Box<T>()
+  Task.detached { box.value = await work() }
+  let deadline = Date().addingTimeInterval(seconds)
+  while box.value == nil, Date() < deadline { settle(0.05) }
+  return box.value
+}
+
+if ask("24. fn-only push-to-talk: hold fn for 3 s (set your dictation app's hold key to fn first)?") {
+  let fnOnly = ActionContext(frontmostBundleID: nil, parameters: ["keys": "fn"])
+  check("fn down") { try registry.perform("keyboard.hold", input: .press(down: true), context: fnOnly) }
+  settle(3.0)
+  check("fn up") { try registry.perform("keyboard.hold", input: .press(down: false), context: fnOnly) }
+  settle()
+  print("  Did the dictation app listen for 3 s and stop on release? If it did nothing, it may read fn")
+  print("  from the hardware layer (below synthetic events): note the app and its setting in the done report.")
+  print("  Also try ctrl+opt here if your app offers it: re-run step 20 with ctrl+opt.")
+}
+if ask("25. Hold watchdog: hold fn with maxSeconds 5 and never release (expect release after 5 s)?") {
+  let watched = ActionContext(frontmostBundleID: nil, parameters: ["keys": "fn", "maxSeconds": "5"])
+  check("fn down (no up will be sent)") {
+    try registry.perform("keyboard.hold", input: .press(down: true), context: watched)
+  }
+  settle(7.0)
+  print("  Did the dictation app stop by itself after ~5 s? Edgy logs \"hold: no release after 5.0 s\":")
+  print("  /usr/bin/log show --last 1m --predicate 'subsystem == \"com.garavit.edgy\"' --info")
+  check("late up is harmless") {
+    try registry.perform("keyboard.hold", input: .press(down: false), context: watched)
+  }
+}
+if ask("26. Key recorder: press a combo, a bare key, or press and release fn alone (15 s; escape cancels)?") {
+  let recorder = makeLiveKeyComboRecorder()
+  let states = waitFor(16) { () async -> [KeyRecorderState] in
+    var seen: [KeyRecorderState] = []
+    for await state in recorder.start(timeout: 15) {
+      print("  state: \(state)")
+      seen.append(state)
+    }
+    return seen
+  }
+  switch states?.last {
+  case .recorded(let combo)?: print("  Recorded: \(combo)  (does it match what you pressed?)")
+  case .unavailable(let reason)?: print("  Unavailable: \(reason) (grant Input Monitoring to your terminal app)")
+  case let other?: print("  Ended: \(other)")
+  case nil: print("  FAILED: the recorder never finished")
+  }
+}
+if ask("27. Installed apps: list them (count, first 10, running ones)?") {
+  let provider = makeLiveInstalledAppsProvider()
+  let started = Date()
+  if let apps = waitFor(30, { await provider.installedApps() }) {
+    print("  \(apps.count) apps in \(String(format: "%.2f", Date().timeIntervalSince(started))) s")
+    for app in apps.prefix(10) { print("    \(app.name)  \(app.bundleID)  \(app.isRunning ? "running" : "")") }
+    print("  running: \(apps.filter(\.isRunning).map(\.name).joined(separator: ", "))")
+    print("  Any app missing or listed twice?")
+  } else {
+    print("  FAILED: no answer within 30 s")
+  }
+}
+if ask("28. Shortcuts: list your Shortcuts through the shortcuts command?") {
+  let listing = makeLiveShortcutsListing()
+  if let list = waitFor(15, { await listing.shortcuts() }) {
+    if let failure = list.failure { print("  failure: \(failure)") }
+    print("  \(list.names.count) shortcuts: \(list.names.prefix(15).joined(separator: " | "))")
+    print("  Do names with spaces or emoji look right?")
+  } else {
+    print("  FAILED: no answer within 15 s")
+  }
 }
 print("\nNot run here: system.lockScreen and system.sleepDisplay (they end the session). Bind them and try by hand.")
 

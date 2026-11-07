@@ -34,6 +34,66 @@ enum KeyCodes {
     .fn: (0x3F, .maskSecondaryFn),
   ]
 
+  /// The `KeyCombo` name of a virtual key code, `nil` for keys Edgy has no name for.
+  static func name(for keyCode: Int64) -> String? { namesByCode[keyCode] }
+
+  private static let namesByCode: [Int64: String] = Dictionary(
+    uniqueKeysWithValues: byName.map { (Int64($0.value), $0.key) })
+
+  /// The modifiers whose generic flags are set in `flags` (device bits and others ignored).
+  static func modifiers(in flags: CGEventFlags) -> Set<KeyCombo.Modifier> {
+    Set(KeyCombo.Modifier.allCases.filter { modifiers[$0].map { flags.contains($0.flag) } ?? false })
+  }
+
+  /// Device-dependent flag bits a real keyboard sets alongside each generic modifier flag, for
+  /// the left-hand key (the key codes in `modifiers` are the left-hand ones). Some apps that
+  /// listen for a bare modifier check these bits to tell left from right. fn has none: its only
+  /// signal is `.maskSecondaryFn`.
+  static let deviceBits: [KeyCombo.Modifier: UInt64] = [
+    .ctrl: 0x0000_0001, .shift: 0x0000_0002, .cmd: 0x0000_0008, .opt: 0x0000_0020,
+  ]
+
+  /// Flags of a set of held modifier keys, as a real keyboard reports them: each modifier's
+  /// generic flag plus its left-hand device bit.
+  static func heldFlags(_ held: Set<KeyCombo.Modifier>) -> CGEventFlags {
+    held.reduce(into: CGEventFlags()) { flags, modifier in
+      guard let entry = modifiers[modifier] else { return }
+      flags.insert(entry.flag)
+      flags.insert(CGEventFlags(rawValue: deviceBits[modifier] ?? 0))
+    }
+  }
+
+  /// One event of a modifier key going down or up.
+  struct ModifierEvent: Equatable {
+    var modifier: KeyCombo.Modifier
+    var code: CGKeyCode
+    var down: Bool
+    /// The full modifier state *after* this key changed, which is what a flags-changed event
+    /// carries (so a key-up carries the modifiers still held, not its own flag).
+    var flags: CGEventFlags
+  }
+
+  /// The events that press (or release) `modifiers` in the order given, starting from `held`,
+  /// and the held set afterwards. Pressing a held modifier, or releasing one that isn't, still
+  /// emits its event (the system ignores a duplicate) so a stuck key can always be released.
+  ///
+  /// On macOS 27 a keyboard event built for a modifier key code is a **flags-changed** event
+  /// (type 12), not a key-down: that is the route a key-listening app watches for a bare
+  /// modifier such as a dictation app's fn push-to-talk key. The live output also sets the type
+  /// explicitly, so the route doesn't depend on that inference.
+  static func modifierEvents(
+    _ modifiers: [KeyCombo.Modifier], down: Bool, held: Set<KeyCombo.Modifier>
+  ) -> (events: [ModifierEvent], held: Set<KeyCombo.Modifier>) {
+    var held = held
+    var events: [ModifierEvent] = []
+    for modifier in modifiers {
+      guard let entry = self.modifiers[modifier] else { continue }
+      if down { held.insert(modifier) } else { held.remove(modifier) }
+      events.append(ModifierEvent(modifier: modifier, code: entry.code, down: down, flags: heldFlags(held)))
+    }
+    return (events, held)
+  }
+
   /// Keys a real keyboard reports with extra flags: arrows carry the numeric-pad and function
   /// flags, the other navigation and function keys carry the function flag. Some system
   /// shortcuts (e.g. switching Spaces with ctrl+arrow) only match events that look like that.

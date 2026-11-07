@@ -330,6 +330,7 @@ struct Harness {
   let backlight = MockKeyboardBacklightOutput()
   let dictation = MockDictationOutput()
   let waiter = MockTransitionWaiter()
+  let scheduler = MockScheduler()
   let registry: ActionRegistry
 
   init(settings: AppSettings = .defaults, levelKeys working: Bool = false) {
@@ -337,7 +338,8 @@ struct Harness {
     registry = ActionRegistry(
       settings: settings, audio: audio, display: display, media: media, hud: hud, haptics: haptics,
       shortcuts: shortcuts, keyboard: keyboard, workspace: workspace, windows: windows, system: system,
-      levelKeys: levelKeys, displays: displays, backlight: backlight, dictation: dictation, waiter: waiter)
+      levelKeys: levelKeys, displays: displays, backlight: backlight, dictation: dictation, waiter: waiter,
+      scheduler: scheduler)
   }
 
   func press(_ id: ActionID, down: Bool, _ parameters: [String: String] = [:]) throws {
@@ -366,4 +368,50 @@ extension AppSettings {
     settings.haptics = haptics
     return settings
   }
+}
+
+/// A virtual clock: work runs only when the test advances time past its deadline.
+final class MockScheduler: ActionScheduler, @unchecked Sendable {
+  final class Work: ScheduledWork, @unchecked Sendable {
+    let deadline: TimeInterval
+    let delay: TimeInterval
+    let body: @Sendable () -> Void
+    private(set) var cancelled = false
+    private(set) var ran = false
+    init(deadline: TimeInterval, delay: TimeInterval, body: @escaping @Sendable () -> Void) {
+      self.deadline = deadline
+      self.delay = delay
+      self.body = body
+    }
+    func cancel() { cancelled = true }
+    func run() {
+      ran = true
+      body()
+    }
+  }
+
+  private(set) var now: TimeInterval = 0
+  /// Everything ever scheduled, in order.
+  private(set) var scheduled: [Work] = []
+  /// Scheduled, not yet run, not cancelled.
+  var pending: [Work] { scheduled.filter { !$0.cancelled && !$0.ran } }
+
+  func schedule(after delay: TimeInterval, _ work: @escaping @Sendable () -> Void) -> ScheduledWork {
+    let item = Work(deadline: now + delay, delay: delay, body: work)
+    scheduled.append(item)
+    return item
+  }
+
+  /// Moves the clock forward, running due work in deadline order.
+  func advance(by seconds: TimeInterval) {
+    let target = now + seconds
+    while let next = pending.filter({ $0.deadline <= target }).min(by: { $0.deadline < $1.deadline }) {
+      now = next.deadline
+      next.run()
+    }
+    now = target
+  }
+
+  /// Runs `work` as if its timer fired now, even if it was cancelled (a fire racing a cancel).
+  func fireLate(_ work: Work) { work.run() }
 }

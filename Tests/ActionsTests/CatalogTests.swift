@@ -19,12 +19,12 @@ import Testing
         "keyboard.shortcut", "keyboard.slideSteps", "keyboard.hold",
         "app.open", "url.open", "file.open", "apps.switcher",
         "system.missionControl", "system.appWindows", "system.showDesktop", "spaces.left", "spaces.right",
-        "system.lockScreen", "system.sleepDisplay", "system.dictation",
+        "system.lockScreen", "system.sleepDisplay", "system.dictation", "edgy.none",
         "window.leftHalf", "window.rightHalf", "window.topHalf", "window.bottomHalf", "window.maximize",
         "window.center", "window.minimize", "window.restore",
       ])
     #expect(Set(ids).count == ids.count)
-    #expect(ids.count == 33)
+    #expect(ids.count == 34)
   }
 
   @Test func shapesAndCategories() {
@@ -47,6 +47,7 @@ import Testing
       "window.maximize": .windows, "window.center": .windows, "window.minimize": .windows,
       "window.restore": .windows, "apps.switcher": .apps, "keyboard.hold": .keyboard,
       "system.dictation": .system, "keyboard.backlight": .display, "keyboard.backlightToggle": .display,
+      "edgy.none": .system,
     ]
     #expect(byID.mapValues(\.category) == expected)
   }
@@ -77,7 +78,10 @@ import Testing
     #expect(byID["file.open"]?.parameters.map(\.key) == ["path"])
     #expect(
       byID["keyboard.hold"]?.parameters == [
-        ActionParameter(key: "keys", kind: .keyCombo, required: true, displayName: "Keys")
+        ActionParameter(key: "keys", kind: .keyCombo, required: true, displayName: "Keys"),
+        ActionParameter(
+          key: "maxSeconds", kind: .number(5...600), required: false, defaultValue: "120",
+          displayName: "Release after"),
       ])
     #expect(
       byID["apps.switcher"]?.parameters == [

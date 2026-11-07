@@ -13,6 +13,9 @@ extension ActionRegistry {
   /// The modifier that keeps the switcher open, and the key that moves through it.
   static let switcherModifier: KeyCombo.Modifier = .cmd
   static let switcherKey = "tab"
+  /// Watchdog: a switcher session that gets no event for this long is cancelled (escape, then
+  /// command up), so a lost `.ended` / `.cancelled` never leaves command stuck down.
+  static let switcherIdleTimeout: TimeInterval = 10
 
   // MARK: - App switcher
 
@@ -20,12 +23,18 @@ extension ActionRegistry {
   /// app); each `step` of travel sends tab (toward top/right) or shift-tab; `.ended` releases
   /// command, which selects; `.cancelled` sends escape, then releases.
   ///
-  /// Command is never left down: every error releases it, and a `.began` that arrives while a
+  /// Command is never left down: every error releases it, a `.began` that arrives while a
   /// switcher session is still open (its end was lost) first cancels that session — escape, then
-  /// release — rather than selecting an app the user never chose.
+  /// release — rather than selecting an app the user never chose, and a session that hears
+  /// nothing for `switcherIdleTimeout` is cancelled by its watchdog.
   func performSwitcher(
     _ id: ActionID, delta: Double, phase: GestureEvent.Phase, context: ActionContext
   ) throws {
+    keyLock.lock()
+    defer {
+      rearmSwitcherWatchdog()
+      keyLock.unlock()
+    }
     switch phase {
     case .began:
       endSwitcher(cancel: true)
@@ -34,6 +43,7 @@ extension ActionRegistry {
         default: ActionCatalog.defaultSwitcherStep)
       // The session (and so the release) exists only once command is really down.
       try unavailable(id) { try keyboard.setModifiers([Self.switcherModifier], down: true) }
+      keySessionGeneration += 1
       switcher = SwitcherSession(step: step, carry: 0)
       try releasingSwitcherOnError(id) { try tapSwitcher(forward: true) }
       try switcherTravel(id, delta: delta, context: context)
@@ -82,6 +92,10 @@ extension ActionRegistry {
   /// Ends the switcher session, if any: escape first when cancelling, then release command.
   /// Best effort — a failure here can't be reported to anyone who could act on it, so it is logged.
   func endSwitcher(cancel: Bool) {
+    keyLock.lock()
+    defer { keyLock.unlock() }
+    switcherWatchdog?.cancel()
+    switcherWatchdog = nil
     guard switcher != nil else { return }
     switcher = nil
     let held: Set<KeyCombo.Modifier> = [Self.switcherModifier]
@@ -100,16 +114,47 @@ extension ActionRegistry {
     }
   }
 
+  /// Restarts the idle watchdog after any switcher event; no open session → no watchdog.
+  private func rearmSwitcherWatchdog() {
+    switcherWatchdog?.cancel()
+    switcherWatchdog = nil
+    guard switcher != nil else { return }
+    let generation = keySessionGeneration
+    switcherWatchdog = scheduler.schedule(after: Self.switcherIdleTimeout) { [weak self] in
+      self?.switcherWatchdogFired(generation: generation)
+    }
+  }
+
+  func switcherWatchdogFired(generation: Int) {
+    keyLock.lock()
+    defer { keyLock.unlock() }
+    guard switcher != nil, generation == keySessionGeneration else { return }
+    actionsLog.notice(
+      "app switcher: no event for \(Self.switcherIdleTimeout, privacy: .public) s; cancelling and releasing command")
+    endSwitcher(cancel: true)
+  }
+
   // MARK: - Hold a key
 
-  /// `keyboard.hold`: `down: true` presses the combo's modifiers, then its key, and keeps them
-  /// down; `down: false` releases the key, then the modifiers in reverse. A second `down: true`
-  /// without an up releases the first combo before pressing. Releasing never needs the binding's
-  /// parameters (they may have changed or broken meanwhile), so a held key always comes back up.
+  /// `keyboard.hold`: `down: true` presses the combo's modifiers, then its key (if it has one),
+  /// and keeps them down; `down: false` releases the key, then the modifiers in reverse. A
+  /// modifier-only combo (`fn`, `ctrl+opt`) presses and releases just the modifiers, as
+  /// flags-changed events like the physical keys send. A second `down: true` without an up
+  /// releases the first combo before pressing. Releasing never needs the binding's parameters
+  /// (they may have changed or broken meanwhile), so a held key always comes back up.
+  ///
+  /// Watchdog: if no up arrives within `maxSeconds` (default 120), the hold is released and
+  /// logged once.
   func performHold(_ id: ActionID, down: Bool, context: ActionContext) throws {
+    keyLock.lock()
+    defer { keyLock.unlock() }
     releaseHeld()
     guard down else { return }
     let combo = try combo(ActionParameterKey.keys, for: id, in: context)
+    let maxSeconds = try number(
+      ActionParameterKey.maxSeconds, for: id, in: context, range: ActionCatalog.holdMaxSecondsRange,
+      default: ActionCatalog.defaultHoldMaxSeconds)
+    keySessionGeneration += 1
     heldCombo = combo
     do {
       try unavailable(id) {
@@ -120,10 +165,27 @@ extension ActionRegistry {
       releaseHeld()
       throw error
     }
+    let generation = keySessionGeneration
+    holdWatchdog = scheduler.schedule(after: maxSeconds) { [weak self] in
+      self?.holdWatchdogFired(generation: generation, after: maxSeconds)
+    }
+  }
+
+  func holdWatchdogFired(generation: Int, after seconds: Double) {
+    keyLock.lock()
+    defer { keyLock.unlock() }
+    guard let combo = heldCombo, generation == keySessionGeneration else { return }
+    actionsLog.notice(
+      "hold: no release after \(seconds, privacy: .public) s; releasing \(combo.description, privacy: .public)")
+    releaseHeld()
   }
 
   /// Releases the held combo, if any: key up, then modifiers in reverse order. Best effort, logged.
   func releaseHeld() {
+    keyLock.lock()
+    defer { keyLock.unlock() }
+    holdWatchdog?.cancel()
+    holdWatchdog = nil
     guard let combo = heldCombo else { return }
     heldCombo = nil
     do {

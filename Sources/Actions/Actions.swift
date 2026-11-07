@@ -21,5 +21,6 @@ public func makeLiveActionRegistry(settings: AppSettings) -> ActionPerforming {
     shortcuts: LiveShortcutRunner(), keyboard: keyboard, workspace: LiveWorkspaceOutput(),
     windows: LiveWindowOutput(), system: LiveSystemOutput(keyboard: keyboard), levelKeys: LiveLevelKeyOutput(),
     displays: makeLiveDisplayBrightness(), backlight: LiveKeyboardBacklightOutput(),
-    dictation: LiveDictationOutput(), waiter: LiveTransitionWaiter())
+    dictation: LiveDictationOutput(), waiter: LiveTransitionWaiter(),
+    scheduler: LiveActionScheduler())
 }

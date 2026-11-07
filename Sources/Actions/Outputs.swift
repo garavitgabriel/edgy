@@ -172,3 +172,19 @@ enum SystemCommand: String, CaseIterable, Equatable, Sendable {
 protocol SystemOutput: AnyObject {
   func perform(_ command: SystemCommand) throws
 }
+
+// MARK: - v0.4
+
+/// A piece of work handed to an `ActionScheduler`.
+protocol ScheduledWork: AnyObject, Sendable {
+  /// Stops the work from running, if it hasn't yet. Safe to call more than once.
+  func cancel()
+}
+
+/// Runs work later, off the caller's thread. Injected so tests drive time (the hold and app
+/// switcher watchdogs).
+protocol ActionScheduler: AnyObject, Sendable {
+  /// Runs `work` once, `delay` seconds from now, on the scheduler's own queue, unless the
+  /// returned handle is cancelled first.
+  func schedule(after delay: TimeInterval, _ work: @escaping @Sendable () -> Void) -> ScheduledWork
+}
