@@ -41,7 +41,7 @@ struct Batch21MirrorTests {
   }
 
   @Test func fitPicksTheFirstFormThatFitsElseClipsTheLastWithoutEllipsis() {
-    let forms = ["Keyboard Shortcut, Next Track and Play / Pause", "⌘ Left, Next Track and Play / Pause"]
+    let forms = ["Keyboard Shortcut, Next Track and Play/Pause", "⌘ Left, Next Track and Play/Pause"]
     let wide = MirrorPad.fit(forms, room: 1000)
     #expect(wide == MirrorPad.FittedLabel(text: forms[0], clipWidth: nil))
     let middle = MirrorPad.fit(forms, room: MirrorPad.textWidth(forms[1]) + 1)

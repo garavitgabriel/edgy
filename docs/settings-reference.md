@@ -155,8 +155,8 @@ A parameter with no default is required.
 | `mic.mute` | Microphone Mute | trigger | sound | — |
 | `display.brightness` | Brightness | continuous | display | `speedUp` (availability depends on the displays) |
 | `keyboard.backlight` | Keyboard Brightness | continuous | display | `speedUp` (unavailable without a backlit keyboard) |
-| `keyboard.backlightToggle` | Keyboard Backlight On / Off | trigger | display | — (unavailable without a backlit keyboard) |
-| `media.playPause` | Play / Pause | trigger | media | — |
+| `keyboard.backlightToggle` | Keyboard Backlight On/Off | trigger | display | — (unavailable without a backlit keyboard) |
+| `media.playPause` | Play/Pause | trigger | media | — |
 | `media.next` | Next Track | trigger | media | — |
 | `media.previous` | Previous Track | trigger | media | — |
 | `system.missionControl` | Mission Control | trigger | system | — |

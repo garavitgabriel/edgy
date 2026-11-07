@@ -142,7 +142,7 @@ enum ActionCatalog {
       id: BuiltInAction.brightness, shape: .continuous, displayName: "Brightness", category: .display,
       parameters: [levelSpeedUp]),
     ActionDescriptor(id: BuiltInAction.micMute, shape: .trigger, displayName: "Microphone Mute", category: .sound),
-    ActionDescriptor(id: BuiltInAction.playPause, shape: .trigger, displayName: "Play / Pause", category: .media),
+    ActionDescriptor(id: BuiltInAction.playPause, shape: .trigger, displayName: "Play/Pause", category: .media),
     ActionDescriptor(id: BuiltInAction.next, shape: .trigger, displayName: "Next Track", category: .media),
     ActionDescriptor(id: BuiltInAction.previous, shape: .trigger, displayName: "Previous Track", category: .media),
     ActionDescriptor(
@@ -159,7 +159,7 @@ enum ActionCatalog {
       category: .display, parameters: [levelSpeedUp]),
     // Off, or back to the last non-zero level.
     ActionDescriptor(
-      id: BuiltInAction.keyboardBacklightToggle, shape: .trigger, displayName: "Keyboard Backlight On / Off",
+      id: BuiltInAction.keyboardBacklightToggle, shape: .trigger, displayName: "Keyboard Backlight On/Off",
       category: .display),
 
     // Keyboard.
