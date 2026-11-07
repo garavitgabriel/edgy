@@ -116,7 +116,7 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
    - **One plate component** is shared by the overlay and the onboarding feedback: same radius, same 17/13 type pair, same inset. In the render, C and D look like two products; don't build that.
    - **The plate is always dark** (the espresso plate of renders D and S8) in both system appearances. Over dark documents it gets a 0.5 pt light edge (`rgba(255,230,210,.24)`).
    - **Contacts on a plate** (filled accent, or the dry-run ring) get a 1 pt cream rim (`#FBEADB` at 70%) for ≥3:1, like the app icon's dot. It's a stroke, never a halo.
-   - **Run-mode trigger plates** show the bare action name ("Play/Pause"). The display check is the one plate exempt from the 17/13 pair.
+   - **Run-mode trigger plates** show the bare action name ("Play/Pause"). Actions with a parameter keep a past-tense verb plus the object ("Opened Quillpad", "Pressed ⇧⌘ 4", "Ran <name>"), pairing with dry run's "Would …". The plate edge is always drawn; it isn't gated on the backdrop. The display check is the one plate exempt from the 17/13 pair.
 10. **The menu-bar popover** (not a plain menu):
     - **Top half:** a live mini mirror (zones of the active profile plus the last touch where it landed), profile chips, and **Enabled** and **Test Mode** switches.
     - **Profile chips don't select anything.** Profiles follow the frontmost app automatically. The chip of the profile in effect is filled; the others are outlined. Clicking a chip opens Settings on that profile's tab. If the frontmost app has its own profile, its chip comes first.
