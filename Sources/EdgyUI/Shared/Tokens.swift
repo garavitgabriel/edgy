@@ -37,6 +37,17 @@ public enum Tokens {
   /// 1 pt cream rim around an accent contact on a plate (≥3:1), a stroke, never a halo.
   public static let contactRim = Color(nsColor: NSColor(hex: 0xFBEADB)).opacity(0.7)
   public static let contactRimWidth: CGFloat = 1
+  /// 0.5 pt outline around the title-bar app icon: `ink` at 18% in light mode, none in dark mode
+  /// (BRIEF § Window identity (a)).
+  public static let titleIconOutline = Color(
+    nsColor: NSColor(name: nil) { appearance in
+      appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua
+        ? .clear : NSColor(hex: 0x3B2219).withAlphaComponent(0.18)
+    })
+  public static let titleIconOutlineWidth: CGFloat = 0.5
+  /// The title-bar app icon: the profile-tab pill's height, 12 pt after the last traffic light.
+  public static let titleIconSize: CGFloat = 26
+  public static let titleIconLeading: CGFloat = 12
 
   // MARK: Type — one scale, system font only, regular and semibold
 
