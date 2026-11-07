@@ -23,6 +23,21 @@ public enum Tokens {
   public static let windowTint = dynamic(light: 0xFBE8D8, dark: 0x2A1B15)
   public static let windowTintOpacity = 0.82
 
+  // MARK: Plates (always dark, in both system appearances — BRIEF bone 9 ruling)
+
+  /// The espresso plate fill (render D / S8), the same in light and dark.
+  public static let plateFill = Color(nsColor: NSColor(hex: 0x2A1B15)).opacity(0.92)
+  /// Primary text on a plate (the dark-mode `ink`).
+  public static let plateInk = Color(nsColor: NSColor(hex: 0xFBEADB))
+  /// Secondary text on a plate (the dark-mode `ink2`).
+  public static let plateInk2 = Color(nsColor: NSColor(hex: 0xD9BFAE))
+  /// 0.5 pt light edge so a plate holds over dark documents: rgba(255,230,210,.24).
+  public static let plateEdge = Color(nsColor: NSColor(hex: 0xFFE6D2)).opacity(0.24)
+  public static let plateEdgeWidth: CGFloat = 0.5
+  /// 1 pt cream rim around an accent contact on a plate (≥3:1), a stroke, never a halo.
+  public static let contactRim = Color(nsColor: NSColor(hex: 0xFBEADB)).opacity(0.7)
+  public static let contactRimWidth: CGFloat = 1
+
   // MARK: Type — one scale, system font only, regular and semibold
 
   /// Picker group headers only.

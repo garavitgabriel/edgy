@@ -114,6 +114,9 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
    - Each element is its own plate, docked to the screen edge or corner of the touched zone and fully on-screen.
    - Plate text is ≥13 pt at ≥4.5:1, readable over light and dark documents.
    - **One plate component** is shared by the overlay and the onboarding feedback: same radius, same 17/13 type pair, same inset. In the render, C and D look like two products; don't build that.
+   - **The plate is always dark** (the espresso plate of renders D and S8) in both system appearances. Over dark documents it gets a 0.5 pt light edge (`rgba(255,230,210,.24)`).
+   - **Contacts on a plate** (filled accent, or the dry-run ring) get a 1 pt cream rim (`#FBEADB` at 70%) for ≥3:1, like the app icon's dot. It's a stroke, never a halo.
+   - **Run-mode trigger plates** show the bare action name ("Play/Pause"). The display check is the one plate exempt from the 17/13 pair.
 10. **The menu-bar popover** (not a plain menu):
     - **Top half:** a live mini mirror (zones of the active profile plus the last touch where it landed), profile chips, and **Enabled** and **Test Mode** switches.
     - **Profile chips don't select anything.** Profiles follow the frontmost app automatically. The chip of the profile in effect is filled; the others are outlined. Clicking a chip opens Settings on that profile's tab. If the frontmost app has its own profile, its chip comes first.
@@ -298,7 +301,7 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
 
 - **External display brightness and keyboard backlight.** The system draws no indicator for these, so Edgy uses **the one plate component**:
   - The value line (17) reads "Brightness 40%" or "Keyboard 60%".
-  - The second line (13, `ink2`) names the device: the display's name, or "Keyboard".
+  - The second line (13, `ink2`) names the device: the display's name, or the keyboard's ("Built-in keyboard").
   - A slim level bar uses the accent fill.
   - It docks at the screen edge of the touched zone, on the display being changed, and fades 1.2 s after the slide ends. It shows whether or not Test Mode is on, because it replaces a system HUD.
 - **"Did the screen change?"** This is asked once per external display, the first time brightness is used on it:
