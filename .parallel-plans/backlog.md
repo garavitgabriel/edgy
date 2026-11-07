@@ -30,3 +30,7 @@ Items found in testing or left open by builders, to fold into a future round.
 ## Overlay follow-ups (critique 23 should-fix, chief to do after 22/24)
 - Parameterised run plates: past-tense verb + object ("Opened Quillpad", "Pressed ⇧⌘ 4", "Ran <name>"); plain triggers stay bare.
 - plate-component shot gets the black-document half.
+
+## From batch 24
+- `SettingsModel.decisionSerial` (monotonic) so onboarding step 2 counts new decisions exactly (today: overlap inference, can only miss a decision repeating a full 32-window).
+- Design question: does the rejected (struck) mark on a plate also take the cream rim? Today only filled/dry-run contacts do.
