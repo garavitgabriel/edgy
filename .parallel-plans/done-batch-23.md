@@ -166,3 +166,6 @@ Kill list: no halo (the rim is a 1 pt solid stroke), no hero numerals, no second
 1. **Parameterized run copy:** does "run mode needs no verb" extend to "Opened Quillpad" → "Quillpad", "Pressed ⇧⌘ 4" → "⇧⌘ 4", "Ran <name>" → "<name>"? I kept batch 18's copy because the ruling answered the bare trigger only.
 2. **External keyboard name:** the plate shows `ActionOutcome.detail` when Actions sets it for the keyboard backlight. Today Actions sends none, so it always reads "Built-in keyboard".
 3. **Skeleton shots:** `SkeletonTests` rewrites `build-shots/skeleton/plate-*.png` with the now-dark plate. Regenerate them on `main`.
+
+## Addendum (chief, from the builder's note after its worktree closed)
+- **Must-fix 3, no system HUD in dry run:** `hud.show` is called in exactly one place, inside the action registry (`Sources/Actions/ActionRegistry.swift`, the level path), so the HUD appears only when an action is performed. `EdgyRuntimeTests` `TestModeTests.testModeSlideTicksAndReportsOncePerSlide` and `testModeRunsNothingButReportsAndTicks` assert `actions.performed.isEmpty` with Test Mode (dry run) on — therefore dry run draws no HUD.
