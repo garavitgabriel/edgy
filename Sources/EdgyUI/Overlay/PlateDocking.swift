@@ -21,7 +21,7 @@ enum PlateDocking {
       switch edge {
       case .right, .left:
         let x = edge == .right ? inner.maxX - size.width : inner.minX
-        // Side segments count bottom → top, like the screen's y.
+        // Side segments count bottom to top, like the screen's y.
         let y = inner.minY + inner.height * fraction - size.height / 2 - step * (size.height + margin)
         origin = CGPoint(x: x, y: y)
       case .top, .bottom:

@@ -168,7 +168,7 @@ enum PlateNaming {
     "\(ZoneNaming.title(zone)), \(GestureNaming.lower(kind))"
   }
 
-  /// The catalog's name as the pad spells it ("Play / Pause" → "Play/Pause").
+  /// The catalog's name as the pad spells it ("Play / Pause" becomes "Play/Pause").
   static func name(_ id: ActionID, catalog: [ActionID: ActionDescriptor]) -> String {
     catalog[id]?.displayName.replacingOccurrences(of: " / ", with: "/") ?? id.rawValue
   }

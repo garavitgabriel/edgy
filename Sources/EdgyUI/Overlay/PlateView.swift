@@ -78,7 +78,7 @@ public struct PlateView: View {
     .frame(minWidth: isLevel ? PlateMetrics.levelWidth : nil, alignment: .leading)
     .background(
       RoundedRectangle(cornerRadius: Tokens.radiusPlate, style: .continuous)
-        .fill(Tokens.windowTint.opacity(Tokens.windowTintOpacity))
+        .fill(Tokens.windowTint.opacity(PlateMetrics.tintOpacity))
     )
     .overlay(
       RoundedRectangle(cornerRadius: Tokens.radiusPlate, style: .continuous)
@@ -120,6 +120,9 @@ public struct PlateView: View {
 
 /// Plate layout numbers (not type, colour or radius: those live in `Tokens`).
 enum PlateMetrics {
+  /// Plates sit over any document, so they take more tint than the window (0.82): at 0.82 a
+  /// light plate over a black page puts `ink2` near 4.1:1. BRIEF: "add opacity, not a second colour".
+  static let tintOpacity = 0.92
   static let insetH: CGFloat = 18
   static let insetV: CGFloat = 14
   static let mark: CGFloat = 26

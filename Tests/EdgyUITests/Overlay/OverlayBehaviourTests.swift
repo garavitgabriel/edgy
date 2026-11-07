@@ -1,8 +1,10 @@
 import Actions
+import AppKit
 import CoreGraphics
 import EdgyCore
 import EdgyRuntime
 import Foundation
+import SwiftUI
 import Testing
 
 @testable import EdgyUI
@@ -411,5 +413,56 @@ final class OverlayFakeEngine: LiveEngine, @unchecked Sendable {
     feed(model, due)
     controller.pump()
     #expect(presenter.shown.isEmpty)
+  }
+}
+
+// MARK: Ordinary pointer use
+
+@MainActor @Test func plainTouchesNeverMakeAPlate() {
+  let (controller, presenter, _, model) = overlayRig()
+  let touch = LiveTouch(id: 1, position: Point2D(x: 80, y: 60), state: .down)
+  model.simulate(
+    LiveFeedUpdate(touches: LiveTouchFrame(deviceID: 1, timestamp: 1, touches: [touch]), decisions: []))
+  feed(
+    model,
+    .rejected(
+      contactID: 1, zone: nil, reason: .startedOutsideZone, deviceID: 1,
+      measure: .init(measured: 25, limit: 8, unit: .mm)))
+  controller.pump()
+  #expect(presenter.shown.isEmpty)
+}
+
+// MARK: Contrast (bone 9: ≥4.5:1 over light and dark documents)
+
+@MainActor @Suite struct PlateContrastTests {
+  /// sRGB components of a token under an appearance.
+  func rgb(_ color: Color, dark: Bool) -> (Double, Double, Double) {
+    var result = (0.0, 0.0, 0.0)
+    NSAppearance(named: dark ? .darkAqua : .aqua)!.performAsCurrentDrawingAppearance {
+      let ns = NSColor(color).usingColorSpace(.sRGB)!
+      result = (Double(ns.redComponent), Double(ns.greenComponent), Double(ns.blueComponent))
+    }
+    return result
+  }
+
+  func luminance(_ c: (Double, Double, Double)) -> Double {
+    func lin(_ v: Double) -> Double { v <= 0.03928 ? v / 12.92 : pow((v + 0.055) / 1.055, 2.4) }
+    return 0.2126 * lin(c.0) + 0.7152 * lin(c.1) + 0.0722 * lin(c.2)
+  }
+
+  func contrast(_ text: Color, overDocument doc: Double, dark: Bool) -> Double {
+    let tint = rgb(Tokens.windowTint, dark: dark)
+    let a = PlateMetrics.tintOpacity
+    let plate = (tint.0 * a + doc * (1 - a), tint.1 * a + doc * (1 - a), tint.2 * a + doc * (1 - a))
+    let l1 = luminance(rgb(text, dark: dark))
+    let l2 = luminance(plate)
+    return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
+  }
+
+  @Test(arguments: [true, false]) func plateTextReadsOverWhiteAndBlackDocuments(dark: Bool) {
+    for document in [0.0, 1.0] {
+      #expect(contrast(Tokens.ink, overDocument: document, dark: dark) >= 4.5)
+      #expect(contrast(Tokens.ink2, overDocument: document, dark: dark) >= 4.5)
+    }
   }
 }
