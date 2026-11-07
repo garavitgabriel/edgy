@@ -34,7 +34,7 @@ enum InspectorFixtures {
       config: config, catalog: catalog, store: MemoryStore(config), scheduler: ImmediateScheduler(), actions: fake,
       apply: { _ in })
     return SettingsModel(
-      editor: editor, engine: nil, installedApps: FakeApps(apps: apps), shortcuts: FakeShortcuts(names: shortcuts),
+      editor: editor, engine: nil, installedApps: InspectorFakeApps(apps: apps), shortcuts: FakeShortcuts(names: shortcuts),
       keyRecorder: recorder, devices: [PreviewFixtures.externalPad])
   }
 
@@ -57,7 +57,7 @@ final class FakeActions: ActionPerforming {
   func availability(of id: ActionID) -> ActionAvailability { table[id] ?? .available }
 }
 
-struct FakeApps: InstalledAppsProviding {
+struct InspectorFakeApps: InstalledAppsProviding {
   var apps: [InstalledApp]
   func installedApps() async -> [InstalledApp] { apps }
 }

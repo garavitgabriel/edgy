@@ -295,9 +295,12 @@ import Testing
 /// A stand-in for batch 14's mirror: a pad with zones that publish picker anchors.
 private struct PlaceholderMirror: View {
   var body: some View {
-    let pad = CGRect(x: 40, y: 60, width: 723, height: 470)
-    let strip: CGFloat = 43
-    let corner: CGFloat = 54
+    // To scale: the external pad at the window mirror's points per millimetre, 8 mm strips, 10 mm corners.
+    let mm = Tokens.mirrorPointsPerMM
+    let sensor = PreviewFixtures.externalPad.sensorSizeMM
+    let pad = CGRect(x: 60, y: 60, width: sensor.width * mm, height: sensor.height * mm)
+    let strip: CGFloat = 8 * mm
+    let corner: CGFloat = 10 * mm
     let zones: [(Zone, CGRect)] = [
       (.edge(.bottom), CGRect(x: pad.minX + corner, y: pad.maxY - strip, width: pad.width - 2 * corner, height: strip)),
       (.edge(.top), CGRect(x: pad.minX + corner, y: pad.minY, width: pad.width - 2 * corner, height: strip)),
