@@ -29,19 +29,34 @@ struct Replay {
   func relative(_ event: GestureEvent) -> Double { event.timestamp - (frames.first?.timestamp ?? 0) }
 }
 
+extension GestureSettings {
+  /// The settings every gesture test runs with. Spelled out rather than `.defaults`, so changing a
+  /// shipped default (e.g. `cornerSizeMM` 12 → 10) never moves a test's zone boundaries.
+  static let test = GestureSettings(
+    edgeWidthMM: 8, cornerSizeMM: 12, dwellMS: 120, palmMajorAxisMM: 18, typingSuppressionMS: 500,
+    doubleTapWindowMS: 300, longPressMS: 500, fingers: 1)
+
+  /// `.test` with another corner size.
+  static func test(cornerSizeMM: Double) -> GestureSettings {
+    var settings = GestureSettings.test
+    settings.cornerSizeMM = cornerSizeMM
+    return settings
+  }
+}
+
 func replay(
   _ frames: [TouchFrame], device: TouchDeviceInfo = TraceBuilder.defaultDevice, zones: Set<Zone>,
-  settings: GestureSettings = .defaults, secondsSinceLastKeyPress: Double? = nil,
-  slideZones: Set<Zone>? = nil, longPressZones: Set<Zone>? = nil,
+  settings: GestureSettings = .test, secondsSinceLastKeyPress: Double? = nil,
+  slideZones: Set<Zone>? = nil, longPressZones: Set<Zone>? = nil, doubleTapZones: Set<Zone>? = nil,
   recognizer: GestureRecognizing = makeGestureRecognizer()
 ) -> Replay {
   let context = GestureContext(
     settings: settings, enabledZones: zones, secondsSinceLastKeyPress: secondsSinceLastKeyPress,
-    slideZones: slideZones, longPressZones: longPressZones)
+    slideZones: slideZones, longPressZones: longPressZones, doubleTapZones: doubleTapZones)
   return Replay(frames: frames, outputs: frames.map { recognizer.process($0, device: device, context: context) })
 }
 
-func replay(_ trace: TraceFile, zones: Set<Zone>, settings: GestureSettings = .defaults) -> Replay {
+func replay(_ trace: TraceFile, zones: Set<Zone>, settings: GestureSettings = .test) -> Replay {
   replay(trace.frames, device: trace.device, zones: zones, settings: settings)
 }
 
