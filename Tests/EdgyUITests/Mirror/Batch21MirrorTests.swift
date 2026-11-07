@@ -167,6 +167,20 @@ struct Batch21MirrorTests {
 
   // MARK: One fade
 
+  @Test func miniMirrorKeepsTheLastTouchAfterTheLift() {
+    let down = [LiveTouch(id: 1, position: Point2D(x: 0.975, y: 0.55), state: .claimed)]
+    // Finger down: remembered and drawn.
+    let kept = MiniMirrorView.remembered(after: down, previous: [])
+    #expect(MiniMirrorView.shown(live: down, last: kept) == down)
+    // Lift (an empty frame): the last frame stays where it landed.
+    let afterLift = MiniMirrorView.remembered(after: [], previous: kept)
+    #expect(afterLift == down)
+    #expect(MiniMirrorView.shown(live: [], last: afterLift) == down)
+    // A new touch replaces it.
+    let next = [LiveTouch(id: 2, position: Point2D(x: 0.03, y: 0.4), state: .claimed)]
+    #expect(MiniMirrorView.remembered(after: next, previous: afterLift) == next)
+  }
+
   @Test func miniMirrorLeavesTheFadeToItsHost() {
     let model = PreviewFixtures.model()
     let plain = MiniMirrorView(model: model, frontmostApp: nil)
