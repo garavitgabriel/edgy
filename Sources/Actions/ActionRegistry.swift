@@ -198,6 +198,23 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
   public let available: [ActionDescriptor] = ActionCatalog.all
 
   public func perform(_ id: ActionID, input: ActionInput, context: ActionContext) throws {
+    _ = try performReporting(id, input: input, context: context)
+  }
+
+  /// `perform`, reporting what happened (see `ActionOutcome`):
+  /// - **Level slides** (`audio.volume`, `display.brightness`, `keyboard.backlight`): `level` is
+  ///   the level after this update (0...1, unchanged when the update moved nothing).
+  ///   `systemHUDShown` is true for volume and built-in brightness while the HUD setting is
+  ///   `native` (the system draws its indicator). External brightness: `detail` is the display's
+  ///   name, followed by a display-check request when one is due (`DisplayCheckRequest`).
+  /// - **`keyboard.hold`**: `detail` is the combo as the user reads it (`KeyCombo.displayText`,
+  ///   e.g. "fn", "⌃⌥ Space").
+  /// - **`apps.switcher`**: no level; `systemHUDShown` is true (the system's app switcher is the
+  ///   feedback).
+  /// - Everything else: `nil`.
+  public func performReporting(_ id: ActionID, input: ActionInput, context: ActionContext) throws
+    -> ActionOutcome?
+  {
     guard let descriptor = available.first(where: { $0.id == id }) else {
       throw ActionError.unknownAction(id)
     }
@@ -206,15 +223,19 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
       switch id {
       case BuiltInAction.keyboardSlideSteps:
         try performKeySteps(id, delta: delta, phase: phase, context: context)
+        return nil
       case BuiltInAction.appSwitcher:
         try performSwitcher(id, delta: delta, phase: phase, context: context)
+        return ActionOutcome(systemHUDShown: true)
       default:
-        try performLevel(id, delta: delta, phase: phase, context: context)
+        return try performLevel(id, delta: delta, phase: phase, context: context)
       }
     case (.trigger, .trigger):
       try performTrigger(id, context: context)
+      return nil
     case (.hold, .press(let down)):
       try performHold(id, down: down, context: context)
+      return ActionOutcome(detail: (try? combo(ActionParameterKey.keys, for: id, in: context))?.displayText)
     default:
       throw ActionError.wrongInputShape(id)
     }
@@ -225,7 +246,7 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
   /// Volume, brightness and keyboard backlight slides.
   private func performLevel(
     _ id: ActionID, delta: Double, phase: GestureEvent.Phase, context: ActionContext
-  ) throws {
+  ) throws -> ActionOutcome {
     if phase == .began { levelSessions[id] = nil }
     defer { if phase == .ended || phase == .cancelled { levelSessions[id] = nil } }
 
@@ -233,7 +254,8 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     let old = session.level
     let step = LevelStep.apply(delta: delta, sensitivity: Self.sensitivity(context), to: old)
     levelSessions[id] = LevelSession(target: session.target, level: step.level)
-    guard step.level != old else { return }
+    let outcome = levelOutcome(session.target, level: step.level)
+    guard step.level != old else { return outcome }
 
     try unavailable(id) { try setLevel(session.target, from: old, to: step.level) }
     if step.strongTick && settings.allowsHaptic(.slideLimits, parameters: context.parameters) {
@@ -242,6 +264,30 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     if settings.allowsHaptic(.slideSteps, parameters: context.parameters) {
       for _ in 0..<step.ticks { haptics.tick(strength: settings.hapticTickStrength) }
     }
+    return outcome
+  }
+
+  /// What a level slide reports at `level` on `target`.
+  func levelOutcome(_ target: LevelTarget, level: Double) -> ActionOutcome {
+    switch target {
+    case .volume, .builtInBrightness:
+      return ActionOutcome(level: level, systemHUDShown: settings.hud == .native)
+    case .keyboardBacklight:
+      return ActionOutcome(level: level)
+    case .displayBrightness(let id):
+      guard let info = displays.displays().first(where: { $0.id == id }) else { return ActionOutcome(level: level) }
+      let request = needsDisplayCheck(info) ? DisplayCheckRequest(key: info.key) : nil
+      return ActionOutcome(level: level, detail: DisplayCheckRequest.detail(name: info.name, request: request))
+    }
+  }
+
+  /// Whether to ask "Did this screen change brightness?" about `info`: a monitor driven over DDC
+  /// (which can accept a command without applying it) that the user hasn't confirmed or turned
+  /// off, asked fewer than `DisplayCheckRequest.maxAsks` times.
+  func needsDisplayCheck(_ info: DisplayInfo) -> Bool {
+    info.kind == .thirdParty && !settings.confirmedDisplays.contains(info.key)
+      && !settings.unresponsiveDisplays.contains(info.key)
+      && settings.displayCheckAsks[info.key, default: 0] < DisplayCheckRequest.maxAsks
   }
 
   static func sensitivity(_ context: ActionContext) -> Double {
@@ -293,6 +339,9 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
       default:
         guard info.brightnessControllable else {
           throw OutputError(info.reason ?? "\(info.name) doesn't accept brightness control")
+        }
+        guard !settings.unresponsiveDisplays.contains(info.key) else {
+          throw OutputError(AvailabilityCopy.turnedOffForDisplay)
         }
         return .displayBrightness(info.id)
       }
