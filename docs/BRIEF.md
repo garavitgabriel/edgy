@@ -29,6 +29,7 @@ Why this look: the owner picked it on taste in every round (rounds 1, 2 and 3; t
 | window material | warm translucent, ~0.8 opacity over blur | `rgba(42,27,21,.82)` | system window material tinted warm; never let text drop below 4.5:1 |
 
 - **One hue.** No second colour anywhere: no blue selection, no amber warnings, no red errors. Warnings use weight plus an icon. **Exception:** system-drawn chrome (window buttons, the system title bar) stays as the system draws it. Don't recolour or fake it.
+- **Gesture icons follow the edge** (owner, 2026-11-07): the slide icon is **vertical (↕) on the left and right edges and horizontal (↔) on the top and bottom edges**, wherever a gesture icon appears: inspector rows, "Add gesture…", picker headers. Swipe icons follow too (up/down on side edges, left/right on top/bottom). Draw the horizontal slide as the vertical one rotated 90°, same stroke and grid.
 - **Type:** the system font only. One scale: **11** (action-picker group headers only; app-list section headers are 13 semibold `ink2`) / **13** (everything else, the floor) / **17** (plate values, Continue) / **26** (the one confident line: the selected zone's name or the onboarding headline). Weights are regular and semibold. Use proportional figures everywhere, with no space before % ("64%").
 - **Radii:** the window has the system radius; controls 6–8; plates 12–14; zone bars fully rounded ends. Never one radius for everything, and never a radius nested inside a radius.
 - **Gesture icons:** one family, one stroke weight and one grid. Swipe up and swipe down must differ clearly.
@@ -145,15 +146,16 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
 
 ### Menu glyph and app icon
 
-- **Glyph: "Lit edge" (01a, with 01b's wider gap).**
-  - A rounded-rectangle outline of the pad, open on the right, with a separate heavy vertical bar standing for the lit right edge.
-  - It's a monochrome template image, about 16 × 11 pt.
-  - In Test Mode it adds a small solid dot inside the outline. **The dot must be ≥2 pt at 1×.** The exported asset is 3.2 pt (`docs/design/assets/`).
-  - Note for the G1 device check: one critic read it as the letters "CI" before reading it as a pad. Judge it at real size in the real menu bar before freezing it.
+- **Glyph: "Lit strip" (V3, owner's pick 2026-11-07; replaced "Lit edge", which read as the letters "CI").**
+  - A **solid** rounded-rectangle pad at true trackpad proportion, with its right edge separated by a thin transparent vertical gap (about 1.2 pt), leaving a sliver (about 3.4 pt) that is the lit edge. One object, so it can't read as letters.
+  - It's a monochrome template image, 16 × 11 pt. Assets: `docs/design/assets/glyph-<state>.pdf`.
+  - **Test Mode:** a round **hole** (r 1.6 pt) cut through the solid pad, away from the strip. A black dot on a black pad wouldn't show.
+  - **Paused:** the sliver becomes two short stacked pieces. **No Accessibility / broken config:** the sliver becomes a long piece plus a short one (an exclamation). **Disabled / No trackpad:** the normal glyph at 40% in code.
+  - **Watch it on device:** a solid rounded rectangle sits near the battery icon. If it ever reads as a second battery (bone B7), the sliver gap is the first thing to widen.
 - **App icon: "Exact".**
   - A pale-stone rounded tile with a gentle light-to-shade gradient.
-  - A graphite line drawing of the pad at true proportion, with a heavy right edge (the glyph, enlarged).
-  - At ≥128 px, add one rust contact dot on the heavy edge. Leave the dot off at 32 px and below.
+  - A graphite drawing of the glyph (the solid pad with its cut-out lit strip), enlarged. Asset: `docs/design/assets/icon-1024.png` and AppIcon.iconset.
+  - At ≥128 px, add one rust contact dot on the lit strip. Leave the dot off below 128 px.
   - No banding at the tile edge.
 
 ### Kill list (never ship these)
@@ -348,7 +350,7 @@ The owner wants both. The runtime has both (`Engine.setTestMode`, the `wouldRun`
   | rejection | unchanged ("Ignored: palm, 21 mm wide, limit 18 mm") | — |
 
 - **What dry run doesn't show:** the level plate for external brightness or the keyboard, and the system HUD. Nothing changed, so there's no level to show (bone 9).
-- **Glyph:** unchanged. The Test Mode dot is enough; the "Would" plates say the rest once, where it happens.
+- **Glyph:** unchanged. The Test Mode hole is enough; the "Would" plates say the rest once, where it happens.
 
 ### System states (spec, 2026-11-07)
 
@@ -356,14 +358,14 @@ The owner wants both. The runtime has both (`Engine.setTestMode`, the `wouldRun`
 
 | State | Menu glyph (16 pt template) | Popover | Settings window |
 |---|---|---|---|
-| Normal | Outline plus the heavy right bar | as designed | as designed |
-| Test Mode | + a solid dot inside the outline (≥2 pt) | the Test Mode switch is on | — |
+| Normal | Solid pad plus the lit strip | as designed | as designed |
+| Test Mode | + a round hole cut through the pad (r 1.6 pt) | the Test Mode switch is on | — |
 | **Disabled** (Enabled off) | The whole glyph at 40% opacity (template "off" look) | The mini mirror fades to 40%; the Enabled switch, off, is the statement. No extra line. | The Default tab's Enabled switch is off and the mirror fades to 40%. Editing still works. |
-| **Paused** | The heavy bar becomes two short stacked dashes (a pause shape inside the glyph) | The mini mirror fades to 40%. Under it, one line: "Paused, 47 min left" with a **Resume** text button. While paused, the list's "Pause for 1 hour" row is hidden. | The mirror fades to 40%, with one line centred on the pad: "Paused, 47 min left" · **Resume**. |
-| **No Accessibility** | The heavy bar becomes a drawn exclamation (a short bar plus a dot) | The mini mirror and chips are replaced by one block (the Enabled and Test Mode rows stay below it): "Edgy needs Accessibility access to run actions." · **Open Settings**. Below it in `ink2`: "Touches still show in Test Mode." The list below is unchanged. | A one-line strip under the tabs, full width, with an info icon in `ink`: the same sentence plus **Open Settings**. It disappears the moment access is granted (the runtime polls). |
+| **Paused** | The lit strip becomes two short stacked pieces (a pause shape) | The mini mirror fades to 40%. Under it, one line: "Paused, 47 min left" with a **Resume** text button. While paused, the list's "Pause for 1 hour" row is hidden. | The mirror fades to 40%, with one line centred on the pad: "Paused, 47 min left" · **Resume**. |
+| **No Accessibility** | The lit strip becomes an exclamation (a long piece plus a short one) | The mini mirror and chips are replaced by one block (the Enabled and Test Mode rows stay below it): "Edgy needs Accessibility access to run actions." · **Open Settings**. Below it in `ink2`: "Touches still show in Test Mode." The list below is unchanged. | A one-line strip under the tabs, full width, with an info icon in `ink`: the same sentence plus **Open Settings**. It disappears the moment access is granted (the runtime polls). |
 | **No trackpad** | 40% opacity, like Disabled; nothing can fire, so it reads the same | The mini mirror becomes a dashed pad outline at the default proportion, with one line inside: "No trackpad connected". | The mirror becomes the same dashed outline, with "Connect a trackpad to see it here." Bindings stay editable; the pad's zones still draw from the last-known size. |
 
-- **Precedence when several apply:** No Accessibility > No trackpad > Paused > Disabled > Test Mode. The glyph shows the top one only.
+- **Precedence when several apply:** Broken config > No Accessibility > No trackpad > Paused > Disabled > Test Mode. The glyph shows the top one only.
 - **Copy:** time left counts down in whole minutes ("47 min left"). Under 1 minute it reads "less than a minute left". There's no clock time, to avoid a 12/24-hour mismatch.
 
 ### Onboarding (spec, 2026-11-07; step 2 is in render C)

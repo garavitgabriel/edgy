@@ -103,25 +103,25 @@ It is the same value in light and dark. It never marks selection (selection is a
 
 ## Iconography
 
-### Menu-bar glyph: "Lit edge"
+### Menu-bar glyph: "Lit strip"
 
-A rounded-rectangle outline of the pad, open on the right, with a separate heavy vertical bar standing for the lit right edge. A monochrome template image, about 16 × 11 pt, tinted by the system for light, dark and highlighted bars.
+A **solid** rounded-rectangle pad with its right edge cut off by a thin transparent gap; that sliver is the lit edge. It's a monochrome template image, 16 × 11 pt, tinted by the system for light, dark and highlighted bars. (It replaced the earlier "Lit edge" outline, which read as the letters "CI". The owner picked V3 on 2026-11-07.)
 
 States change the **shape**, never the colour:
 
 | State | Glyph |
 |---|---|
-| Normal | outline plus the heavy right bar |
-| Test Mode | adds a small solid dot inside the outline (3.2 pt; must be ≥2 pt at 1×) |
-| Paused | the heavy bar becomes two short stacked dashes |
+| Normal | solid pad plus the lit strip |
+| Test Mode | a round hole (r 1.6 pt) cut through the pad |
+| Paused | the strip becomes two short stacked pieces |
 | Disabled / No trackpad | normal artwork at 40% opacity (applied in code) |
-| No Accessibility / Broken config | the heavy bar becomes an exclamation (a short bar plus a dot) |
+| No Accessibility / Broken config | the strip becomes an exclamation (a long piece plus a short one) |
 
 Precedence when several apply: Broken config > No Accessibility > No trackpad > Paused > Disabled > Test Mode. Show the top one only.
 
 ### App icon: "Exact"
 
-A pale-stone rounded tile with a gentle light-to-shade gradient, carrying a graphite line drawing of the pad at true proportion with a heavy right edge (the glyph, enlarged). At ≥128 px it adds one rust contact dot on the heavy edge; at 64 px and below there is no dot, and a heavier small-size drawing is used. No banding at the tile edge.
+A pale-stone rounded tile with a gentle light-to-shade gradient, carrying a graphite drawing of the glyph (the solid pad with its cut-out lit strip), enlarged. At ≥128 px it adds one rust contact dot on the lit strip; at 64 px and below there is no dot, and a heavier small-size drawing is used. No banding at the tile edge.
 
 ### Where the assets live
 
