@@ -115,7 +115,10 @@ private func externalHarness(_ display: DisplayInfo = desk, settings: AppSetting
 
   @Test func appSwitcherReportsNoLevelAndTheSystemUI() throws {
     let h = Harness()
-    let outcome = try report(h, "apps.switcher", .delta(0, phase: .began))
+    // Batch 26 ruling (the switcher opens on one step of travel, never on contact): nothing shows on `.began`; the outcome comes with the opening step.
+    // Before: let outcome = try report(h, "apps.switcher", .delta(0, phase: .began))
+    #expect(try report(h, "apps.switcher", .delta(0, phase: .began)) == nil)
+    let outcome = try report(h, "apps.switcher", .delta(0.1, phase: .changed))
     #expect(outcome == ActionOutcome(level: nil, detail: nil, systemHUDShown: true))
     _ = try report(h, "apps.switcher", .delta(0, phase: .ended))
   }

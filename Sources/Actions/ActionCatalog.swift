@@ -216,13 +216,14 @@ enum ActionCatalog {
       parameters: [
         ActionParameter(key: ActionParameterKey.path, kind: .filePath, required: true, displayName: "File or Folder")
       ]),
-    // The command-tab app switcher, driven by a slide: opens on the next app, one app per `stepMM`
-    // of travel (toward top/right = forward) with the shared slide feel, stays open `keepOpenMS`
-    // after a stroke so the next stroke continues, then selects. See `ActionRegistry+Keys.swift`.
+    // The command-tab app switcher, driven by a slide: opens on the next app after one `stepMM` of
+    // travel (never on contact, batch 26), then one app per `stepMM` (toward top/right = forward)
+    // with the shared slide feel, stays open `keepOpenMS` after a stroke so the next stroke
+    // continues, then selects. See `ActionRegistry+Keys.swift`.
     ActionDescriptor(
       id: BuiltInAction.appSwitcher, shape: .continuous, displayName: "Switch Apps", category: .apps,
       parameters: [
-        stepMM("Distance per app", "Slide this far to move one app."),
+        stepMM("Distance per app", "Slide this far to open the switcher and move one app."),
         speedUp("A quick flick skips several apps."),
         ActionParameter(
           key: ActionParameterKey.keepOpenMS, kind: .number(keepOpenRange), required: false,

@@ -236,6 +236,9 @@ import Testing
   @Test func idleSessionIsCancelledAndCommandReleased() throws {
     let h = Harness()
     try h.slide("apps.switcher", 0, phase: .began)
+    // Batch 26 ruling (the switcher opens on one step of travel, never on contact): the watchdog arms when it opens.
+    #expect(h.scheduler.pending.isEmpty)
+    try h.slide("apps.switcher", 0.1)
     #expect(h.scheduler.pending.map(\.delay) == [ActionRegistry.switcherIdleTimeout])
     #expect(ActionRegistry.switcherIdleTimeout == 10)
     h.scheduler.advance(by: 10)
@@ -251,6 +254,8 @@ import Testing
   @Test func everyEventPushesTheDeadlineBack() throws {
     let h = Harness()
     try h.slide("apps.switcher", 0, phase: .began)
+    // Batch 26 ruling (the switcher opens on one step of travel, never on contact): open it first.
+    try h.slide("apps.switcher", 0.1)
     for _ in 0..<5 {
       h.scheduler.advance(by: 9)
       try h.slide("apps.switcher", 0.01)
@@ -266,6 +271,8 @@ import Testing
     // keepOpenMS 0: the stroke-at-a-time switcher this test was written for (batch 20).
     let h = Harness()
     try h.slide("apps.switcher", 0, phase: .began, ["keepOpenMS": "0"])
+    // Batch 26 ruling (the switcher opens on one step of travel, never on contact): open it first.
+    try h.slide("apps.switcher", 0.1, ["keepOpenMS": "0"])
     try h.slide("apps.switcher", 0, phase: .ended, ["keepOpenMS": "0"])
     #expect(h.scheduler.pending.isEmpty)
     h.scheduler.advance(by: 60)
@@ -275,9 +282,12 @@ import Testing
   @Test func staleFireCannotEndANewerSession() throws {
     // keepOpenMS 0: the stroke-at-a-time switcher this test was written for (batch 20).
     let h = Harness()
+    // Batch 26 ruling (the switcher opens on one step of travel, never on contact): each session opens on one step of travel (before, each `.began` opened it).
     try h.slide("apps.switcher", 0, phase: .began, ["keepOpenMS": "0"])
+    try h.slide("apps.switcher", 0.1, ["keepOpenMS": "0"])
     try h.slide("apps.switcher", 0, phase: .cancelled, ["keepOpenMS": "0"])
     try h.slide("apps.switcher", 0, phase: .began, ["keepOpenMS": "0"])
+    try h.slide("apps.switcher", 0.1, ["keepOpenMS": "0"])
     let eventsBefore = h.keyboard.events
     h.scheduler.fireLate(h.scheduler.scheduled[0])
     #expect(h.keyboard.events == eventsBefore)
