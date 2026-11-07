@@ -8,7 +8,7 @@ verification: pass
 ---
 
 ## Acceptance criteria
-- [✓] **≥ 30 new tests: 74 new** (EdgyRuntimeTests 114 → 188).
+- [✓] **≥ 30 new tests: 81 new** (EdgyRuntimeTests 114 → 195).
   - Overrides, turn off, revert, effective-binding sources, undo: `ProfileOverrideTests` (15), including `fullReplaceProfilesStillBehaveExactlyAsBefore`, `convertToInheritingKeepsTheAppBehavingTheSame` and `undoAndRedoCoverOverrideTurnOffAndRevert`.
   - Validation: `DoNothingValidationTests` (5), `ModifierOnlyComboTests` (4), `ConflictNoteTests` (8), `InheritingValidationTests` (4).
   - Engine context `doubleTapZones` and routing through resolved profiles: `DoubleTapZonesContextTests` (5).
@@ -23,7 +23,7 @@ verification: pass
 
 ## Verification
 - `swift build`: `Build complete!`
-- `swift test`: every target passes: 48, 6, 64, **188 EdgyRuntimeTests**, 19, 50, 156 (integration).
+- `swift test`: every target passes: 48, 6, 64, **195 EdgyRuntimeTests**, 19, 50, 156 (integration).
 - `swift format lint --strict -r Sources Tests Package.swift`: exit 0.
 - `git grep -niE -f ~/.config/edgy-names-denylist`: no output.
 - `git diff --name-only 7432e8a..HEAD` lists only `Sources/EdgyRuntime/**`, `Tests/EdgyRuntimeTests/**` and `docs/settings-reference.md`.
@@ -73,6 +73,46 @@ engine.removeFeedObserver(token)
 menuItem.action = { engine.setTestMode(!engine.isTestMode) }    // not persisted
 engine.onStatusChange { status in DispatchQueue.main.async { menuItem.state = status.testMode ? .on : .off } }
 ```
+
+## Late addition: waking the recognizer for a held tap (chief's request after batch 10 merged)
+Merged `main` (9c958d8) into this branch, without a rebase. Tests: `DeferredFlushTests` (7). They cover:
+- a held tap routes exactly once after the window with no further frames;
+- a double-tap routes only the double-tap;
+- a newer frame supersedes the wake-up;
+- an app change before the flush drops the tap;
+- pause, apply, stop and Test Mode each cancel the timer;
+- a flushed tap reaches the feed;
+- a recognizer that can't flush never schedules.
+
+How it works:
+- **`GestureFlushing` (EdgyRuntime) mirrors `DeferredGestureFlushing`.** EdgyRuntime can't import Gestures, and `GesturePipeline` is internal, so the engine checks `recognizer as? GestureFlushing`. **The chief must hand the engine an adapter in EdgyApp**, or the flush never runs:
+  ```swift
+  final class FlushingRecognizer: GestureRecognizing, GestureFlushing {
+    private let inner: GestureRecognizing & DeferredGestureFlushing
+    init?(_ r: GestureRecognizing) {
+      guard let f = r as? (GestureRecognizing & DeferredGestureFlushing) else { return nil }
+      inner = f
+    }
+    func process(_ f: TouchFrame, device: TouchDeviceInfo, context: GestureContext) -> GestureOutput {
+      inner.process(f, device: device, context: context)
+    }
+    func reset() { inner.reset() }
+    var nextFlushDeadline: Double? { inner.nextFlushDeadline }
+    func flush(now: Double) -> GestureOutput { inner.flush(now: now) }
+  }
+  let base = makeGestureRecognizer()
+  let recognizer: GestureRecognizing = FlushingRecognizer(base) ?? base
+  ```
+- **Scheduling:**
+  - `Engine.init` gains a defaulted `timer: EngineTimer = DispatchEngineTimer()` (monotonic uptime clock plus a one-shot; tests inject a manual one).
+  - After each `process` and each `flush`, the engine reads the deadline and schedules `(deadline − lastFrame.timestamp) − elapsed since that frame arrived + 1 ms of slack`. Without the slack, clock rounding could make a wake-up land a hair early and need a second one.
+  - A newer frame cancels and reschedules the wake-up. A generation counter makes a superseded wake-up that already fired do nothing.
+- **Firing:**
+  - The flush time is `now = lastFrame.timestamp + (monotonic now − arrival)`.
+  - The output is handled like a `process` output: pointer guard, routing and feed decisions (decisions only; there is no touch frame).
+  - If the frontmost app changed since the last frame, the held gesture is **dropped** (chief's ruling) and the drop is logged.
+  - No flush runs while paused, disabled or stopped.
+- **Cancelling:** `quiesce` cancels the timer, which covers pause, apply, stop and Test Mode toggles.
 
 ## Decisions I made (and why)
 - **No `holdAndTriggerOnLongPress` code.** A zone has one long-press slot. A hold fits only a long-press and a trigger would sit in the same slot, so a second binding there is already a `duplicateBinding` error. The combination can't happen within a resolved profile, and the doc says so.

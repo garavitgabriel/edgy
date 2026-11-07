@@ -6,6 +6,42 @@ public protocol FrontmostAppProviding: AnyObject, Sendable {
   var frontmostBundleID: String? { get }
 }
 
+/// The runtime's view of a recognizer that holds gestures back (a tap waiting out the double-tap
+/// window) and must be woken after the last frame. Same shape as the Gestures module's
+/// `DeferredGestureFlushing`; EdgyRuntime can't import Gestures, so the app hands the engine a
+/// recognizer that adopts this one too (a thin forwarding adapter). Times are on the frame clock
+/// (`TouchFrame.timestamp`).
+public protocol GestureFlushing: AnyObject {
+  /// Earliest frame-clock time at which `flush(now:)` releases something; nil = nothing waiting.
+  var nextFlushDeadline: Double? { get }
+  /// Releases every held gesture due at `now`; handled exactly like a `process` output.
+  func flush(now: Double) -> GestureOutput
+}
+
+/// Monotonic clock + one-shot timer for the engine's flush wake-ups. Tests inject a manual one.
+public protocol EngineTimer: AnyObject, Sendable {
+  /// Monotonic seconds.
+  var now: Double { get }
+  /// Runs `work` once after `seconds` (on any queue; the engine hops to its own).
+  func schedule(after seconds: Double, _ work: @escaping @Sendable () -> Void) -> ScheduledWork
+}
+
+/// Live `EngineTimer`: uptime clock, `DispatchQueue.global().asyncAfter`.
+public final class DispatchEngineTimer: EngineTimer, @unchecked Sendable {
+  public init() {}
+  public var now: Double { Double(DispatchTime.now().uptimeNanoseconds) / 1e9 }
+  public func schedule(after seconds: Double, _ work: @escaping @Sendable () -> Void) -> ScheduledWork {
+    let item = DispatchWorkItem(block: work)
+    DispatchQueue.global(qos: .userInteractive).asyncAfter(deadline: .now() + max(0, seconds), execute: item)
+    return Handle(item)
+  }
+  private final class Handle: ScheduledWork {
+    let item: DispatchWorkItem
+    init(_ item: DispatchWorkItem) { self.item = item }
+    func cancel() { item.cancel() }
+  }
+}
+
 /// A snapshot of what the engine is doing, for the menu and the settings window.
 public struct EngineStatus: Equatable, Sendable {
   /// Touch input started and not stopped.
@@ -73,6 +109,13 @@ public final class Engine: @unchecked Sendable {
   /// Frontmost app of the last processed frame (`.none` before the first one).
   private var lastFrontmost: String?? = .none
   private var testMode = false
+  private let timer: EngineTimer
+  /// The last frame handed to the recognizer: its frame-clock time, monotonic arrival time, and
+  /// the frontmost app it was routed for. A flush converts its clock from these.
+  private var lastFrame: (timestamp: Double, arrival: Double, bundleID: String?)?
+  private var pendingFlush: ScheduledWork?
+  /// Bumped on every (re)schedule and cancel, so a superseded wake-up that already fired does nothing.
+  private var flushGeneration = 0
   /// Internal (not private) so tests can see it stays empty without observers.
   var feed = LiveFeedState()
 
@@ -83,8 +126,9 @@ public final class Engine: @unchecked Sendable {
   public init(
     touchSource: TouchSource, recognizer: GestureRecognizing, actions: ActionPerforming,
     pointerGuard: PointerGuarding, typing: TypingActivitySource, frontmost: FrontmostAppProviding,
-    config: EdgyConfig, logger: EdgyLogging, queue: DispatchQueue
+    config: EdgyConfig, logger: EdgyLogging, queue: DispatchQueue, timer: EngineTimer = DispatchEngineTimer()
   ) {
+    self.timer = timer
     self.touchSource = touchSource
     self.recognizer = recognizer
     self.router = Router(actions: actions, logger: logger)
@@ -256,6 +300,8 @@ public final class Engine: @unchecked Sendable {
       longPressZones: zones(bound: .longPress, in: profile),
       doubleTapZones: zones(bound: .doubleTap, in: profile))
     let output = recognizer.process(frame, device: device, context: context)
+    lastFrame = (frame.timestamp, timer.now, bundleID)
+    defer { scheduleFlush() }
     updatePointerGuard(claimed: !output.claimedContactIDs.isEmpty, at: frame.timestamp)
     for (contactID, reason) in output.rejections where reason != .startedOutsideZone {
       logger.log(.info, "Rejected contact \(contactID): \(reason)")
@@ -270,6 +316,62 @@ public final class Engine: @unchecked Sendable {
       router.route(event, config: config, frontmostBundleID: bundleID)
     }
     if feeding { deliverFeed(frame, claimed: output.claimedContactIDs) }
+  }
+
+  // MARK: Deferred flush (a held tap after the last frame)
+
+  /// Wake-ups land this long after the deadline, so clock rounding never makes a flush arrive a
+  /// hair early, find nothing due, and need a second wake-up.
+  static let flushSlackS: Double = 0.001
+
+  private func scheduleFlush() {
+    cancelFlush()
+    guard let flusher = recognizer as? GestureFlushing, let deadline = flusher.nextFlushDeadline,
+      let lastFrame
+    else { return }
+    let delay = max(0, (deadline - lastFrame.timestamp) - (timer.now - lastFrame.arrival)) + Self.flushSlackS
+    let generation = flushGeneration
+    pendingFlush = timer.schedule(after: delay) { [weak self] in
+      guard let self else { return }
+      self.queue.async { self.fireFlush(generation) }
+    }
+  }
+
+  private func cancelFlush() {
+    flushGeneration += 1
+    pendingFlush?.cancel()
+    pendingFlush = nil
+  }
+
+  private func fireFlush(_ generation: Int) {
+    guard generation == flushGeneration, let lastFrame, let flusher = recognizer as? GestureFlushing else { return }
+    pendingFlush = nil
+    guard running, !paused, config.app.enabled else { return }
+    let now = lastFrame.timestamp + (timer.now - lastFrame.arrival)
+    let output = flusher.flush(now: now)
+    defer { scheduleFlush() }
+    updatePointerGuard(claimed: !output.claimedContactIDs.isEmpty)
+    let bundleID = frontmost.frontmostBundleID
+    guard bundleID == lastFrame.bundleID else {
+      // The tap was made for the app that was frontmost then; never run it in another app.
+      if !output.events.isEmpty {
+        logger.log(.info, "Dropped \(output.events.count) held gesture(s): frontmost app changed")
+      }
+      return
+    }
+    let feeding = feed.isActive
+    for event in output.events {
+      if feeding && !(event.kind == .slide && event.phase == .changed) {
+        feed.decisions.append(
+          .recognized(zone: event.zone, kind: event.kind, phase: event.phase, deviceID: event.deviceID))
+      }
+      router.route(event, config: config, frontmostBundleID: bundleID)
+    }
+    if feeding && !feed.decisions.isEmpty {
+      let update = LiveFeedUpdate(touches: nil, decisions: feed.decisions)
+      feed.decisions.removeAll()
+      for (queue, handler) in feed.observers.values { queue.async { handler(update) } }
+    }
   }
 
   private func recordRejections(
@@ -359,6 +461,7 @@ public final class Engine: @unchecked Sendable {
   }
 
   private func quiesce() {
+    cancelFlush()
     updatePointerGuard(claimed: false)
     recognizer.reset()
     router.reset()
