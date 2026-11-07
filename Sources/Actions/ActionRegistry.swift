@@ -493,11 +493,15 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     return abs(motion.deltaMM / delta)
   }
 
-  /// Whether `speedUp` is on (default on); anything but "on"/"off" is a bad parameter.
+  /// Whether `speedUp` is on (default: the action's catalog default — off for stepped slides, on
+  /// for levels); anything but "on"/"off" is a bad parameter.
   func speedUp(_ id: ActionID, in context: ActionContext) throws -> Bool {
-    try choice(
+    let fallback =
+      available.first { $0.id == id }?.parameters.first { $0.key == ActionParameterKey.speedUp }?.defaultValue
+      ?? ActionParameterKey.on
+    return try choice(
       ActionParameterKey.speedUp, for: id, in: context, allowed: [ActionParameterKey.on, ActionParameterKey.off],
-      default: ActionParameterKey.on) == ActionParameterKey.on
+      default: fallback) == ActionParameterKey.on
   }
 
   // MARK: - Triggers

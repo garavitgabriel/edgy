@@ -68,7 +68,7 @@ import Testing
     #expect(steps.map(\.required) == [true, true, false, false])
     #expect(steps.map(\.kind) == [.keyCombo, .keyCombo, .number(4...20), .choice(["on", "off"])])
     #expect(steps[2].defaultValue == "8")
-    #expect(steps[3].defaultValue == "on")
+    #expect(steps[3].defaultValue == "off")  // stepped slides: speed-up off by default (BRIEF ruling)
     let app = byID["app.open"]?.parameters ?? []
     #expect(app.map(\.key) == ["bundleID", "whenFrontmost"])
     #expect(app.map(\.kind) == [.appBundleID, .choice(["stay", "hide"])])

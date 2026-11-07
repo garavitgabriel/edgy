@@ -106,10 +106,12 @@ enum ActionCatalog {
   static let holdMSRange: ClosedRange<Double> = 100...1500
   static let defaultHoldKeysMS = 300.0
 
-  static func speedUp(_ helpText: String) -> ActionParameter {
+  /// Off by default for stepped slides (switcher, repeat keys), on for levels (BRIEF ruling).
+  static func speedUp(_ helpText: String, defaultOn: Bool = false) -> ActionParameter {
     ActionParameter(
       key: ActionParameterKey.speedUp, kind: .choice([ActionParameterKey.on, ActionParameterKey.off]),
-      required: false, defaultValue: ActionParameterKey.on, displayName: "Faster when you flick", helpText: helpText)
+      required: false, defaultValue: defaultOn ? ActionParameterKey.on : ActionParameterKey.off,
+      displayName: "Faster when you flick", helpText: helpText)
   }
 
   static func stepMM(_ displayName: String, _ helpText: String) -> ActionParameter {
@@ -119,7 +121,7 @@ enum ActionCatalog {
   }
 
   /// The level slides' one parameter.
-  static let levelSpeedUp = speedUp("A quick flick moves the level further.")
+  static let levelSpeedUp = speedUp("A quick flick moves the level further.", defaultOn: true)
 
   /// `holdMS` on a long-press binding of any action but `keyboard.hold` (which has its own, with a
   /// 300 ms default): no default of its own, it falls back to the global long-press time. The

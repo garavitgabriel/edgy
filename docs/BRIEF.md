@@ -290,6 +290,8 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
 | `maxSeconds` | Hold Keys | Let go after | slider over `holdMaxSecondsRange`, value "120 s" | "If a lift is missed, the keys come back up after this long." |
 
 - At 0 ms, `keepOpenMS` reads "Off" instead of "0 ms".
+- `speedUp` defaults: **off** for Switch Apps and Slide to Repeat Keys, **on** for the levels.
+- Where `stepMM` is shown, the generic `sensitivity` row is hidden ("Distance per …" already sets travel).
 - A slider set to its default shows the value in `ink2`; a changed value shows in `ink`. There's no other changed-state mark.
 
 **Interaction note: slide plus swipes on one edge** (bone 7 pattern: info icon, `ink2`, informational).
@@ -366,6 +368,10 @@ The same 640 × 520 glass window, with a step row at the top ("1 Accessibility �
 - Primary: **Open Settings**, which opens the system privacy pane.
 - The window watches the permission live. When it turns granted, the step row shows ✓, the body becomes "Access granted.", and the primary becomes **Continue**.
 - A quiet text button, **Skip for now**, continues without access; the No Accessibility state above then applies.
+
+**Mirrors in onboarding:** steps 1–3 may use a fitted scale, but **one scale for all of them**. The step 1 mirror is illustrative: zone shapes and corner icons only, no label tabs.
+
+**Step 2 extras:** Continue is always enabled; a landed slide only adds the ✓. A rejected slide shows the struck contact plus the one dark plate beside the mirror, with the bone-4 copy. The system volume indicator appears wherever the system draws it.
 
 **Step 3: Pick a preset.** The headline is "Pick a starting point". Three radio rows, each with a 120 pt mini mirror showing that preset's zones (normal zone shapes), the name, and one line:
 
