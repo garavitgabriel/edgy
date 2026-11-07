@@ -185,3 +185,23 @@ final class LiveTransitionWaiter: TransitionWaiter {
     queue.async { poll(0) }
   }
 }
+
+// MARK: - Scheduler (v0.4)
+
+/// `ActionScheduler` on a private serial queue. Used by the hold and app switcher watchdogs.
+final class LiveActionScheduler: ActionScheduler {
+  private let queue = DispatchQueue(label: "com.garavit.edgy.actions.watchdog")
+
+  // `DispatchWorkItem.cancel` is thread-safe; the item itself is never mutated.
+  private final class Work: ScheduledWork, @unchecked Sendable {
+    let item: DispatchWorkItem
+    init(_ item: DispatchWorkItem) { self.item = item }
+    func cancel() { item.cancel() }
+  }
+
+  func schedule(after delay: TimeInterval, _ work: @escaping @Sendable () -> Void) -> ScheduledWork {
+    let item = DispatchWorkItem(block: work)
+    queue.asyncAfter(deadline: .now() + delay, execute: item)
+    return Work(item)
+  }
+}

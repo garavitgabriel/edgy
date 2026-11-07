@@ -345,6 +345,7 @@ import Testing
     #expect(r.backlight is MockKeyboardBacklightOutput)
     #expect(r.dictation is MockDictationOutput)
     #expect(r.waiter is MockTransitionWaiter)
+    #expect(r.scheduler is MockScheduler)
   }
 
   @Test func noTestSourceCallsTheLiveFactory() throws {
@@ -357,7 +358,7 @@ import Testing
       "Live" + "WorkspaceOutput", "Live" + "WindowOutput", "Live" + "SystemOutput", "Live" + "MediaKeyOutput",
       "Live" + "BrightnessOutput", "Live" + "HapticOutput", "Live" + "ShortcutRunner",
       "Live" + "LevelKeyOutput", "Live" + "KeyboardBacklightOutput", "Live" + "DictationOutput",
-      "Live" + "TransitionWaiter", "makeLive" + "DisplayBrightness",
+      "Live" + "TransitionWaiter", "makeLive" + "DisplayBrightness", "Live" + "ActionScheduler",
     ]
     for file in files {
       let text = try String(contentsOf: file, encoding: .utf8)

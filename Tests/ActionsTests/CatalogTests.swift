@@ -78,7 +78,10 @@ import Testing
     #expect(byID["file.open"]?.parameters.map(\.key) == ["path"])
     #expect(
       byID["keyboard.hold"]?.parameters == [
-        ActionParameter(key: "keys", kind: .keyCombo, required: true, displayName: "Keys")
+        ActionParameter(key: "keys", kind: .keyCombo, required: true, displayName: "Keys"),
+        ActionParameter(
+          key: "maxSeconds", kind: .number(5...600), required: false, defaultValue: "120",
+          displayName: "Release after"),
       ])
     #expect(
       byID["apps.switcher"]?.parameters == [

@@ -59,6 +59,8 @@ public enum ActionParameterKey {
   public static let whenFrontmost = "whenFrontmost"
   public static let url = "url"
   public static let path = "path"
+  /// `keyboard.hold`: seconds after which a hold that never got its release lets go.
+  public static let maxSeconds = "maxSeconds"
 
   /// `whenFrontmost` values for `app.open`.
   public static let frontmostStay = "stay"
@@ -71,6 +73,9 @@ enum ActionCatalog {
   /// `apps.switcher`: slide travel per app.
   static let switcherStepRange: ClosedRange<Double> = 0.04...0.5
   static let defaultSwitcherStep = 0.1
+  /// `keyboard.hold`: the stuck-key watchdog, in seconds.
+  static let holdMaxSecondsRange: ClosedRange<Double> = 5...600
+  static let defaultHoldMaxSeconds = 120.0
 
   /// Every action, in the order the settings UI lists them within a category.
   static let all: [ActionDescriptor] = [
@@ -120,11 +125,16 @@ enum ActionCatalog {
           defaultValue: String(defaultStep), displayName: "Step"),
       ]),
     // Holds the combo down for as long as the finger stays (long-press): the push-to-talk key a
-    // dictation app asks the user to hold.
+    // dictation app asks the user to hold. The combo may be modifiers alone (`fn`, `ctrl+opt`).
     ActionDescriptor(
       id: BuiltInAction.keyboardHold, shape: .hold, displayName: "Hold Keys", category: .keyboard,
-      parameters: [ActionParameter(key: ActionParameterKey.keys, kind: .keyCombo, required: true, displayName: "Keys")]
-    ),
+      parameters: [
+        ActionParameter(key: ActionParameterKey.keys, kind: .keyCombo, required: true, displayName: "Keys"),
+        // Stuck-key watchdog: if no release arrives, let go after this many seconds.
+        ActionParameter(
+          key: ActionParameterKey.maxSeconds, kind: .number(holdMaxSecondsRange), required: false,
+          defaultValue: "120", displayName: "Release after"),
+      ]),
 
     // Apps.
     ActionDescriptor(

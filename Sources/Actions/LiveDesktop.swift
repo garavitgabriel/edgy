@@ -48,17 +48,25 @@ final class LiveKeyboardOutput: KeyboardOutput {
   }
 
   /// Modifiers currently held down by `setModifiers`; their flags go on every later event.
+  /// Behind `lock`: a hold watchdog may release them from the scheduler's queue.
   private var held = Set<KeyCombo.Modifier>()
+  private let lock = NSLock()
 
+  /// Each modifier goes out as a flags-changed event with the modifier key's own code and the
+  /// whole held state as flags (fn = the secondary-fn flag), which is what the physical key
+  /// sends. See `KeyCodes.modifierEvents` for the event route.
   func setModifiers(_ modifiers: [KeyCombo.Modifier], down: Bool) throws {
     let source = try Self.source()
-    for modifier in modifiers {
-      guard let (code, _) = KeyCodes.modifiers[modifier] else { continue }
-      if down { held.insert(modifier) } else { held.remove(modifier) }
-      guard let event = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: down) else {
+    lock.lock()
+    defer { lock.unlock() }
+    let plan = KeyCodes.modifierEvents(modifiers, down: down, held: held)
+    held = plan.held
+    for spec in plan.events {
+      guard let event = CGEvent(keyboardEventSource: source, virtualKey: spec.code, keyDown: spec.down) else {
         throw OutputError("cannot create a key event")
       }
-      event.flags = Self.flags(held)
+      event.type = .flagsChanged
+      event.flags = spec.flags
       event.post(tap: .cghidEventTap)
     }
   }
@@ -69,7 +77,10 @@ final class LiveKeyboardOutput: KeyboardOutput {
     guard let event = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: down) else {
       throw OutputError("cannot create a key event")
     }
-    event.flags = Self.flags(modifiers.union(held)).union(KeyCodes.implicitFlags(for: key))
+    lock.lock()
+    let held = self.held
+    lock.unlock()
+    event.flags = KeyCodes.heldFlags(modifiers.union(held)).union(KeyCodes.implicitFlags(for: key))
     event.post(tap: .cghidEventTap)
   }
 
@@ -78,10 +89,6 @@ final class LiveKeyboardOutput: KeyboardOutput {
       throw OutputError("cannot create a keyboard event source")
     }
     return source
-  }
-
-  private static func flags(_ modifiers: Set<KeyCombo.Modifier>) -> CGEventFlags {
-    modifiers.reduce(into: CGEventFlags()) { $0.insert(KeyCodes.modifiers[$1]?.flag ?? []) }
   }
 }
 

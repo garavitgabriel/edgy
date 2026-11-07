@@ -119,6 +119,7 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
   let backlight: KeyboardBacklightOutput
   let dictation: DictationOutput
   let waiter: TransitionWaiter
+  let scheduler: ActionScheduler
 
   /// The level slide in progress, per action. Keeps its own level rather than re-reading (and
   /// re-quantizing) the system value on every frame.
@@ -139,9 +140,16 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
   /// Logged once: level keys couldn't be posted and the registry fell back to setting levels.
   private var loggedLevelKeyFallback = false
 
-  // App switcher and hold-a-key sessions (see `ActionRegistry+Keys.swift`).
+  // App switcher and hold-a-key sessions (see `ActionRegistry+Keys.swift`). Guarded by
+  // `keyLock`: their watchdogs fire on the scheduler's queue.
+  let keyLock = NSRecursiveLock()
   var switcher: SwitcherSession?
   var heldCombo: KeyCombo?
+  /// Bumped for every new hold / switcher session, so a watchdog that fires late can't end a
+  /// newer session than the one it was armed for.
+  var keySessionGeneration = 0
+  var holdWatchdog: ScheduledWork?
+  var switcherWatchdog: ScheduledWork?
 
   // Window memory (see `ActionRegistry+Windows.swift`). Guarded by `windowLock`.
   let windowLock = NSRecursiveLock()
@@ -166,7 +174,7 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     hud: HUDOutput, haptics: HapticOutput, shortcuts: ShortcutRunner, keyboard: KeyboardOutput,
     workspace: WorkspaceOutput, windows: WindowOutput, system: SystemOutput, levelKeys: LevelKeyOutput,
     displays: DisplayBrightnessControlling, backlight: KeyboardBacklightOutput, dictation: DictationOutput,
-    waiter: TransitionWaiter
+    waiter: TransitionWaiter, scheduler: ActionScheduler
   ) {
     self.settings = settings
     self.audio = audio
@@ -184,6 +192,7 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     self.backlight = backlight
     self.dictation = dictation
     self.waiter = waiter
+    self.scheduler = scheduler
   }
 
   public let available: [ActionDescriptor] = ActionCatalog.all
@@ -356,8 +365,8 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     if phase == .began { keyStepCarry = 0 }
     defer { if phase == .ended || phase == .cancelled { keyStepCarry = 0 } }
 
-    let up = try combo(ActionParameterKey.upKeys, for: id, in: context)
-    let down = try combo(ActionParameterKey.downKeys, for: id, in: context)
+    let up = try keyedCombo(ActionParameterKey.upKeys, for: id, in: context)
+    let down = try keyedCombo(ActionParameterKey.downKeys, for: id, in: context)
     let step = try number(
       ActionParameterKey.step, for: id, in: context, range: ActionCatalog.stepRange,
       default: ActionCatalog.defaultStep)
@@ -393,7 +402,7 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     case BuiltInAction.runShortcut:
       shortcuts.run(name: try text(ActionParameterKey.shortcutName, for: id, in: context))
     case BuiltInAction.keyboardShortcut:
-      let keys = try combo(ActionParameterKey.keys, for: id, in: context)
+      let keys = try keyedCombo(ActionParameterKey.keys, for: id, in: context)
       try unavailable(id) { try keyboard.post(keys) }
     case BuiltInAction.openApp:
       try openApp(id, context: context)
@@ -485,6 +494,17 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     let raw = try text(key, for: id, in: context)
     guard let combo = KeyCombo(raw) else {
       throw ActionError.unavailable(id, reason: "\(key): \"\(raw)\" is not a key combination")
+    }
+    return combo
+  }
+
+  /// A required key combination that ends in a key, for actions that type it (shortcut, slide
+  /// steps). A modifier-only combo (`"fn"`, `"ctrl+opt"`) can only be held → `unavailable`.
+  func keyedCombo(_ key: String, for id: ActionID, in context: ActionContext) throws -> KeyCombo {
+    let combo = try combo(key, for: id, in: context)
+    guard !combo.isModifierOnly else {
+      throw ActionError.unavailable(
+        id, reason: "\(key): \"\(combo)\" is modifiers only; this action needs a key (holding works)")
     }
     return combo
   }
