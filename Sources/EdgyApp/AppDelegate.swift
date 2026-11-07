@@ -24,6 +24,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var permissions: PermissionMonitor?
   private var engineStatus = EngineStatus()
   private var statusMenu: StatusMenu?
+  private var menuBar: MenuBarController?
+  private var frontmostObserver: NSObjectProtocol?
   private var pauseTimer: Timer?
   private var activationObserver: NSObjectProtocol?
   private var feedObserver: UUID?
@@ -95,7 +97,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       })
     LaunchAtLogin.sync(wanted: config.app.launchAtLogin, logger: logger)
 
-    statusMenu = StatusMenu(handler: self)
+    // The designed menu-bar glyph + glass popover (EdgyUI). The old text menu (StatusMenu) stays
+    // in the source as a fallback but is no longer installed.
+    let menuBar = MenuBarController(
+      model: settingsModel,
+      actions: MenuBarActions(
+        openSettings: { [weak self] in self?.showSettings() },
+        openConfigFile: { [weak self] in self?.openConfigFile() },
+        reloadConfig: { [weak self] in self?.reloadConfig() },
+        about: { [weak self] in self?.showAbout() },
+        quit: { [weak self] in self?.quit() },
+        openAccessibilitySettings: { [weak self] in self?.grantAccessibility() }))
+    menuBar.onOverlayVisibleChange = { [weak self] visible in self?.overlayVisibilityChanged(visible) }
+    menuBar.state.frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+    menuBar.install()
+    self.menuBar = menuBar
+    frontmostObserver = NSWorkspace.shared.notificationCenter.addObserver(
+      forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
+    ) { [weak self] note in
+      let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
+      let id = app?.bundleIdentifier
+      MainActor.assumeIsolated { self?.menuBar?.state.frontmostBundleID = id }
+    }
+    if let apps = settingsModel.installedApps {
+      Task { @MainActor [weak self] in self?.menuBar?.state.installedApps = await apps.installedApps() }
+    }
     let permissions = PermissionMonitor(checker: AccessibilityPermissionChecker(), scheduler: scheduler) {
       [weak self] state in
       self?.logger.log(.info, "Accessibility permission: \(state.rawValue)")
@@ -143,6 +169,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func refreshMenu() {
+    menuBar?.state.accessibility = permissions?.accessibility ?? .unknown
+    menuBar?.state.configProblem = editor?.configProblem.map {
+      EdgyUI.ConfigProblem(fileName: store.fileURL.lastPathComponent, line: $0.line, message: $0.message)
+    }
     settingsWindow?.state.conditions.accessibility = permissions?.accessibility ?? .unknown
     settingsWindow?.state.conditions.configProblem = editor?.configProblem.map {
       EdgyUI.ConfigProblem(fileName: store.fileURL.lastPathComponent, line: $0.line, message: $0.message)
@@ -199,6 +229,20 @@ extension AppDelegate: StatusMenuHandler {
     }
     engine.setTestMode(on)
     refreshMenu()
+  }
+
+  /// Test Mode's overlay (batch 18 draws it). Until it lands, decisions go to the log.
+  private func overlayVisibilityChanged(_ visible: Bool) {
+    guard let engine else { return }
+    if visible, feedObserver == nil {
+      let log = SystemLogger(category: "testmode")
+      feedObserver = engine.observeFeed { update in
+        for decision in update.decisions { log.log(.info, "\(decision)") }
+      }
+    } else if !visible, let feedObserver {
+      engine.removeFeedObserver(feedObserver)
+      self.feedObserver = nil
+    }
   }
 
   func pauseForOneHour() {

@@ -9,7 +9,8 @@ You own `Sources/EdgyUI/Mirror/**`, `Sources/EdgyUI/Inspector/**`, `Sources/Edgy
 2. **Every should-fix** unless it conflicts with BRIEF (then follow BRIEF and say so): label wraps ("Sensitivity", "Previous Track"), inspector left inset ≈ 22 pt as in A, mini mirror shot at real popover size (~290 pt), Windows preset mirror shot, Tap row present with a blank value while its picker is open, the rest as listed.
 3. **Chief rulings already made:** "Split into" hidden on app tabs; picker height capped at the pad's interior (already merged — keep it); `InspectorDrafts` may stay a side table (document it).
 4. **Labels on the pad** per bone 3 as updated: never "…" on the pad; parameter short value → action short name → clip with a 12 pt fade.
-5. Use the catalog's `displayName` everywhere; never re-spell action names in the UI (batch 20 normalises the catalog spellings).
+5. **From batch 17:** `MiniMirrorView` must not fade for Disabled when the popover already applies 0.4 (one fade only — keep the popover's); unify the two `ConfigProblem` types by making the Window one a thin wrapper or typealias over `EdgyRuntime.ConfigProblem` plus the file name (keep `WindowConditions` source-compatible for EdgyApp).
+6. Use the catalog's `displayName` everywhere; never re-spell action names in the UI (batch 20 normalises the catalog spellings).
 
 ## Acceptance
 - Every must-fix and should-fix in the three critiques ticked in the done report with the snapshot that shows it (or the BRIEF rule that overrides it).
