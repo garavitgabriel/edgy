@@ -206,7 +206,7 @@ func drawnBarsSitInsideTheirZoneAndClearTheCornerTiles(segments: Int) {
   #expect(!model.mirrorZones(forApp: nil).contains { $0.overridden || $0.style == .offHere })
 }
 
-@MainActor @Test func appOffDrawsEveryZoneAsAHairlineAndSaysSo() {
+@MainActor @Test func appOffDrawsEveryZoneAsAHairlineAndLeavesTheLineToTheWindow() {
   let model = PreviewFixtures.model()
   let huddle = PreviewFixtures.huddle
   #expect(model.mirrorZones(forApp: huddle).allSatisfy { $0.style == .unmapped && $0.label == nil })

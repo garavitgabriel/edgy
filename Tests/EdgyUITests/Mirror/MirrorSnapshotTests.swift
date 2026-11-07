@@ -56,6 +56,19 @@ struct MirrorSnapshotTests {
     try shoot(PadMirrorView(model: model), "pad-split-bottom2-right3")
   }
 
+  /// A long label in a quarter of the bottom edge truncates inside its bar instead of running on.
+  @Test func longLabelInASplitBarTruncates() throws {
+    var config = EdgyConfig.defaults
+    config.defaultProfile.bindings.removeAll { $0.zone == .edge(.bottom) }
+    let part = Zone.edge(.bottom, segment: 1, segments: 4)
+    config.defaultProfile.bindings += [
+      Binding(zone: part, gesture: .swipe(.left), action: "keyboard.shortcut", parameters: ["keys": "cmd+left"]),
+      Binding(zone: part, gesture: .swipe(.right), action: "media.next"),
+      Binding(zone: part, gesture: .doubleTap, action: "media.playPause"),
+    ]
+    try shoot(PadMirrorView(model: PreviewFixtures.model(config: config)), "pad-split-bottom4-long-label")
+  }
+
   @Test func wayfareTab() throws {
     let model = PreviewFixtures.model()
     model.selectedProfile = .app(PreviewFixtures.wayfare)

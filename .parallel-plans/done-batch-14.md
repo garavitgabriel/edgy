@@ -4,7 +4,7 @@ tag: EDGY-MIRROR
 branch: worktree-edgy-mirror
 worktree_path: ~/Projects/edgy/.claude/worktrees/edgy-mirror
 completed_at: 2026-11-07
-verification: swift build ✓ · swift test ✓ (all suites; EdgyUITests 79 tests, 6 suites) · swift format lint --strict ✓ · token greps empty · denylist empty
+verification: swift build ✓ · swift test ✓ (all suites; EdgyUITests 80 tests, 6 suites) · swift format lint --strict ✓ · token greps empty · denylist empty
 ---
 
 # Done — batch 14: the pad mirror (big and mini)
@@ -25,15 +25,15 @@ verification: swift build ✓ · swift test ✓ (all suites; EdgyUITests 79 test
 | Two pads: outline cross-fades 150 ms | ✓ (code) | `.id(device?.id).transition(.opacity)` with `.animation(.easeInOut(duration: 0.15), value: device?.id)`; motion is judged on the device |
 | `MiniMirrorView`: same drawing at `miniMirrorPointsPerMM`, no labels, active profile + last touch | ✓ (active profile: see blocker #1) | `mini-idle-*`, `mini-last-touch-*`, `mini-no-trackpad-*`, `mini-paused-*`, `mini-huddle-off-*` |
 | Snapshots light + dark, every listed state | ✓ | `docs/design/build-shots/batch-14/` (16 pairs, below) |
-| ≥ 12 tests | ✓ | 15 test functions in `MirrorTests.swift` (29 cases with arguments) + 16 snapshot tests |
+| ≥ 12 tests | ✓ | 16 test functions in `MirrorTests.swift` (30 cases with arguments) + 17 snapshot tests |
 
-Snapshots (each `-light.png` and `-dark.png`): `pad-default-idle`, `pad-right-selected`, `pad-live-slide-right`, `pad-rejected-touch`, `pad-split-bottom2-right3`, `pad-wayfare`, `pad-huddle-off`, `pad-no-trackpad`, `pad-disabled`, `pad-built-in` (134 × 87 mm with a live bottom touch), `mini-idle`, `mini-last-touch`, `mini-no-trackpad`, `mini-paused`, `mini-huddle-off`, `preset-media-minimal`.
+Snapshots (each `-light.png` and `-dark.png`): `pad-default-idle`, `pad-split-bottom4-long-label` (in-bar text truncates inside a quarter bar), `pad-right-selected`, `pad-live-slide-right`, `pad-rejected-touch`, `pad-split-bottom2-right3`, `pad-wayfare`, `pad-huddle-off`, `pad-no-trackpad`, `pad-disabled`, `pad-built-in` (134 × 87 mm with a live bottom touch), `mini-idle`, `mini-last-touch`, `mini-no-trackpad`, `mini-paused`, `mini-huddle-off`, `preset-media-minimal`.
 
 ## Verification (run in this session, after the last change)
 
 ```
 swift build                                     → Build complete!
-swift test                                      → every suite passed (EdgyUITests: 79 tests in 6 suites)
+swift test                                      → every suite passed (EdgyUITests: 80 tests in 6 suites)
 swift format lint --strict -r Sources Tests Package.swift → exit 0, no output
 token greps (shared brief rule 7, plus no .custom fonts / second hue / Unicode arrows in Mirror) → no output
 git grep -niE -f ~/.config/edgy-names-denylist → no output
@@ -88,6 +88,12 @@ Kill list: no rulers, no grey drop-shadowed rectangle (warm slab gradient from t
   - The B dark shot of the same state (`pad-*-dark`) uses the dark tokens. B's two-column picker and old conflict copy are not this batch's.
 - **Split (B shows the right edge split into 2):** separate pills with the PadLayout boundaries and an unmapped middle segment as a hairline (`pad-split-bottom2-right3`). Matches the intent.
 
+**Inside the real window (batch 16's `window-default` shot, regenerated locally at 3.7 pt/mm, not committed).**
+- The mirror fills the window's mirror column as in render A.
+- Tabs (≥13 pt) and corner icons read at 10 mm corners and 8 mm strips.
+- The right edge's selection ring shows.
+- Batch 16's committed window shots predate this mirror (they show the stub), so they will change after merge.
+
 **App tab vs S1.**
 - **Matches:** an ink dot before the overridden tab's text ("• Keyboard Shortcut, Next Track and Play/Pause" in `pad-wayfare`), and "Off here" in `ink2` text-only beside a hairline zone, as S1 draws it.
 - **Differs:** the demo data. S1's data is illustrative; ours is `PreviewFixtures`.
@@ -136,7 +142,9 @@ Kill list: no rulers, no grey drop-shadowed rectangle (warm slab gradient from t
 8. **Pills** are drawn as `RoundedRectangle(cornerRadius: shortSide/2, style: .circular)`. A stroked `Capsule()` rendered flattened ends in `NSHostingView` at these aspect ratios (seen in the ring). The radius is computed, not a literal.
 9. **App name on the pad** falls back to the bundle ID's last component, capitalised. It's only used for the mini-mirror state value now.
 10. Clicking a zone sets `selectedZone` only. It never touches `picking` (batch 15 owns opening the picker).
-11. **`PadMirrorView` calls `model.startFeed()` on appear and never `stopFeed()`.** The feed is shared, and the window that hosts the mirror should own stopping it.
+11. **Whole edge plus segments on the same edge:** a config holding both `.edge(.bottom)` and split `.edge(.bottom, segment:, segments: 2)` bindings is drawn at the finest split. The whole-edge binding isn't drawn. The validator's `overlappingZones` warning fires only when the two share a gesture, so the chief may want a mirror rule here (open question).
+12. **In-bar labels truncate** with "…" inside their bar (`pad-split-bottom4-long-label`). Tabs keep their natural width.
+13. **`PadMirrorView` calls `model.startFeed()` on appear and never `stopFeed()`.** The feed is shared, and the window that hosts the mirror should own stopping it.
 
 ## Needs Gabriel (human-only)
 

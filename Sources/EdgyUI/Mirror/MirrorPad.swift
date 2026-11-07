@@ -237,7 +237,7 @@ struct MirrorPad: View {
     if let text = zone.label {
       let placement = labelPlacement(zone)
       labelBody(zone, text: text, live: live, inBar: placement.inBar)
-        .fixedSize()
+        .fixedSize(horizontal: !placement.inBar, vertical: true)
         .frame(maxWidth: placement.inBar ? geometry.shapeFrame(for: zone.zone).width - 16 : nil)
         .alignmentGuide(HorizontalAlignment.leading) { d in d.width * placement.anchor.x - placement.point.x }
         .alignmentGuide(VerticalAlignment.top) { d in d.height * placement.anchor.y - placement.point.y }
