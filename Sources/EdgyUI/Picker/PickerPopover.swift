@@ -65,7 +65,8 @@ private struct PickerPopoverLayer: View {
   var body: some View {
     GeometryReader { proxy in
       if let target = model.picking, let anchor = anchors.zones[target.zone] {
-        let rect = proxy[anchor]
+        // The trigger is the zone plus its own label tab: the picker covers neither (bone 5).
+        let rect = anchors.tabs[target.zone].map { proxy[anchor].union(proxy[$0]) } ?? proxy[anchor]
         let others =
           anchors.zones.filter { $0.key != target.zone }.map { proxy[$0.value] }
           + anchors.tabs.filter { $0.key != target.zone }.map { proxy[$0.value] }

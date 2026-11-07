@@ -19,7 +19,8 @@ struct WindowSnapshotTests {
     _ model: SettingsModel, conditions: WindowConditions = .normal, name: String
   ) throws {
     let urls = try Snapshot.write(
-      SettingsWindowView(model: model).environment(\.windowConditions, conditions), folder: Self.folder, name: name,
+      SettingsWindowView(model: model).environment(\.windowConditions, conditions).withExportedAppIcon(),
+      folder: Self.folder, name: name,
       size: size)
     #expect(urls.count == 2)
   }

@@ -87,6 +87,33 @@ struct MirrorPad: View {
   /// The Split control's hover preview (§ Split control): this edge's dividers for `parts`, drawn
   /// as `ink` hairlines at 50% until the click or the pointer leaves.
   var splitPreview: SplitPreview.Hover?
+  /// The popover's mini mirror (bone 10): every mapped zone carries its action icon at 10 pt,
+  /// edges included (up to two along a bar). The window's mirror keeps text tabs, no edge icons.
+  var zoneIcons = false
+  /// Reports the zone under the pointer (mini mirror's hover line), `nil` when none.
+  var onHoverZone: ((Zone?) -> Void)?
+
+  static let miniIconSize: CGFloat = 10
+
+  /// The zone whose drawn shape is under `point` (pad space), with a little slack for thin bars.
+  func zone(at point: CGPoint) -> Zone? {
+    let corners = zones.filter(\.isCorner) + zones.filter { !$0.isCorner }
+    return corners.first { geometry.shapeFrame(for: $0.zone).insetBy(dx: -3, dy: -3).contains(point) }?.zone
+  }
+
+  /// Up to two icons along a mapped bar, side by side on top/bottom, stacked on left/right.
+  @ViewBuilder func barIcons(_ zone: MirrorZone, rect: CGRect) -> some View {
+    let icons = Array(zone.actions.prefix(2))
+    let size = Self.miniIconSize
+    Group {
+      if rect.height > rect.width {
+        VStack(spacing: 2) { ForEach(Array(icons.enumerated()), id: \.offset) { ActionIcon(id: $1, size: size) } }
+      } else {
+        HStack(spacing: 2) { ForEach(Array(icons.enumerated()), id: \.offset) { ActionIcon(id: $1, size: size) } }
+      }
+    }
+    .foregroundStyle(Tokens.ink)
+  }
 
   /// Between the inner edges of the top and bottom bars, and of the side strips.
   var interiorRect: CGRect {
@@ -171,6 +198,7 @@ struct MirrorPad: View {
     }
     .frame(width: size.width, height: size.height, alignment: .topLeading)
     .coordinateSpace(name: Self.space)
+    .modifier(ZoneHover(pad: self))
     .modifier(PickerMirrorAnchor(enabled: publishesPickerAnchors))
   }
 
@@ -267,6 +295,7 @@ struct MirrorPad: View {
       pill.fill(Tokens.bar)
         .overlay { if live { pill.fill(Tokens.accent.opacity(0.4)) } }
         .overlay { if live { pill.strokeBorder(Tokens.accent, lineWidth: 1.5) } }
+        .overlay { if zoneIcons { barIcons(zone, rect: rect) } }
     case .unmapped, .offHere:
       pill.strokeBorder(Tokens.line, lineWidth: 1)
     }
@@ -290,7 +319,7 @@ struct MirrorPad: View {
 
   @ViewBuilder private func cornerIcon(_ zone: MirrorZone) -> some View {
     if showsIcons, let action = zone.symbol {
-      ActionIcon(id: action, size: full ? 16 : 12).foregroundStyle(Tokens.ink)
+      ActionIcon(id: action, size: zoneIcons ? Self.miniIconSize : (full ? 16 : 12)).foregroundStyle(Tokens.ink)
     }
   }
 
@@ -546,6 +575,23 @@ struct PickerZoneAnchor: ViewModifier {
 
   func body(content: Content) -> some View {
     if enabled { content.pickerAnchor(for: zone) } else { content }
+  }
+}
+
+/// Reports the zone under the pointer to `onHoverZone` (the mini mirror's hover line).
+struct ZoneHover: ViewModifier {
+  var pad: MirrorPad
+  func body(content: Content) -> some View {
+    if let report = pad.onHoverZone {
+      content.onContinuousHover(coordinateSpace: .local) { phase in
+        switch phase {
+        case .active(let point): report(pad.zone(at: point))
+        case .ended: report(nil)
+        }
+      }
+    } else {
+      content
+    }
   }
 }
 

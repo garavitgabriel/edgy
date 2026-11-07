@@ -28,6 +28,10 @@ struct MirrorZone: Hashable, Identifiable {
   /// One of the zone's actions is unavailable on this Mac (§ Issue states, `actionUnavailable`):
   /// the tab reads in `ink2` with a small slashed-circle mark.
   var unavailable = false
+  /// Every running action of the zone in pad gesture order (slide, swipes, tap, double-tap,
+  /// long-press): the mini mirror draws up to two icons and names them all on hover (bone 10).
+  var actions: [ActionID] = []
+  var actionNames: [String] = []
 
   /// Every form of the label, longest first.
   var labelForms: [String] { label.map { [$0] + shorter.filter { $0 != label } } ?? [] }
@@ -87,7 +91,9 @@ enum MirrorContent {
         overridden: running.contains { $0.source == .overridden },
         symbol: first?.action,
         shorter: ZoneLabel.shorterForms(for: bindings, catalog: catalog),
-        unavailable: bindings.contains { !availability($0.action).isUsable })
+        unavailable: bindings.contains { !availability($0.action).isUsable },
+        actions: ZoneLabel.ordered(bindings).map(\.action),
+        actionNames: ZoneLabel.ordered(bindings).map { catalog[$0.action]?.displayName ?? $0.action.rawValue })
     }
   }
 

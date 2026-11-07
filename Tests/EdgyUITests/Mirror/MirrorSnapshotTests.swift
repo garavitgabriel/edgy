@@ -76,7 +76,7 @@ struct MirrorSnapshotTests {
     model.selectedZone = .edge(.bottom)
     model.picking = PickerTarget(zone: .edge(.bottom), gesture: .tap)
     let urls = try Snapshot.write(
-      SettingsWindowView(model: model), folder: Self.folder, name: "window-picker-bottom",
+      SettingsWindowView(model: model).withExportedAppIcon(), folder: Self.folder, name: "window-picker-bottom",
       size: SettingsWindowView.minimumSize)
     #expect(urls.count == 2)
   }

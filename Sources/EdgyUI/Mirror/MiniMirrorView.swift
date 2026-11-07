@@ -21,6 +21,7 @@ public struct MiniMirrorView: View {
   /// `nil` = follow the frontmost app; `.some(app)` = pinned (`.some(nil)` = Default).
   let pinnedApp: String??
   @State private var lastTouches: [LiveTouch] = []
+  @State private var hovered: Zone?
   @State private var lastKnownSize: Size2D?
   /// The host already fades the mirror for these states (the popover applies its one 40%), so
   /// the mirror doesn't fade again (one fade only).
@@ -43,6 +44,22 @@ public struct MiniMirrorView: View {
   public init(model: SettingsModel, frontmostApp: String?) {
     self.model = model
     pinnedApp = .some(frontmostApp)
+  }
+
+  /// Snapshots: open with `zone` hovered (the hover line showing).
+  func hovering(_ zone: Zone?) -> MiniMirrorView {
+    var copy = self
+    copy._hovered = State(initialValue: zone)
+    return copy
+  }
+
+  /// Bone 10's hover line: the zone, a colon, its actions as a comma list ("Bottom edge: Previous
+  /// Track, Next Track, Play/Pause"). Empty with no hover, or over a zone with nothing mapped.
+  static func hoverLine(_ zone: MirrorZone?) -> String {
+    guard let zone, zone.style == .mapped, !zone.actionNames.isEmpty else { return "" }
+    var names: [String] = []
+    for name in zone.actionNames where !names.contains(name) { names.append(name) }
+    return "\(ZoneNaming.title(zone.zone)): \(names.joined(separator: ", "))"
   }
 
   /// The last touch where it landed (bone 10): the frame kept after a lift is the last non-empty one.
@@ -78,24 +95,63 @@ public struct MiniMirrorView: View {
       : device?.sensorSizeMM ?? model.lastKnownPadSizeMM ?? lastKnownSize ?? MirrorGeometry.defaultSensorSizeMM
     let geometry = MirrorGeometry(
       sensorSizeMM: sizeMM, settings: model.editor.config.gestures, pointsPerMM: Tokens.miniMirrorPointsPerMM)
-    ZStack {
-      MirrorPad(
-        geometry: geometry, zones: model.mirrorZones(forApp: frontmostApp, unavailableAsUnmapped: true), selected: nil,
-        touches: device == nil ? [] : Self.shown(live: model.liveTouches, last: lastTouches),
-        faded: state.faded && !hostFades, dashedOutline: state == .noTrackpad, showsLabels: false,
-        message: state == .noTrackpad ? MirrorMessage(text: MirrorCopy.noTrackpadMini) : nil
-      )
-      .id(device?.id)
-      .transition(.opacity)
+    let zones = model.mirrorZones(forApp: frontmostApp, unavailableAsUnmapped: true)
+    let mapped = Set(zones.filter { $0.style == .mapped }.map(\.zone))
+    VStack(alignment: .leading, spacing: 6) {
+      ZStack {
+        MirrorPad(
+          geometry: geometry, zones: zones, selected: nil,
+          touches: device == nil ? [] : Self.shown(live: model.liveTouches, last: lastTouches),
+          faded: state.faded && !hostFades, dashedOutline: state == .noTrackpad, showsLabels: false,
+          message: state == .noTrackpad ? MirrorMessage(text: MirrorCopy.noTrackpadMini) : nil,
+          zoneIcons: true, onHoverZone: { hovered = $0 }
+        )
+        .id(device?.id)
+        .transition(.opacity)
+      }
+      .animation(MirrorMotion.padSwitch, value: device?.id)
+      HoverLine(text: Self.hoverLine(hovered.flatMap { zone in zones.first { $0.zone == zone } }))
+        .frame(width: geometry.size.width, alignment: .leading)
     }
-    .animation(MirrorMotion.padSwitch, value: device?.id)
     .onChange(of: model.liveTouches, initial: true) { _, new in
-      lastTouches = Self.remembered(after: new, previous: lastTouches)
+      // Remember only frames with a zone touch: a lifted pointer touch never lingers (bone 2).
+      let drawn = MirrorPad.drawnTouches(new, geometry: geometry, mapped: mapped)
+      lastTouches = Self.remembered(after: drawn, previous: lastTouches)
     }
     .onChange(of: device, initial: true) { old, new in
       if let new { lastKnownSize = new.sensorSizeMM }
       if old?.id != new?.id { lastTouches = [] }
     }
+  }
+}
+
+/// One line under the mini mirror (13, `ink2`). Its height is always reserved, so the popover never
+/// jumps; a line too long for the width clips with the 12 pt fade (bone 10).
+struct HoverLine: View {
+  var text: String
+
+  var body: some View {
+    ViewThatFits(in: .horizontal) {
+      line
+      line.frame(maxWidth: .infinity, alignment: .leading).clipped()
+        .mask(
+          GeometryReader { proxy in
+            LinearGradient(
+              stops: [
+                .init(color: .black, location: 0),
+                .init(color: .black, location: max(0, 1 - MirrorPad.labelFade / max(proxy.size.width, 1))),
+                .init(color: .clear, location: 1),
+              ], startPoint: .leading, endPoint: .trailing)
+          })
+    }
+    .frame(height: 16, alignment: .leading)
+    .accessibilityHidden(text.isEmpty)
+  }
+
+  private var line: some View {
+    Text(text.isEmpty ? " " : text)
+      .font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
+      .lineLimit(1).fixedSize()
   }
 }
 
