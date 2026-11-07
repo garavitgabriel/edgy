@@ -331,6 +331,7 @@ struct Harness {
   let dictation = MockDictationOutput()
   let waiter = MockTransitionWaiter()
   let scheduler = MockScheduler()
+  let switcherInput = MockSwitcherInput()
   let registry: ActionRegistry
 
   init(settings: AppSettings = .defaults, levelKeys working: Bool = false) {
@@ -339,7 +340,19 @@ struct Harness {
       settings: settings, audio: audio, display: display, media: media, hud: hud, haptics: haptics,
       shortcuts: shortcuts, keyboard: keyboard, workspace: workspace, windows: windows, system: system,
       levelKeys: levelKeys, displays: displays, backlight: backlight, dictation: dictation, waiter: waiter,
-      scheduler: scheduler)
+      scheduler: scheduler, switcherInput: switcherInput)
+  }
+
+  /// A slide update with the physical motion behind it (millimetres, a timestamp, an end).
+  func move(
+    _ id: ActionID, mm: Double, at time: TimeInterval, zoneMM: Double = 100, atEnd: Int = 0,
+    phase: GestureEvent.Phase = .changed, _ parameters: [String: String] = [:]
+  ) throws {
+    try registry.perform(
+      id, input: .delta(mm / zoneMM, phase: phase),
+      context: ActionContext(
+        frontmostBundleID: nil, parameters: parameters,
+        motion: SlideMotion(deltaMM: mm, timestamp: time, atEnd: atEnd)))
   }
 
   func press(_ id: ActionID, down: Bool, _ parameters: [String: String] = [:]) throws {
@@ -414,4 +427,27 @@ final class MockScheduler: ActionScheduler, @unchecked Sendable {
 
   /// Runs `work` as if its timer fired now, even if it was cancelled (a fire racing a cancel).
   func fireLate(_ work: Work) { work.run() }
+}
+
+/// Listen-only switcher input, driven by the test.
+final class MockSwitcherInput: SwitcherInputMonitor, @unchecked Sendable {
+  private(set) var starts = 0
+  private(set) var stops = 0
+  private(set) var handler: (@Sendable (SwitcherInterrupt) -> Void)?
+  var appCount: Int?
+
+  var listening: Bool { handler != nil }
+
+  func start(_ handler: @escaping @Sendable (SwitcherInterrupt) -> Void) {
+    starts += 1
+    self.handler = handler
+  }
+  func stop() {
+    stops += 1
+    handler = nil
+  }
+  func switcherAppCount() -> Int? { appCount }
+
+  /// Delivers an interrupt as the live monitor would (only while listening).
+  func send(_ interrupt: SwitcherInterrupt) { handler?(interrupt) }
 }
