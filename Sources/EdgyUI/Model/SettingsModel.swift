@@ -67,6 +67,10 @@ public final class SettingsModel {
   /// readers that must not compete with the overlay's `takeDecisions()` (onboarding's Try it).
   public private(set) var recentDecisions: [LiveDecision] = []
   public static let recentDecisionLimit = 32
+  /// How many decisions have ever arrived (monotonic, never reset). A reader records it as a
+  /// baseline and later takes the last `decisionSerial - baseline` of `recentDecisions` (capped
+  /// at its count) as exactly the new ones, with no overlap inference.
+  public private(set) var decisionSerial = 0
 
   // MARK: Pickers (data sources for parameter editors)
 
@@ -154,6 +158,7 @@ public final class SettingsModel {
     pendingDecisions += update.decisions
     if !update.decisions.isEmpty {
       recentDecisions = Array((recentDecisions + update.decisions).suffix(Self.recentDecisionLimit))
+      decisionSerial += update.decisions.count
     }
   }
 

@@ -35,6 +35,21 @@ import Testing
   #expect(model.liveTouches.count == 1)
 }
 
+@MainActor @Test func decisionSerialCountsEveryDecisionPastTheRecentCap() {
+  let model = PreviewFixtures.model()
+  let d = LiveDecision.recognized(zone: .edge(.left), kind: .slide, phase: .began, deviceID: 1)
+  #expect(model.decisionSerial == 0)
+  model.simulate(LiveFeedUpdate(touches: nil, decisions: []))
+  #expect(model.decisionSerial == 0)
+  let limit = SettingsModel.recentDecisionLimit
+  model.simulate(LiveFeedUpdate(touches: nil, decisions: Array(repeating: d, count: limit + 5)))
+  #expect(model.decisionSerial == limit + 5)
+  _ = model.takeDecisions()
+  model.simulate(LiveFeedUpdate(touches: nil, decisions: [d, d]))
+  #expect(model.decisionSerial == limit + 7)
+  #expect(model.recentDecisions.count == limit)
+}
+
 @Test func glyphArtworkShipsInTheModuleBundle() {
   for state in ["normal", "testMode", "paused", "disabled", "noTrackpad", "needsAccessibility", "brokenConfig"] {
     #expect(EdgyUIResources.glyphPDF(state) != nil, "\(state)")
