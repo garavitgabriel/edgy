@@ -37,3 +37,9 @@ Items found in testing or left open by builders, to fold into a future round.
 
 ## Switch Apps opens on contact (Gabriel, MBP, 2026-11-07) → batch 26
 - Top-edge Switch Apps opens without a real slide: a 120 ms rest claims the slide and `.began` opens the switcher. Fix in batch 26: it opens after one `stepMM` of travel; strokes that never reach that press nothing.
+
+## From batch 26 (2026-11-07)
+- Router still plays `gestureCaught` on every slide `.began` (a resting finger ticks once on the switcher edge) and emits `actionRan(outcome: nil)` on `.began`; full silence until the switcher opens needs a Router change (EdgyRuntime).
+- `switcherAppCount()` still runs on every `.began`; move it to the opening.
+- Sensitivity scales the opening travel (sensitivity 2 opens at 4 mm of real travel) — note in settings-reference.
+- EdgyUI `ParameterPresentationTests` / `Batch15SnapshotTests` hardcode the old Switch Apps helper line in their own descriptors; re-point at the catalog and re-shoot `batch-22/inspector-switch-apps-keep-open-off`.
