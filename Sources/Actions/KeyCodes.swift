@@ -34,6 +34,17 @@ enum KeyCodes {
     .fn: (0x3F, .maskSecondaryFn),
   ]
 
+  /// The `KeyCombo` name of a virtual key code, `nil` for keys Edgy has no name for.
+  static func name(for keyCode: Int64) -> String? { namesByCode[keyCode] }
+
+  private static let namesByCode: [Int64: String] = Dictionary(
+    uniqueKeysWithValues: byName.map { (Int64($0.value), $0.key) })
+
+  /// The modifiers whose generic flags are set in `flags` (device bits and others ignored).
+  static func modifiers(in flags: CGEventFlags) -> Set<KeyCombo.Modifier> {
+    Set(KeyCombo.Modifier.allCases.filter { modifiers[$0].map { flags.contains($0.flag) } ?? false })
+  }
+
   /// Device-dependent flag bits a real keyboard sets alongside each generic modifier flag, for
   /// the left-hand key (the key codes in `modifiers` are the left-hand ones). Some apps that
   /// listen for a bare modifier check these bits to tell left from right. fn has none: its only

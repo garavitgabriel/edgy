@@ -359,6 +359,9 @@ import Testing
       "Live" + "BrightnessOutput", "Live" + "HapticOutput", "Live" + "ShortcutRunner",
       "Live" + "LevelKeyOutput", "Live" + "KeyboardBacklightOutput", "Live" + "DictationOutput",
       "Live" + "TransitionWaiter", "makeLive" + "DisplayBrightness", "Live" + "ActionScheduler",
+      // v0.4 pickers: live sources and their factories.
+      "Live" + "AppFolderReader", "Live" + "RunningApps", "Live" + "ProcessRunner", "Live" + "KeyEventTap",
+      "makeLive" + "InstalledAppsProvider", "makeLive" + "ShortcutsListing", "makeLive" + "KeyComboRecorder",
     ]
     for file in files {
       let text = try String(contentsOf: file, encoding: .utf8)
