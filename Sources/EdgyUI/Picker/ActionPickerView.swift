@@ -59,7 +59,7 @@ public struct ActionPickerView: View {
             chosenGesture = gesture
           } label: {
             HStack(spacing: 10) {
-              GestureIcon(gesture: gesture)
+              GestureIcon(gesture: gesture, zone: zone)
               Text(GestureNaming.name(gesture)).foregroundStyle(Tokens.ink)
               Spacer()
             }

@@ -120,7 +120,7 @@ private struct SegmentBindings: View {
             isOpen: open == row.id,
             autofocus: drafts.focus == key)
         }
-        if let pending { PendingRowView(gesture: pending) }
+        if let pending { PendingRowView(gesture: pending, zone: zone) }
       }
       if rules, !rows.isEmpty || pending != nil { InspectorRule().padding(.vertical, 10) }
       if !model.unmappedGestures(for: zone).isEmpty {
@@ -159,10 +159,11 @@ private struct SegmentBindings: View {
 /// The row of a gesture being chosen in the picker: gesture icon and name, value blank.
 struct PendingRowView: View {
   var gesture: GestureKind
+  var zone: Zone? = nil
 
   var body: some View {
     HStack(spacing: 10) {
-      GestureIcon(gesture: gesture)
+      GestureIcon(gesture: gesture, zone: zone)
       Text(GestureNaming.name(gesture)).foregroundStyle(Tokens.ink)
       Spacer(minLength: 8)
     }
@@ -218,7 +219,9 @@ struct BindingRowView: View {
   @ViewBuilder private func block(inline: Bool) -> some View {
     VStack(alignment: .leading, spacing: 4) {
       HStack(alignment: .firstTextBaseline, spacing: 10) {
-        GestureIcon(gesture: row.gesture).alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
+        GestureIcon(gesture: row.gesture, zone: row.binding.zone).alignmentGuide(.firstTextBaseline) {
+          $0[VerticalAlignment.center] + 4
+        }
         Text(GestureNaming.name(row.gesture)).foregroundStyle(Tokens.ink).lineLimit(1).fixedSize()
         Spacer(minLength: 8)
         // While the picker is open the value is blank: its header already says it (bone 6).

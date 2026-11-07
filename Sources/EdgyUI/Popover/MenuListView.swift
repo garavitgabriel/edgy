@@ -32,6 +32,8 @@ struct MenuRowButton: View {
   let row: MenuRow
   let perform: () -> Void
   @State private var hovering = false
+  /// Snapshots: draw the hover wash without a pointer.
+  var forceHover = false
 
   var body: some View {
     Button(action: perform) {
@@ -39,14 +41,16 @@ struct MenuRowButton: View {
         Text(row.title)
         Spacer(minLength: 12)
         if let shortcut = row.shortcut {
-          Text(shortcut).foregroundStyle(hovering ? MenuHighlight.text : Tokens.ink2)
+          Text(shortcut).foregroundStyle((hovering || forceHover) ? MenuHighlight.text : Tokens.ink2)
         }
       }
-      .foregroundStyle(hovering ? MenuHighlight.text : Tokens.ink)
+      .foregroundStyle((hovering || forceHover) ? MenuHighlight.text : Tokens.ink)
       .padding(.horizontal, PopoverMetrics.inset - PopoverMetrics.listInset)
       .padding(.vertical, 4)
       .background {
-        if hovering { RoundedRectangle(cornerRadius: Tokens.radiusControl - 2).fill(MenuHighlight.background) }
+        if hovering || forceHover {
+          RoundedRectangle(cornerRadius: Tokens.radiusControl - 2).fill(MenuHighlight.background)
+        }
       }
       .contentShape(Rectangle())
     }

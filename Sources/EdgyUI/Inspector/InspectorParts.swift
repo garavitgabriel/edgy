@@ -6,6 +6,13 @@ import SwiftUI
 /// the head points.
 struct GestureIcon: View {
   var gesture: GestureKind
+  /// The zone the gesture is on: a slide on a top or bottom edge draws horizontally.
+  var zone: Zone? = nil
+
+  static func turnsSideways(_ gesture: GestureKind, on zone: Zone?) -> Bool {
+    guard gesture == .slide, case .edge(let edge, _, _) = zone else { return false }
+    return edge == .top || edge == .bottom
+  }
   static let size: CGFloat = 16
   static let stroke: CGFloat = 1.5
 
@@ -73,6 +80,8 @@ struct GestureIcon: View {
       context.fill(fill, with: .color(Tokens.ink))
     }
     .frame(width: Self.size, height: Self.size)
+    // A slide runs along its edge: ↔ on top and bottom, ↕ on left and right (the same glyph turned).
+    .rotationEffect(.degrees(Self.turnsSideways(gesture, on: zone) ? 90 : 0))
     .accessibilityHidden(true)
   }
 }

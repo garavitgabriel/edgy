@@ -178,6 +178,48 @@ struct Batch22SnapshotTests {
     #expect(bottom?.actions.count == 3)
   }
 
+  // MARK: Late items: slide orientation, strip alignment, menu hover wash
+
+  @Test func slideIconFollowsTheEdge() throws {
+    #expect(GestureIcon.turnsSideways(.slide, on: .edge(.top)))
+    #expect(GestureIcon.turnsSideways(.slide, on: .edge(.bottom, segment: 1, segments: 2)))
+    #expect(!GestureIcon.turnsSideways(.slide, on: .edge(.left)))
+    #expect(!GestureIcon.turnsSideways(.slide, on: nil))
+    #expect(!GestureIcon.turnsSideways(.tap, on: .edge(.top)))
+    let model = InspectorFixtures.model(
+      config: config([
+        EdgyCore.Binding(zone: .edge(.top), gesture: .slide, action: "audio.volume"),
+        EdgyCore.Binding(zone: .edge(.right), gesture: .slide, action: "display.brightness"),
+      ]))
+    model.selectedZone = .edge(.top)
+    try inspector(model, "inspector-top-edge-slide")
+  }
+
+  @Test func brokenConfigStripButtonsTopAlign() throws {
+    let strip = WindowStripView(
+      symbol: "exclamationmark.circle",
+      text:
+        "config.json has an error on line 14, column 3: Unexpected character 'x'. Edgy kept the last working settings."
+    ) {
+      HStack(spacing: 12) {
+        TextAction(title: "Open config file") {}
+        TextAction(title: "Replace with current settings") {}
+      }
+    }
+    .frame(width: 760).background(Tokens.windowTint)
+    try Snapshot.write(strip, folder: Self.folder, name: "strip-broken-config-wrapped")
+  }
+
+  @Test func menuRowHoverWash() throws {
+    let rows = VStack(spacing: 0) {
+      ForEach(Array(MenuRow.allCases.enumerated()), id: \.offset) { index, row in
+        MenuRowButton(row: row, perform: {}, forceHover: index == 1)
+      }
+    }
+    .padding(8).frame(width: 320).background(Tokens.windowTint)
+    try Snapshot.write(rows, folder: Self.folder, name: "popover-menu-hover-wash")
+  }
+
   // MARK: Batch-20 parameter shots (chief's list) and critique 15 S2
 
   @Test func holdKeysOpen() throws {

@@ -87,7 +87,8 @@ struct WindowStripView<Buttons: View>: View {
   @ViewBuilder let buttons: Buttons
 
   var body: some View {
-    HStack(spacing: 10) {
+    // Top-aligned: when the sentence wraps, the buttons stay on its first line (critique 21 S4).
+    HStack(alignment: .firstTextBaseline, spacing: 10) {
       Image(systemName: symbol).foregroundStyle(Tokens.ink)
       Text(text).foregroundStyle(Tokens.ink).lineLimit(2).fixedSize(horizontal: false, vertical: true)
       Spacer(minLength: 12)
