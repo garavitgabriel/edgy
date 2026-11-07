@@ -22,11 +22,17 @@ public struct DisplayInfo: Hashable, Sendable {
   public var brightnessControllable: Bool
   /// Shown to the user when `brightnessControllable` is false.
   public var reason: String?
+  /// Identity that survives reconnects and reboots (vendor, model and serial where the display
+  /// reports them; the name otherwise). Keys `AppSettings.unresponsiveDisplays` and friends.
+  public var key: String
 
-  public init(id: UInt32, name: String, kind: Kind, brightnessControllable: Bool, reason: String? = nil) {
+  public init(
+    id: UInt32, name: String, kind: Kind, brightnessControllable: Bool, reason: String? = nil, key: String? = nil
+  ) {
     self.id = id
     self.name = name
     self.kind = kind
+    self.key = key ?? name
     self.brightnessControllable = brightnessControllable
     self.reason = reason
   }

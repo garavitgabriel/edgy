@@ -19,6 +19,9 @@ import Testing
     "hapticTickStrength": { $0.hapticTickStrength = 2 },
     "hapticClickStrength": { $0.hapticClickStrength = 3 },
     "launchAtLogin": { $0.launchAtLogin = true },
+    "unresponsiveDisplays": { $0.unresponsiveDisplays = ["desk-34"] },
+    "confirmedDisplays": { $0.confirmedDisplays = ["desk-27"] },
+    "displayCheckAsks": { $0.displayCheckAsks = ["desk-34": 1] },
   ]
 
   /// Each `GestureSettings` field → an edit to a non-default value inside its limits.

@@ -106,6 +106,13 @@ public struct AppSettings: Codable, Hashable, Sendable {
   /// Strength of clicks (slide limits, action fired), `hapticStrengthRange`.
   public var hapticClickStrength: Int
   public var launchAtLogin: Bool
+  /// External displays the user said don't respond to brightness ("No, turn off for this
+  /// display"), by display key (see `DisplayInfo.key` in Displays). Brightness skips them.
+  public var unresponsiveDisplays: Set<String>
+  /// External displays the user confirmed do respond (never asked again).
+  public var confirmedDisplays: Set<String>
+  /// How many times Edgy has asked about each unconfirmed display (it asks at most 3 times).
+  public var displayCheckAsks: [String: Int]
 
   /// Trackpad haptics come in fixed steps; this is the user-facing scale (1 = lightest).
   public static let hapticStrengthRange = 1...6
@@ -119,7 +126,8 @@ public struct AppSettings: Codable, Hashable, Sendable {
   public init(
     enabled: Bool, showMenuBarIcon: Bool, hud: HUDMode, haptics: Bool,
     hapticEvents: Set<HapticEvent> = Set(HapticEvent.allCases), hapticTickStrength: Int = 6,
-    hapticClickStrength: Int = 6, launchAtLogin: Bool
+    hapticClickStrength: Int = 6, launchAtLogin: Bool, unresponsiveDisplays: Set<String> = [],
+    confirmedDisplays: Set<String> = [], displayCheckAsks: [String: Int] = [:]
   ) {
     self.enabled = enabled
     self.showMenuBarIcon = showMenuBarIcon
@@ -129,6 +137,9 @@ public struct AppSettings: Codable, Hashable, Sendable {
     self.hapticTickStrength = Self.clampStrength(hapticTickStrength)
     self.hapticClickStrength = Self.clampStrength(hapticClickStrength)
     self.launchAtLogin = launchAtLogin
+    self.unresponsiveDisplays = unresponsiveDisplays
+    self.confirmedDisplays = confirmedDisplays
+    self.displayCheckAsks = displayCheckAsks
   }
 
   public static func clampStrength(_ value: Int) -> Int {
@@ -145,6 +156,9 @@ public struct AppSettings: Codable, Hashable, Sendable {
     hapticTickStrength = Self.clampStrength(try c.decodeIfPresent(Int.self, forKey: .hapticTickStrength) ?? 6)
     hapticClickStrength = Self.clampStrength(try c.decodeIfPresent(Int.self, forKey: .hapticClickStrength) ?? 6)
     launchAtLogin = try c.decode(Bool.self, forKey: .launchAtLogin)
+    unresponsiveDisplays = try c.decodeIfPresent(Set<String>.self, forKey: .unresponsiveDisplays) ?? []
+    confirmedDisplays = try c.decodeIfPresent(Set<String>.self, forKey: .confirmedDisplays) ?? []
+    displayCheckAsks = try c.decodeIfPresent([String: Int].self, forKey: .displayCheckAsks) ?? [:]
   }
 
   /// Whether `event` should produce haptics for a binding with these parameters.

@@ -29,6 +29,9 @@ Change with `updateAppSettings { $0.<field> = … }`.
 | `hapticTickStrength` | Int 1…6 (`AppSettings.hapticStrengthRange`) | 6 | Strength of light ticks (slide steps, gesture caught). Clamped on edit and on load. |
 | `hapticClickStrength` | Int 1…6 | 6 | Strength of clicks (slide limits, action fired). Clamped. |
 | `launchAtLogin` | Bool | `false` | Start Edgy at login. |
+| `unresponsiveDisplays` | Set of display keys | empty | External displays the user said ignore brightness commands ("No, turn off for this display"); brightness skips them. Set by the display check plate; the inspector's "Turn back on" removes one. |
+| `confirmedDisplays` | Set of display keys | empty | External displays the user confirmed respond; never asked again. |
+| `displayCheckAsks` | Display key → count | empty | How often Edgy asked about an unconfirmed display (at most 3). |
 
 ## Gesture tuning: `GestureSettings`
 

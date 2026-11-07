@@ -82,20 +82,50 @@ public enum RejectionReason: String, Codable, Sendable {
   case physicalClick
 }
 
+/// The number behind a rejection, for Test Mode's plate: "Ignored: palm, 21 mm wide, limit 18 mm".
+/// `measured` is what the touch did, `limit` the setting or threshold it crossed, both in `unit`.
+public struct RejectionMeasure: Hashable, Sendable {
+  public enum Unit: String, Hashable, Sendable {
+    /// Millimetres (palm width, travel, distance from the edge).
+    case mm
+    /// Milliseconds (time since the last key, hold or dwell time).
+    case ms
+    /// Contact count (`measured` fingers against the `limit` the binding uses).
+    case fingers
+    /// Millimetres per second (initial speed).
+    case mmPerSecond
+  }
+
+  public var measured: Double
+  public var limit: Double
+  public var unit: Unit
+
+  public init(measured: Double, limit: Double, unit: Unit) {
+    self.measured = measured
+    self.limit = limit
+    self.unit = unit
+  }
+}
+
 /// Output of one pipeline step.
 public struct GestureOutput: Sendable {
   public var events: [GestureEvent]
   /// Contacts currently claimed by a gesture (pointer guard should be engaged while non-empty).
   public var claimedContactIDs: Set<Int32>
   public var rejections: [(contactID: Int32, reason: RejectionReason)]
+  /// The measurement behind a rejection in `rejections`, keyed by contact id, when one means
+  /// something (none for a click or a system-gesture handoff).
+  public var rejectionMeasures: [Int32: RejectionMeasure]
 
   public init(
     events: [GestureEvent] = [], claimedContactIDs: Set<Int32> = [],
-    rejections: [(contactID: Int32, reason: RejectionReason)] = []
+    rejections: [(contactID: Int32, reason: RejectionReason)] = [],
+    rejectionMeasures: [Int32: RejectionMeasure] = [:]
   ) {
     self.events = events
     self.claimedContactIDs = claimedContactIDs
     self.rejections = rejections
+    self.rejectionMeasures = rejectionMeasures
   }
 }
 

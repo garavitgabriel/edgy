@@ -121,9 +121,29 @@ public struct ActionDescriptor: Sendable, Hashable {
 }
 
 /// The action registry. Implemented by the Actions module.
+/// What an action did, for Test Mode's plate and Edgy's own level plate ("Volume 64%",
+/// "Brightness 40%" + "Desk 34", "Holding fn"). Every field is optional; `nil` = nothing to show.
+public struct ActionOutcome: Hashable, Sendable {
+  /// The level after the action, 0...1 (volume, brightness, backlight).
+  public var level: Double?
+  /// Short qualifier: the display or device changed, the key held ("fn").
+  public var detail: String?
+  /// The system drew its own HUD for this change; Edgy must not draw a level plate for it.
+  public var systemHUDShown: Bool
+
+  public init(level: Double? = nil, detail: String? = nil, systemHUDShown: Bool = false) {
+    self.level = level
+    self.detail = detail
+    self.systemHUDShown = systemHUDShown
+  }
+}
+
 public protocol ActionPerforming: AnyObject {
   var available: [ActionDescriptor] { get }
   func perform(_ id: ActionID, input: ActionInput, context: ActionContext) throws
+  /// `perform`, reporting what happened. The default calls `perform` and reports nothing; level
+  /// and hold actions override it. Callers that want an outcome call this instead of `perform`.
+  func performReporting(_ id: ActionID, input: ActionInput, context: ActionContext) throws -> ActionOutcome?
   /// Live app-settings change (HUD mode, haptics). Implementations keep their in-flight state.
   func apply(settings: AppSettings)
   /// Haptic feedback for a gesture moment (not tied to an action's own output). Implementations
@@ -135,6 +155,13 @@ public protocol ActionPerforming: AnyObject {
 }
 
 extension ActionPerforming {
+  public func performReporting(_ id: ActionID, input: ActionInput, context: ActionContext) throws
+    -> ActionOutcome?
+  {
+    try perform(id, input: input, context: context)
+    return nil
+  }
+
   public func apply(settings: AppSettings) {}
   public func feedback(_ event: HapticEvent, context: ActionContext) {}
   public func availability(of id: ActionID) -> ActionAvailability { .available }

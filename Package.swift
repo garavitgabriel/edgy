@@ -26,8 +26,12 @@ let package = Package(
     .executableTarget(name: "EdgyTrace", dependencies: ["EdgyCore", "TouchKit"]),
     // Display probe / brightness smoke CLI (owned by the displays batch).
     .executableTarget(name: "EdgyDisplaysCLI", dependencies: ["Displays"]),
+    // SwiftUI surfaces (settings window, mirror, inspector, picker, popover, overlay, onboarding),
+    // hosted in AppKit by EdgyApp. Design spec: docs/BRIEF.md § Design.
+    .target(name: "EdgyUI", dependencies: ["EdgyCore", "EdgyRuntime", "Gestures", "Actions"]),
     // Menu-bar app shell: config store, router wiring, bundling.
-    .executableTarget(name: "EdgyApp", dependencies: ["EdgyCore", "EdgyRuntime", "TouchKit", "Gestures", "Actions"]),
+    .executableTarget(
+      name: "EdgyApp", dependencies: ["EdgyCore", "EdgyRuntime", "TouchKit", "Gestures", "Actions", "EdgyUI"]),
 
     .testTarget(name: "EdgyCoreTests", dependencies: ["EdgyCore"]),
     .testTarget(name: "TouchKitTests", dependencies: ["TouchKit"]),
@@ -38,5 +42,6 @@ let package = Package(
     .testTarget(name: "DisplaysTests", dependencies: ["Displays"]),
     .testTarget(name: "EdgyRuntimeTests", dependencies: ["EdgyRuntime"]),
     .testTarget(name: "IntegrationTests", dependencies: ["Actions", "EdgyRuntime"]),
+    .testTarget(name: "EdgyUITests", dependencies: ["EdgyUI", "EdgyRuntime", "EdgyCore"]),
   ]
 )
