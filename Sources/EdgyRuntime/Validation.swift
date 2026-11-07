@@ -40,6 +40,9 @@ public struct ValidationIssue: Hashable, Sendable, CustomStringConvertible {
     case error
     /// Shown to the user; never blocks.
     case warning
+    /// A conflict note: how two bindings interact (e.g. a tap that waits for a possible
+    /// double-tap). Shown next to the zone; never blocks and never means something is wrong.
+    case info
   }
 
   /// Stable codes the settings UI maps to copy. Raw values are part of the contract: never rename.
@@ -55,7 +58,8 @@ public struct ValidationIssue: Hashable, Sendable, CustomStringConvertible {
     case segmentOutOfRange
     /// A required action parameter is absent or empty.
     case missingParameter
-    /// A `keyCombo` parameter that `KeyCombo` can't parse.
+    /// A `keyCombo` parameter that `KeyCombo` can't parse, or a modifier-only combo (`"fn"`) on an
+    /// action that isn't a hold: modifiers alone can only be held, never pressed (`detail` says so).
     case invalidKeyCombo
     /// A `url` parameter without a scheme.
     case invalidURL
@@ -84,6 +88,9 @@ public struct ValidationIssue: Hashable, Sendable, CustomStringConvertible {
     /// no built-in display and no controllable monitor). Warning: the binding is kept so it works
     /// again when the hardware comes back; `limited` actions are not flagged.
     case actionUnavailable
+    /// Info: the zone has both a tap and a double-tap, so a single tap waits the double-tap window
+    /// before it runs (`detail` = the wait in milliseconds, e.g. `"300"`). Attached to the tap.
+    case tapWaitsForDoubleTap
   }
 
   public var severity: Severity
@@ -93,10 +100,16 @@ public struct ValidationIssue: Hashable, Sendable, CustomStringConvertible {
   public var action: ActionID?
   /// Parameter key, or gesture-setting name for `settingOutOfRange`.
   public var parameter: String?
+  /// One extra fact for the UI's copy: the wait in milliseconds for `tapWaitsForDoubleTap`
+  /// (`"300"`), `ValidationIssue.modifierOnlyNeedsHold` for a modifier-only `invalidKeyCombo`.
+  public var detail: String?
+
+  /// `detail` of an `invalidKeyCombo` whose combo is modifiers alone on a non-hold action.
+  public static let modifierOnlyNeedsHold = "modifier-only combos can only be held (a hold action on a long-press)"
 
   public init(
     _ severity: Severity, _ code: Code, profile: ProfileRef? = nil, binding: BindingKey? = nil,
-    action: ActionID? = nil, parameter: String? = nil
+    action: ActionID? = nil, parameter: String? = nil, detail: String? = nil
   ) {
     self.severity = severity
     self.code = code
@@ -104,6 +117,7 @@ public struct ValidationIssue: Hashable, Sendable, CustomStringConvertible {
     self.binding = binding
     self.action = action
     self.parameter = parameter
+    self.detail = detail
   }
 
   public var isError: Bool { severity == .error }
@@ -115,6 +129,7 @@ public struct ValidationIssue: Hashable, Sendable, CustomStringConvertible {
     if let binding { parts.append("\(binding.gesture) at \(binding.zone)") }
     if let action { parts.append("action \(action.rawValue)") }
     if let parameter { parts.append("'\(parameter)'") }
+    if let detail { parts.append(detail) }
     return parts.joined(separator: ", ")
   }
 }
@@ -213,10 +228,14 @@ public struct ConfigValidator: Sendable {
   /// Problems with one binding on its own (action, shape, zone, segment, parameters).
   public func validate(_ binding: Binding, in profile: ProfileRef = .default) -> [ValidationIssue] {
     var issues: [ValidationIssue] = []
-    func add(_ severity: ValidationIssue.Severity, _ code: ValidationIssue.Code, parameter: String? = nil) {
+    func add(
+      _ severity: ValidationIssue.Severity, _ code: ValidationIssue.Code, parameter: String? = nil,
+      detail: String? = nil
+    ) {
       issues.append(
         ValidationIssue(
-          severity, code, profile: profile, binding: binding.key, action: binding.action, parameter: parameter))
+          severity, code, profile: profile, binding: binding.key, action: binding.action, parameter: parameter,
+          detail: detail))
     }
 
     if case .edge(_, let segment, let segments) = binding.zone,
@@ -225,6 +244,15 @@ public struct ConfigValidator: Sendable {
       add(.error, .segmentOutOfRange)
     }
     if !binding.zone.supports(binding.gesture) { add(.error, .gestureNotSupported) }
+
+    // "Do nothing" fits every gesture and is never performed, with or without a catalog entry.
+    if binding.action == .doNothing {
+      let known = Set(byID[.doNothing]?.parameters.map(\.key) ?? []).union(Self.crossCuttingParameters)
+      for key in binding.parameters.keys.sorted() where !known.contains(key) {
+        add(.warning, .unknownParameter, parameter: key)
+      }
+      return issues
+    }
 
     guard let descriptor = byID[binding.action] else {
       add(.error, .unknownAction)
@@ -239,7 +267,13 @@ public struct ConfigValidator: Sendable {
         if parameter.required { add(.error, .missingParameter, parameter: parameter.key) }
         continue
       }
-      if let code = Self.check(value, against: parameter.kind) { add(.error, code, parameter: parameter.key) }
+      if let code = Self.check(value, against: parameter.kind) {
+        add(.error, code, parameter: parameter.key)
+      } else if case .keyCombo = parameter.kind, descriptor.shape != .hold,
+        KeyCombo(value.trimmingCharacters(in: .whitespaces))?.isModifierOnly == true
+      {
+        add(.error, .invalidKeyCombo, parameter: parameter.key, detail: ValidationIssue.modifierOnlyNeedsHold)
+      }
     }
     let known = Set(descriptor.parameters.map(\.key)).union(Self.crossCuttingParameters)
     for key in binding.parameters.keys.sorted() where !known.contains(key) {
@@ -255,12 +289,52 @@ public struct ConfigValidator: Sendable {
       issues.append(ValidationIssue(.warning, .settingOutOfRange, parameter: name))
     }
     issues += validate(config.defaultProfile, as: .default)
+    issues += Self.conflictNotes(in: config.profile(for: nil), as: .default, settings: config.gestures)
     for bundleID in config.appProfiles.keys.sorted() {
       let ref = ProfileRef.app(bundleID)
+      let app = config.appProfiles[bundleID]!
       if !Self.isBundleID(bundleID) { issues.append(ValidationIssue(.error, .invalidProfileID, profile: ref)) }
-      issues += validate(config.appProfiles[bundleID]!, as: ref)
+      issues += validate(app, as: ref)
+      guard app.inheritsDefault else {
+        issues += Self.conflictNotes(in: config.profile(for: bundleID), as: ref, settings: config.gestures)
+        continue
+      }
+      // Overrides replace their default slot (never a duplicate). What's left to check is how the
+      // app's own bindings meet the default bindings that still show through.
+      let own = Set(app.bindings.map(\.key))
+      let inherited = config.defaultProfile.bindings.filter { !own.contains($0.key) && $0.action != .doNothing }
+      for binding in app.bindings where binding.action != .doNothing {
+        for other in inherited where Self.overlaps(other, binding) {
+          issues.append(
+            ValidationIssue(.warning, .overlappingZones, profile: ref, binding: binding.key, action: binding.action))
+        }
+      }
+      issues += Self.conflictNotes(
+        in: config.profile(for: bundleID), as: ref, settings: config.gestures, involving: own)
     }
     return issues
+  }
+
+  /// Info notes on a resolved profile: every zone with both a tap and a double-tap gets a
+  /// `tapWaitsForDoubleTap` on its tap. `involving`: only zones where one of those two slots is in
+  /// this set (an inheriting app reports the notes its own bindings cause; the default's own notes
+  /// are reported once, on the default).
+  ///
+  /// There is no "hold and trigger on one long-press" note: a zone has one long-press slot, so a
+  /// hold and a trigger can't share it (a second binding is a `duplicateBinding` error).
+  public static func conflictNotes(
+    in resolved: Profile, as ref: ProfileRef, settings: GestureSettings, involving: Set<BindingKey>? = nil
+  ) -> [ValidationIssue] {
+    let keys = Set(resolved.bindings.map(\.key))
+    let wait = String(Int(GestureSettingsLimits.clamped(settings).doubleTapWindowMS.rounded()))
+    return resolved.bindings.compactMap { tap in
+      guard tap.gesture == .tap else { return nil }
+      let doubleTap = BindingKey(zone: tap.zone, gesture: .doubleTap)
+      guard keys.contains(doubleTap) else { return nil }
+      if let involving, !involving.contains(tap.key), !involving.contains(doubleTap) { return nil }
+      return ValidationIssue(
+        .info, .tapWaitsForDoubleTap, profile: ref, binding: tap.key, action: tap.action, detail: wait)
+    }
   }
 
   /// Bindings plus duplicate and overlap checks within one profile.
@@ -273,7 +347,8 @@ public struct ConfigValidator: Sendable {
         issues.append(
           ValidationIssue(.error, .duplicateBinding, profile: ref, binding: binding.key, action: binding.action))
       }
-      for other in profile.bindings[..<index] where Self.overlaps(other, binding) {
+      for other in profile.bindings[..<index]
+      where binding.action != .doNothing && other.action != .doNothing && Self.overlaps(other, binding) {
         issues.append(
           ValidationIssue(.warning, .overlappingZones, profile: ref, binding: binding.key, action: binding.action))
       }

@@ -64,11 +64,13 @@ enum MachineCatalog {
     let longPress = validator.compatibleActions(zone: .corner(.topLeft), gesture: .longPress)
     #expect(longPress.contains(MachineCatalog.hold))
     #expect(longPress.allSatisfy { $0.shape == .trigger || $0.shape == .hold })
-    #expect(longPress.count == MachineCatalog.descriptors.filter { $0.shape != .continuous }.count)
+    // Every non-continuous catalog action, then "Do nothing" last (v0.4).
+    #expect(longPress.count == MachineCatalog.descriptors.filter { $0.shape != .continuous }.count + 1)
+    #expect(longPress.last?.id == .doNothing)
     let tap = validator.compatibleActions(zone: .corner(.topLeft), gesture: .tap)
     #expect(!tap.contains(MachineCatalog.hold))
     let slide = validator.compatibleActions(zone: .edge(.left), gesture: .slide)
-    #expect(!slide.contains(MachineCatalog.hold) && slide.allSatisfy { $0.shape == .continuous })
+    #expect(!slide.contains(MachineCatalog.hold) && slide.dropLast().allSatisfy { $0.shape == .continuous })
   }
 
   @Test func supportedGesturesIncludeLongPressEverywhere() {

@@ -13,8 +13,17 @@ import Foundation
 /// disabled profile or a removed binding can't strand a held key. `reset()`, `releaseHolds(reason:)`
 /// and `replaceActions(_:)` release every pending hold before forgetting it: every `down: true` is
 /// followed by exactly one `down: false`.
+///
+/// **Test Mode** (`testMode`): everything is routed as usual but no action is performed. Each
+/// gesture that would run an action gives one `gestureCaught` haptic (a slide at its start, a
+/// discrete gesture when it would fire, a hold at its `.began`) and reports `wouldRun`. A would-be
+/// hold presses nothing, so nothing is released later either.
 public final class Router {
   public private(set) var actions: ActionPerforming
+  /// Route without performing (see the type's docs). The engine flips it with its own reset.
+  public internal(set) var testMode = false
+  /// The live feed's decision sink; `nil` when nobody observes, so nothing is built.
+  var onDecision: ((LiveDecision) -> Void)?
   private let logger: EdgyLogging
   private var shapes: [ActionID: ActionDescriptor.Shape]
 
@@ -91,14 +100,33 @@ public final class Router {
       return
     }
     guard let input = input(for: event, key: key) else { return }
+    // Reported once per gesture: a discrete gesture when it fires, a slide at its start.
+    let firstOfGesture = input == .trigger || event.phase == .began
+    if testMode {
+      guard firstOfGesture else { return }
+      actions.feedback(.gestureCaught, context: context)
+      onDecision?(.wouldRun(binding.action, zone: event.zone, kind: event.kind))
+      return
+    }
     if event.kind == .slide && event.phase == .began {
       actions.feedback(.gestureCaught, context: context)
     }
     do {
       try actions.perform(binding.action, input: input, context: context)
       if case .trigger = input { actions.feedback(.actionFired, context: context) }
+      if firstOfGesture { onDecision?(.actionRan(binding.action, zone: event.zone, kind: event.kind)) }
     } catch {
       logger.log(.error, "Action \(binding.action.rawValue) failed: \(error)")
+      if firstOfGesture { report(error, binding.action, event) }
+    }
+  }
+
+  private func report(_ error: Error, _ action: ActionID, _ event: GestureEvent) {
+    guard let onDecision else { return }
+    if case ActionError.unavailable(_, let reason) = error {
+      onDecision(.actionUnavailable(action, zone: event.zone, kind: event.kind, reason: reason))
+    } else {
+      onDecision(.actionFailed(action, zone: event.zone, kind: event.kind, message: String(describing: error)))
     }
   }
 
@@ -111,6 +139,12 @@ public final class Router {
       }
       return
     }
+    if testMode {
+      // Nothing is pressed, so nothing is recorded to release.
+      actions.feedback(.gestureCaught, context: context)
+      onDecision?(.wouldRun(binding.action, zone: event.zone, kind: event.kind))
+      return
+    }
     // A second `.began` for a key still held (a recognizer that skipped the end) closes the first.
     if let stale = pendingHolds.removeValue(forKey: key) { release(stale) }
     holdCounter += 1
@@ -119,8 +153,10 @@ public final class Router {
     do {
       try actions.perform(binding.action, input: .press(down: true), context: context)
       actions.feedback(.actionFired, context: context)
+      onDecision?(.actionRan(binding.action, zone: event.zone, kind: event.kind))
     } catch {
       logger.log(.error, "Action \(binding.action.rawValue) failed: \(error)")
+      report(error, binding.action, event)
     }
   }
 
