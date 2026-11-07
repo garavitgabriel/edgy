@@ -41,15 +41,35 @@ public enum ActionAvailability: Sendable, Hashable {
 }
 
 /// Where and why the action fires.
+/// The physical side of a slide step, for actions that step in millimetres, speed up with quick
+/// flicks or keep stepping at the end of the edge.
+public struct SlideMotion: Hashable, Sendable {
+  /// Signed travel since the previous event, in millimetres (+ = toward top/right).
+  public var deltaMM: Double
+  /// Device timestamp of this event, seconds.
+  public var timestamp: TimeInterval
+  /// -1 / +1 while resting at the low / high end of the zone, 0 otherwise (`GestureEvent.atEnd`).
+  public var atEnd: Int
+
+  public init(deltaMM: Double, timestamp: TimeInterval, atEnd: Int = 0) {
+    self.deltaMM = deltaMM
+    self.timestamp = timestamp
+    self.atEnd = atEnd
+  }
+}
+
 public struct ActionContext: Sendable {
   /// Bundle ID of the frontmost app, if known.
   public var frontmostBundleID: String?
   /// Free-form parameters from the binding (e.g. Shortcut name, step size).
   public var parameters: [String: String]
+  /// For slide input: the physical motion behind the normalized delta. `nil` when unknown.
+  public var motion: SlideMotion?
 
-  public init(frontmostBundleID: String?, parameters: [String: String]) {
+  public init(frontmostBundleID: String?, parameters: [String: String], motion: SlideMotion? = nil) {
     self.frontmostBundleID = frontmostBundleID
     self.parameters = parameters
+    self.motion = motion
   }
 }
 
@@ -86,13 +106,34 @@ public struct ActionParameter: Sendable, Hashable {
   public var defaultValue: String?
   /// Label for the settings UI.
   public var displayName: String
+  /// One helper line under the row (BRIEF § Binding parameters: tuning rows only). `nil` = none.
+  public var helpText: String?
+  /// Unit shown after a number's value ("mm", "ms"). `nil` = none.
+  public var unit: String?
+  /// What a number reads as at 0 (e.g. "Off"). `nil` = the number.
+  public var zeroLabel: String?
+  /// When the parameter is absent, the value comes from this app-wide setting instead of
+  /// `defaultValue` (e.g. a hold time that falls back to `GestureSettings.longPressMS`); the UI
+  /// shows "Default (<that value>)" and a Reset once changed.
+  public var fallback: Fallback?
 
-  public init(key: String, kind: Kind, required: Bool, defaultValue: String? = nil, displayName: String) {
+  public enum Fallback: String, Sendable, Hashable {
+    case longPressMS
+  }
+
+  public init(
+    key: String, kind: Kind, required: Bool, defaultValue: String? = nil, displayName: String,
+    helpText: String? = nil, unit: String? = nil, zeroLabel: String? = nil, fallback: Fallback? = nil
+  ) {
     self.key = key
     self.kind = kind
     self.required = required
     self.defaultValue = defaultValue
     self.displayName = displayName
+    self.helpText = helpText
+    self.unit = unit
+    self.zeroLabel = zeroLabel
+    self.fallback = fallback
   }
 }
 

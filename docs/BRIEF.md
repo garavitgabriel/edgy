@@ -122,7 +122,7 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
 - **Glyph: "Lit edge" (01a, with 01b's wider gap).**
   - A rounded-rectangle outline of the pad, open on the right, with a separate heavy vertical bar standing for the lit right edge.
   - It's a monochrome template image, about 16 × 11 pt.
-  - In Test Mode it adds a small solid dot inside the outline. **Make that dot ≥2 pt at 1×**, because the render's ~1.5 pt dot disappears.
+  - In Test Mode it adds a small solid dot inside the outline. **The dot must be ≥2 pt at 1×.** The exported asset is 3.2 pt (`docs/design/assets/`).
   - Note for the G1 device check: one critic read it as the letters "CI" before reading it as a pad. Judge it at real size in the real menu bar before freezing it.
 - **App icon: "Exact".**
   - A pale-stone rounded tile with a gentle light-to-shade gradient.
@@ -242,6 +242,32 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
 **Text** (`name` for Run Shortcut): a pop-up of the user's shortcuts if the runtime can list them; otherwise a text field.
 
 **Per-binding haptics:** the last parameter row of every binding is a checkbox, "Haptics for this gesture", on by default.
+
+**Slide feel and hold timing (batch 20).**
+- These use the same parameter rows: a number gets a slider with its value plus unit on the right, and on/off gets a checkbox.
+- Each row may carry **one helper line** under it (13, `ink2`). This is the only place in the inspector where helper text appears.
+- Helper lines describe what the user feels, not the mechanism.
+
+| Parameter | Applies to | Label | Control | Helper line |
+|---|---|---|---|---|
+| `stepMM` | Switch Apps | Distance per app | slider 4–20 mm, value "8 mm" | "Slide this far to move one app." |
+| `stepMM` | Slide to Repeat Keys | Distance per press | slider 4–20 mm | "Slide this far for one key press." |
+| `speedUp` | Switch Apps | Faster when you flick | checkbox | "A quick flick skips several apps." |
+| `speedUp` | Slide to Repeat Keys | Faster when you flick | checkbox | "A quick flick sends several presses." |
+| `speedUp` | Volume, Brightness, Keyboard Brightness | Faster when you flick | checkbox, **on by default** | "A quick flick moves the level further." |
+| `keepOpenMS` | Switch Apps | Keep open between strokes | slider 0–1000 ms, value "400 ms" | "Lift and slide again to keep going; it picks the app when you stop, click or move the pointer." |
+| `holdMS` | Hold Keys | Hold before it starts | slider 100–1500 ms, preset 300 ms | "How long to press before the keys go down." |
+| `holdMS` | any other long-press | Press time | slider 100–1500 ms; shows "Default (500 ms)" until changed, with **Reset** beside a changed value | "How long to press before it runs." |
+
+- At 0 ms, `keepOpenMS` reads "Off" instead of "0 ms".
+- A slider set to its default shows the value in `ink2`; a changed value shows in `ink`. There's no other changed-state mark.
+
+**Interaction note: slide plus swipes on one edge** (bone 7 pattern: info icon, `ink2`, informational).
+- It shows in the inspector when an edge has both a slide and a swipe.
+- Copy: **"Quick slides can look like swipes here, so swipes need a clearer flick on this edge."**
+- One inline fix: **"Move swipes to another edge"**. It selects the swipe row and opens its "…" menu, so the user can change or turn off the swipe. Nothing is removed automatically.
+- It must not read as a warning.
+
 
 ### Level plate and display check (spec)
 

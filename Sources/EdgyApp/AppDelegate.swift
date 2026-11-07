@@ -2,6 +2,7 @@ import Actions
 import AppKit
 import EdgyCore
 import EdgyRuntime
+import EdgyUI
 import Gestures
 import TouchKit
 
@@ -26,6 +27,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var pauseTimer: Timer?
   private var activationObserver: NSObjectProtocol?
   private var feedObserver: UUID?
+  private var settingsModel: SettingsModel?
+  private var settingsWindow: SettingsWindowController?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     let firstRun = !FileManager.default.fileExists(atPath: store.fileURL.path)
@@ -67,6 +70,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       apply: { [weak self] in self?.apply($0) })
     editor.observe { [weak self] _ in self?.refreshMenu() }
     self.editor = editor
+    let settingsModel = SettingsModel(
+      editor: editor, engine: engine, installedApps: makeLiveInstalledAppsProvider(),
+      shortcuts: makeLiveShortcutsListing(), keyRecorder: makeLiveKeyComboRecorder())
+    self.settingsModel = settingsModel
+    settingsWindow = SettingsWindowController(
+      model: settingsModel,
+      commands: WindowCommands(
+        openAccessibilitySettings: { [weak self] in self?.grantAccessibility() },
+        openConfigFile: { [weak self] in self?.openConfigFile() },
+        reloadConfig: { [weak self] in self?.reloadConfig() }))
 
     store.startWatching { [weak self] newConfig in
       Task { @MainActor in self?.editor?.adoptExternal(newConfig) }
@@ -121,6 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func refreshMenu() {
+    settingsWindow?.state.conditions.accessibility = permissions?.accessibility ?? .unknown
     statusMenu?.update(
       StatusMenu.State(
         enabled: editor?.config.app.enabled ?? applied.app.enabled, pausedUntil: engineStatus.pausedUntil,
@@ -136,6 +150,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension AppDelegate: StatusMenuHandler {
+  func showSettings() {
+    settingsWindow?.show()
+  }
+
   func toggleEnabled() {
     do {
       try editor?.updateAppSettings { $0.enabled.toggle() }

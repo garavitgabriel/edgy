@@ -34,3 +34,9 @@ import Testing
   #expect(model.mirroredDevice == PreviewFixtures.builtInPad)
   #expect(model.liveTouches.count == 1)
 }
+
+@Test func glyphArtworkShipsInTheModuleBundle() {
+  for state in ["normal", "testMode", "paused", "disabled", "noTrackpad", "needsAccessibility", "brokenConfig"] {
+    #expect(EdgyUIResources.glyphPDF(state) != nil, "\(state)")
+  }
+}

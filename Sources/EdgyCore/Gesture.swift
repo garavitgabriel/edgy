@@ -59,10 +59,16 @@ public struct GestureEvent: Codable, Hashable, Sendable {
   public var position: Double
   public var timestamp: TimeInterval
   public var deviceID: UInt64
+  /// The zone's length along its axis in millimetres (`delta * zoneLengthMM` = travel in mm), so
+  /// actions can step in physical distance and read speed. 0 when unknown.
+  public var zoneLengthMM: Double
+  /// For `.slide`: -1 / +1 while the finger rests at the low / high end of the zone (bottom/left,
+  /// top/right), 0 otherwise. Lets stepped actions keep stepping at the end of the edge.
+  public var atEnd: Int
 
   public init(
     zone: Zone, kind: GestureKind, fingers: Int, phase: Phase, delta: Double,
-    position: Double, timestamp: TimeInterval, deviceID: UInt64
+    position: Double, timestamp: TimeInterval, deviceID: UInt64, zoneLengthMM: Double = 0, atEnd: Int = 0
   ) {
     self.zone = zone
     self.kind = kind
@@ -72,6 +78,26 @@ public struct GestureEvent: Codable, Hashable, Sendable {
     self.position = position
     self.timestamp = timestamp
     self.deviceID = deviceID
+    self.zoneLengthMM = zoneLengthMM
+    self.atEnd = atEnd
+  }
+
+  private enum CodingKeys: String, CodingKey {
+    case zone, kind, fingers, phase, delta, position, timestamp, deviceID, zoneLengthMM, atEnd
+  }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    zone = try c.decode(Zone.self, forKey: .zone)
+    kind = try c.decode(GestureKind.self, forKey: .kind)
+    fingers = try c.decode(Int.self, forKey: .fingers)
+    phase = try c.decode(Phase.self, forKey: .phase)
+    delta = try c.decode(Double.self, forKey: .delta)
+    position = try c.decode(Double.self, forKey: .position)
+    timestamp = try c.decode(TimeInterval.self, forKey: .timestamp)
+    deviceID = try c.decode(UInt64.self, forKey: .deviceID)
+    zoneLengthMM = try c.decodeIfPresent(Double.self, forKey: .zoneLengthMM) ?? 0
+    atEnd = try c.decodeIfPresent(Int.self, forKey: .atEnd) ?? 0
   }
 }
 
@@ -152,10 +178,14 @@ public struct GestureContext: Sendable {
   /// until the double-tap window passes, so the first tap of a double-tap never fires the tap
   /// action. Elsewhere a tap fires at once. `nil` = no zone waits.
   public var doubleTapZones: Set<Zone>?
+  /// Per-zone long-press time in milliseconds, overriding `settings.longPressMS` for that zone
+  /// (e.g. 300 ms for a push-to-talk hold). `nil` / missing zone = the global setting.
+  public var longPressMSByZone: [Zone: Double]?
 
   public init(
     settings: GestureSettings, enabledZones: Set<Zone>, secondsSinceLastKeyPress: TimeInterval?,
-    slideZones: Set<Zone>? = nil, longPressZones: Set<Zone>? = nil, doubleTapZones: Set<Zone>? = nil
+    slideZones: Set<Zone>? = nil, longPressZones: Set<Zone>? = nil, doubleTapZones: Set<Zone>? = nil,
+    longPressMSByZone: [Zone: Double]? = nil
   ) {
     self.settings = settings
     self.enabledZones = enabledZones
@@ -163,5 +193,6 @@ public struct GestureContext: Sendable {
     self.slideZones = slideZones
     self.longPressZones = longPressZones
     self.doubleTapZones = doubleTapZones
+    self.longPressMSByZone = longPressMSByZone
   }
 }
