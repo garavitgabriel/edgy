@@ -53,13 +53,13 @@ git diff --name-only main...HEAD outside my glob        → (nothing)
 9. **Overlay**: n/a (batch 18), but the overlay flag it needs is exposed (`MenuBarController.isOverlayVisible` / `onOverlayVisibleChange`).
 10. **Menu-bar popover**: ✔ top half mini mirror + chips + Enabled + Test Mode; chips don't select (they open Settings on that tab); live chip filled, others outlined; frontmost app's chip first — `popover-app-chip-live-*`; bottom half plain list with the six rows and shortcuts; no power button, no hero numeral, no cards on cards — `popover-normal-*`. Two-pad cross-fade: n/a here (batch 14, `mirroredDevice`).
 
-**Kill list:** no eyebrow micro-caps, no grey trackpad, no sidebar, no cards, no glow, no emoji/arrows as icons (shortcut glyphs ⌘ are key symbols, not icons), no middot strings, no rulers, no space before %, one typeface, no rotated labels, no hero numerals, no launcher grid, no filler copy, no generic coloured squares (chips show an app mark only when the app is installed, like batch 16), one hue (see decision 1), no third-party names.
+**Kill list:** no eyebrow micro-caps, no grey trackpad, no sidebar, no cards, no glow, no emoji/arrows as icons (shortcut glyphs ⌘ are key symbols, not icons), no middot strings, no rulers, no space before %, one typeface, no rotated labels, no hero numerals, no launcher grid, no filler copy, no generic coloured squares (chips show an app mark only when the app is installed, like batch 16), no third-party names. One hue: the list hover is an `ink` wash, not the system's blue selection (decision 1).
 
 ## Reader-first review
 
 **E (popover, Test Mode switching on)** vs `popover-test-mode-light`, `popover-normal-light`:
 - Matches: order (mini mirror → chips → Enabled → Test Mode → separator → list → separator → About/Quit); chip treatment (filled ink Default, outlined others); row copy and shortcuts in `ink2`, right-aligned; no pill under the glyph.
-- Differs: the mini mirror is batch 14's stub, so the slab, bars and touch aren't in my shots. The popover is 448 pt wide because the mini mirror is to scale at the 2.6 pt/mm token for a 160 mm pad; E's popover reads narrower — a token question for the G1 check, not something to fudge here. ON switches render grey in headless shots (the snapshot window is never key); the code tints them `accent` (as batch 16 does). E's chip order is Default, Wayfare, Huddle; mine is Default, then alphabetical (Huddle, Wayfare) per BRIEF § App profiles' tab order — BRIEF wins. Huddle's chip carries the slashed-circle mark in `ink2` (Edgy is off there), as on the window's tabs; E predates that spec. Chip app marks are absent because the demo apps aren't installed (batch 16's rule: no placeholder squares).
+- Differs: the mini mirror is batch 14's stub, so the slab, bars and touch aren't in my shots. The popover is 448 pt wide because the mini mirror is to scale at the 2.6 pt/mm token for a 160 mm pad; E's popover reads narrower — a token question for the G1 check, not something to fudge here. ON switches render grey in headless shots (the snapshot window is never key; batch 16's `state-paused-light` shows the same grey ON Enabled switch with the same `.tint(Tokens.accent)` code). E's chip order is Default, Wayfare, Huddle; mine is Default, then alphabetical (Huddle, Wayfare) per BRIEF § App profiles' tab order — BRIEF wins. Huddle's chip carries the slashed-circle mark in `ink2` (Edgy is off there), as on the window's tabs; E predates that spec. Chip app marks are absent because the demo apps aren't installed (batch 16's rule: no placeholder squares).
 - Added (not in E): "Don't run actions" checkbox indented 24 pt under Test Mode — `popover-test-mode-dont-run-*`.
 
 **S5 (glyph + system states)** vs `glyph-sheet-*`, `popover-paused-*`, `popover-no-accessibility-*`, `popover-no-trackpad-*`:
@@ -83,7 +83,7 @@ git diff --name-only main...HEAD outside my glob        → (nothing)
 
 ## Decisions I made (and why)
 
-1. **List highlight = the system's menu selection colour** (`selectedContentBackgroundColor` / `selectedMenuItemTextColor`) on hover. BRIEF says "a plain list with the system highlight", and § Tokens exempts system-drawn chrome from one hue. It's blue for most users. If design wants an `ink`-tint hover instead, it's a two-line change in `MenuHighlight`. **Flag for design.**
+1. **List highlight = an `ink` wash (10%) with `ink` text**, full row, on hover. Bone 10's "plain list with the system highlight" is read as the *behaviour* (menu-like full-row hover). The system selection colour was tried first and dropped: it's blue for most users, § Tokens says "no blue selection", and its system-chrome exception covers only what macOS draws (window buttons, title bar), not a fill Edgy draws. Hover isn't in any shot. Change it in `MenuHighlight` if design reads bone 10 differently.
 2. **Reused batch 16's `ConfigProblem` (EdgyUI), `WindowCopy.paused/noAccessibility`, `AppMark`, `TextButtonStyle`, `profileTabs/tabName/isProfileOff/selectProfile`**, so the window and popover say the same thing and sort the same way. No second precedence enum.
 3. **Broken config source:** `MenuBarState.configProblem` (the app's mapped value with the real file name, as for the window), else `editor.configProblem` mapped as "config.json". The glyph checks both.
 4. **Broken config and No Accessibility replace the whole top half** (the same form, so each is said once); if both apply only broken config shows (precedence).
@@ -98,7 +98,7 @@ git diff --name-only main...HEAD outside my glob        → (nothing)
 - The glyph at real size in the real menu bar, light and dark, including the "CI" read risk (BRIEF G1 list) and the 40% disabled look next to system icons.
 - Popover material over real wallpapers (shots are flat: tint only) and the 448 pt width that the 2.6 pt/mm token produces.
 - ON switches in `accent` on a key window (headless shots draw them grey).
-- The list hover colour (decision 1).
+- The list hover wash on the real popover material (decision 1).
 
 ## For the chief at wiring (EdgyApp; outside my glob)
 
@@ -108,5 +108,5 @@ git diff --name-only main...HEAD outside my glob        → (nothing)
 
 ## Open questions
 
-1. List hover: system highlight (as built) or an `ink`-tint hover?
+1. List hover: `ink` wash (as built) — confirm that's the reading of "system highlight" design wants.
 2. Should the paused mini mirror fade (S5 shows a slight fade; BRIEF's popover column doesn't ask for it)? Built without.
