@@ -41,7 +41,7 @@ Shots: `docs/design/build-shots/batch-21/` (new, integrated), plus re-shot `batc
 | M4 | Params under every binding | One open binding (see 15 M1) | B21 `window-picker-bottom` |
 | S1 | Per-layer fade | `.compositingGroup()` before the 0.4 | `pad-disabled`, `pad-huddle-off` |
 | S2 | 33 pt picker rows / 1.5 pt to top bar | 24 pt rows; 8 pt clearance from other zones in `PickerPlacement` | B21 `window-picker-bottom` |
-| S3 | Name spellings | The UI uses catalog names verbatim. The catalog fix is a blocker (it lives in Actions). | all |
+| S3 | Name spellings | ✔ by the governing rule: BRIEF bone 3 ("Action names are the catalog's display names, spelled the same everywhere") and ruling 6 ("Pick one in the catalog, and the UI never re-spells it"). The UI's re-spelling map is removed, so the pad, picker and inspector now show one spelling, the catalog's. **Still open outside this batch:** the catalog itself still reads "Play / Pause" (`Sources/Actions/ActionCatalog.swift:145`, not in my files; blocker 1). The UI follows the catalog the moment it changes. | B21 `window-picker-bottom` (pad, picker and inspector all read "Play / Pause") |
 | S4 | Truncated tab "…" | Rule (a) short value → (b) short name → clip with a 12 pt fade. A cut never adds "…". | `pad-split-bottom4-long-label` |
 | S5 | Preset corners as dots, shoot Windows | Corner radius capped at 30% of the tile | B21 `preset-windows`, `preset-minimal` |
 | S6 | Mini at real size, mini-disabled | Shot inside the popover at its 1.8 pt/mm width | B21 `popover-normal`, `popover-disabled` |
@@ -57,7 +57,7 @@ Shots: `docs/design/build-shots/batch-21/` (new, integrated), plus re-shot `batc
 | M3 | Do nothing here not shown | App-tab picker shot with an empty search and the full list: disclosure, separator, "Do nothing here" | `picker-app-tab-do-nothing` |
 | S1 | Keep-open helper | Helper always shown, from the catalog | B21 `inspector-long-labels` |
 | S2 | Hold Keys timing | "Hold before it starts" row; "Let go after" moved last, with the spec's label and helper; default in `ink2` | `inspector-corner-needs-keys` |
-| S3 | Spaced slashes | Catalog blocker (UI follows catalog) | — |
+| S3 | Spaced slashes | ✔ by the same rule (bone 3 + ruling 6): the UI shows one spelling everywhere, the catalog's. **The catalog's own spacing is still open** (blocker 1; outside my files). | B21 `window-picker-bottom`, `tab-wayfare` |
 | S4 | Title-case labels | `sentenceCase` ("Shortcut name", "File or folder") | `param-shortcut`, `param-path` |
 | S5 | Label sits low in two-line rows | Custom `.parameterRow` alignment: the label lines up with the field; the message hangs below | `param-url-error`, `param-recorder-error` |
 | S6 | Recorder error demo | Field shows "⌘" alone | `param-recorder-error` |
