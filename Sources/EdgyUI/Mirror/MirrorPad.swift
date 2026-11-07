@@ -32,12 +32,9 @@ extension PadMirrorView {
   public typealias ZoneAnchor = ZoneAnchorKey
 }
 
-/// One line centred on the pad, with an optional text button (§ System states, § App profiles).
+/// One line centred on the pad (§ System states: no trackpad).
 struct MirrorMessage: Equatable {
   var text: String
-  var button: String?
-
-  static func == (lhs: Self, rhs: Self) -> Bool { lhs.text == rhs.text && lhs.button == rhs.button }
 }
 
 /// How a contact is drawn (bone 4, § Test Mode).
@@ -68,14 +65,13 @@ struct MirrorPad: View {
   var zones: [MirrorZone]
   var selected: Zone?
   var touches: [LiveTouch] = []
-  /// 40% (§ System states: disabled, paused, off in app).
+  /// 40% (§ System states: disabled, paused in the mini mirror, off in app).
   var faded = false
   /// No trackpad: a dashed pad outline instead of the slab.
   var dashedOutline = false
   var showsLabels = true
   var showsIcons = true
   var message: MirrorMessage?
-  var onMessageButton: (() -> Void)?
   /// `nil` = not interactive (mini mirror, preset mirror).
   var onSelect: ((Zone) -> Void)?
 
@@ -95,6 +91,7 @@ struct MirrorPad: View {
         if !(dashedOutline && !showsLabels) {
           ForEach(zones.filter { !$0.isCorner }) { shape($0, live: live.contains($0.zone)) }
           ForEach(zones.filter(\.isCorner)) { shape($0, live: live.contains($0.zone)) }
+          if let zone = zones.first(where: { $0.zone == selected }) { selectionRing(zone) }
           if onSelect != nil {
             ForEach(zones.filter { !$0.isCorner }) { hitArea($0) }
             ForEach(zones.filter(\.isCorner)) { hitArea($0) }
@@ -120,19 +117,23 @@ struct MirrorPad: View {
         .frame(width: size.width, height: size.height)
     } else {
       shape
-        .fill(LinearGradient(colors: [Tokens.padTop, Tokens.padBottom], startPoint: .topLeading, endPoint: .bottomTrailing))
+        .fill(
+          LinearGradient(colors: [Tokens.padTop, Tokens.padBottom], startPoint: .topLeading, endPoint: .bottomTrailing)
+        )
         // Top-left light.
         .overlay(
           shape.fill(
             RadialGradient(
               colors: [Tokens.padTop.opacity(0.9), Tokens.padTop.opacity(0)], center: .topLeading, startRadius: 0,
-              endRadius: max(size.width, size.height) * 0.7)))
+              endRadius: max(size.width, size.height) * 0.7))
+        )
         // Rim: lighter at the top, a little heavier along the lower edge.
         .overlay(
           shape.strokeBorder(
             LinearGradient(
               colors: [Tokens.line.opacity(0.18), Tokens.line.opacity(0.5)], startPoint: .top, endPoint: .bottom),
-            lineWidth: 1))
+            lineWidth: 1)
+        )
         // Soft lower edge: a lip just below the slab, then a short soft shadow (no halo).
         .background(shape.fill(Tokens.line.opacity(0.3)).offset(y: full ? 2 : 1))
         .shadow(color: Tokens.ink.opacity(0.14), radius: full ? 8 : 4, y: full ? 4 : 2)
@@ -144,29 +145,35 @@ struct MirrorPad: View {
 
   @ViewBuilder private func shape(_ zone: MirrorZone, live: Bool) -> some View {
     let rect = geometry.shapeFrame(for: zone.zone)
-    let isSelected = zone.zone == selected
     Group {
       if zone.isCorner {
         cornerTile(zone, live: live, rect: rect)
       } else {
-        edgeBar(zone, live: live)
+        edgeShape(zone, live: live, rect: rect)
       }
     }
     .frame(width: rect.width, height: rect.height)
     .anchorPreference(key: ZoneAnchorKey.self, value: .bounds) { [zone.zone: $0] }
-    .overlay { if isSelected { selectionRing(zone, rect: rect) } }
     .offset(x: rect.minX, y: rect.minY)
     .allowsHitTesting(false)
   }
 
-  @ViewBuilder private func edgeBar(_ zone: MirrorZone, live: Bool) -> some View {
+  /// Zone bars have fully rounded ends (Tokens: "use Capsule()"). Drawn as a circular rounded
+  /// rectangle with radius = half the short side, which is a capsule; a stroked `Capsule` renders
+  /// flattened ends in a hosting view at this aspect ratio.
+  static func pill(_ rect: CGRect) -> RoundedRectangle {
+    RoundedRectangle(cornerRadius: min(rect.width, rect.height) / 2, style: .circular)
+  }
+
+  @ViewBuilder private func edgeShape(_ zone: MirrorZone, live: Bool, rect: CGRect) -> some View {
+    let pill = Self.pill(rect)
     switch zone.style {
     case .mapped:
-      Capsule().fill(Tokens.bar)
-        .overlay { if live { Capsule().fill(Tokens.accent.opacity(0.4)) } }
-        .overlay { if live { Capsule().strokeBorder(Tokens.accent, lineWidth: 1.5) } }
+      pill.fill(Tokens.bar)
+        .overlay { if live { pill.fill(Tokens.accent.opacity(0.4)) } }
+        .overlay { if live { pill.strokeBorder(Tokens.accent, lineWidth: 1.5) } }
     case .unmapped, .offHere:
-      Capsule().strokeBorder(Tokens.line, lineWidth: 1)
+      pill.strokeBorder(Tokens.line, lineWidth: 1)
     }
   }
 
@@ -194,16 +201,18 @@ struct MirrorPad: View {
   }
 
   /// The `ink` ring, outside the bar with a visible gap, so it never reads as the live border.
-  @ViewBuilder private func selectionRing(_ zone: MirrorZone, rect: CGRect) -> some View {
-    let outset: CGFloat = 3.5
+  @ViewBuilder private func selectionRing(_ zone: MirrorZone) -> some View {
+    let ring = geometry.shapeFrame(for: zone.zone).insetBy(dx: -3.5, dy: -3.5)
     Group {
       if zone.isCorner {
         RoundedRectangle(cornerRadius: Tokens.radiusControl, style: .continuous).strokeBorder(Tokens.ink, lineWidth: 2)
       } else {
-        Capsule().strokeBorder(Tokens.ink, lineWidth: 2)
+        Self.pill(ring).strokeBorder(Tokens.ink, lineWidth: 2)
       }
     }
-    .padding(-outset)
+    .frame(width: ring.width, height: ring.height)
+    .offset(x: ring.minX, y: ring.minY)
+    .allowsHitTesting(false)
   }
 
   /// The click target: the zone as the recognizer sees it (`PadLayout`), corners on top of edges.
@@ -308,17 +317,11 @@ struct MirrorPad: View {
   // MARK: Message
 
   @ViewBuilder private func messageView(_ message: MirrorMessage, size: CGSize) -> some View {
-    HStack(spacing: 10) {
-      Text(message.text).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink)
-      if let button = message.button {
-        Button(button) { onMessageButton?() }
-          .buttonStyle(.plain)
-          .font(Tokens.font(Tokens.typeBody, semibold: true))
-          .foregroundStyle(Tokens.ink)
-      }
-    }
-    .multilineTextAlignment(.center)
-    .frame(width: size.width, height: size.height)
+    Text(message.text)
+      .font(Tokens.font(Tokens.typeBody))
+      .foregroundStyle(Tokens.ink)
+      .multilineTextAlignment(.center)
+      .frame(width: size.width, height: size.height)
   }
 }
 
@@ -334,7 +337,8 @@ struct ContactView: View {
         // Pressed in: shade just inside the top rim, a fine darker rim, a slab-coloured ring outside.
         .overlay(
           Ellipse().fill(
-            LinearGradient(colors: [Tokens.ink.opacity(0.22), Tokens.ink.opacity(0)], startPoint: .top, endPoint: .center))
+            LinearGradient(
+              colors: [Tokens.ink.opacity(0.22), Tokens.ink.opacity(0)], startPoint: .top, endPoint: .center))
         )
         .overlay(Ellipse().strokeBorder(Tokens.ink.opacity(0.3), lineWidth: 1))
         .padding(full ? 2 : 1)

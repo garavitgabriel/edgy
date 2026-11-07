@@ -93,13 +93,13 @@ enum MirrorContent {
 ///    "Play/Pause" (`media.playPause`); any other action uses its catalog name, with " / " closed
 ///    up to "/". An action whose required parameter is still empty ends in "…" (§ Binding
 ///    parameters).
-/// 3. Opposite pairs collapse into one word: Previous + Next Track → "Tracks"; Space Left + Space
-///    Right → "Spaces"; Left + Right Half → "Halves". The word takes the place of the pair's first
+/// 3. Opposite pairs collapse into one word: Previous + Next Track read "Tracks"; Space Left + Space
+///    Right read "Spaces"; Left + Right Half read "Halves". The word takes the place of the pair's first
 ///    member.
 /// 4. Repeated names appear once.
 /// 5. Names are joined like a sentence: "A", "A and B", "A, B and C".
 ///
-/// So the default bottom edge (swipe left → previous, swipe right → next, double-tap → play/pause)
+/// So the default bottom edge (swipe left: previous, swipe right: next, double-tap: play/pause)
 /// reads "Tracks and Play/Pause".
 enum ZoneLabel {
   static let pairs: [(ActionID, ActionID, String)] = [

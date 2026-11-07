@@ -10,7 +10,10 @@ import SwiftUI
 /// - Clicking a zone sets `model.selectedZone`. Every zone's drawn frame is published through
 ///   `PadMirrorView.ZoneAnchor` (`ZoneAnchorKey`) for the picker popover's arrow.
 /// - System states on the pad: no trackpad (dashed outline, zones from the last-known size,
-///   still editable), paused, off in this app, disabled (faded to 40%).
+///   still editable, "Connect a trackpad to see it here."), off in this app (faded to 40%, every
+///   zone a hairline), disabled (faded to 40%). Paused, and the "Edgy is off in <App> · Turn on"
+///   line, are drawn by the settings window around the mirror (batch 16 `WindowStatus.padLine`),
+///   so the mirror doesn't repeat them (each status is said once).
 /// - When the mirrored pad changes, the outline cross-fades over 150 ms.
 public struct PadMirrorView: View {
   @Bindable var model: SettingsModel
@@ -22,7 +25,7 @@ public struct PadMirrorView: View {
 
   public var body: some View {
     let app = SettingsModel.app(of: model.selectedProfile)
-    let state = model.mirrorState(forApp: app)
+    let state = model.mirrorState(forApp: app, includesPaused: false)
     let device = model.mirroredDevice
     let sizeMM = device?.sensorSizeMM ?? lastKnownSize ?? MirrorGeometry.defaultSensorSizeMM
     let geometry = MirrorGeometry(
@@ -32,7 +35,6 @@ public struct PadMirrorView: View {
         geometry: geometry, zones: model.mirrorZones(forApp: app), selected: model.selectedZone,
         touches: device == nil ? [] : model.liveTouches, faded: state.faded, dashedOutline: state == .noTrackpad,
         message: Self.message(for: state),
-        onMessageButton: { model.performMirrorButton(state, app: app) },
         onSelect: { model.selectZone($0) }
       )
       .id(device?.id)
@@ -48,9 +50,7 @@ public struct PadMirrorView: View {
   static func message(for state: MirrorState) -> MirrorMessage? {
     switch state {
     case .noTrackpad: return MirrorMessage(text: MirrorCopy.noTrackpadWindow)
-    case .paused(let line): return MirrorMessage(text: line, button: MirrorCopy.resume)
-    case .appOff(let name): return MirrorMessage(text: MirrorCopy.appOff(name), button: MirrorCopy.turnOn)
-    case .disabled, .normal: return nil
+    case .paused, .appOff, .disabled, .normal: return nil
     }
   }
 }

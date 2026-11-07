@@ -23,8 +23,6 @@ enum MirrorState: Equatable {
 enum MirrorCopy {
   static let noTrackpadWindow = "Connect a trackpad to see it here."
   static let noTrackpadMini = "No trackpad connected"
-  static let resume = "Resume"
-  static let turnOn = "Turn on"
 
   /// "Paused, 47 min left"; whole minutes, rounded up; under a minute "less than a minute left".
   static func paused(until: Date?, now: Date) -> String {
@@ -34,10 +32,8 @@ enum MirrorCopy {
     return "Paused, \(Int((seconds / 60).rounded(.up))) min left"
   }
 
-  static func appOff(_ name: String) -> String { "Edgy is off in \(name)" }
-
   /// An app's name for pad copy. Until a name source reaches the model, the bundle ID's last
-  /// component, capitalised ("com.example.huddle" → "Huddle").
+  /// component, capitalised ("com.example.huddle" becomes "Huddle").
   static func appName(_ bundleID: String) -> String {
     let last = bundleID.split(separator: ".").last.map(String.init) ?? bundleID
     return last.prefix(1).uppercased() + last.dropFirst()
@@ -63,11 +59,14 @@ extension SettingsModel {
     return MirrorContent.zones(rows: editor.effectiveBindings(forApp: app), catalog: mirrorCatalog, allHairline: off)
   }
 
-  /// The pad state for `app` (`nil` = Default).
-  func mirrorState(forApp app: String?, now: Date = Date()) -> MirrorState {
+  /// The pad state for `app` (`nil` = Default). `includesPaused: false` for the settings window,
+  /// whose shell fades the mirror and writes the paused line itself.
+  func mirrorState(forApp app: String?, includesPaused: Bool = true, now: Date = Date()) -> MirrorState {
     _ = revision
     if mirroredDevice == nil { return .noTrackpad }
-    if engineStatus.paused { return .paused(MirrorCopy.paused(until: engineStatus.pausedUntil, now: now)) }
+    if includesPaused, engineStatus.paused {
+      return .paused(MirrorCopy.paused(until: engineStatus.pausedUntil, now: now))
+    }
     if let app, editor.config.appProfiles[app]?.disabled == true { return .appOff(MirrorCopy.appName(app)) }
     if !editor.config.app.enabled { return .disabled }
     return .normal
@@ -77,15 +76,5 @@ extension SettingsModel {
   /// second click, which batch 15 owns; selecting never touches `picking`.
   func selectZone(_ zone: Zone) {
     selectedZone = zone
-  }
-
-  /// The button on a pad message: Resume (paused) or Turn on (off in this app).
-  func performMirrorButton(_ state: MirrorState, app: String?) {
-    switch state {
-    case .paused: resume()
-    case .appOff:
-      if let app { try? editor.setProfileDisabled(false, for: .app(app)) }
-    default: break
-    }
   }
 }
