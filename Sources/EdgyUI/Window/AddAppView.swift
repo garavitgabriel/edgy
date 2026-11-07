@@ -62,11 +62,11 @@ public struct AddAppView: View {
           let sections = AddAppView.sections(apps, matching: search)
           if !sections.running.isEmpty {
             header("Running")
-            ForEach(sections.running) { row($0) }
+            ForEach(sections.running.map { ListRow(section: "running", app: $0) }) { row($0.app) }
           }
           if !sections.all.isEmpty {
             header("All apps")
-            ForEach(sections.all) { row($0) }
+            ForEach(sections.all.map { ListRow(section: "all", app: $0) }) { row($0.app) }
           }
         }
       }
@@ -96,7 +96,9 @@ public struct AddAppView: View {
       .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .disabled(taken)
+    // Not `.disabled`: that dims `ink2` again, below 4.5:1. The row just doesn't take clicks.
+    .allowsHitTesting(!taken)
+    .accessibilityAddTraits(taken ? [] : .isButton)
   }
 
   /// Running apps, then all apps alphabetically; both filtered by `search` (name or bundle ID).
@@ -166,4 +168,11 @@ public struct AddAppView: View {
     model.attempt("add profile") { try model.addAppProfile(bundleID: app.bundleID, startingFrom: start) }
     done()
   }
+}
+
+/// An app appears in both Running and All apps, so each list row is keyed by its section too.
+private struct ListRow: Identifiable {
+  let section: String
+  let app: InstalledApp
+  var id: String { "\(section)/\(app.bundleID)" }
 }

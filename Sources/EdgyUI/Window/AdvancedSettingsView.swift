@@ -86,7 +86,7 @@ public struct AdvancedSettingsView: View {
     return VStack(alignment: .leading, spacing: 4) {
       row(field.label) {
         Slider(
-          value: Binding(get: { shown }, set: { model.setGesture(field, to: $0) }), in: field.range, step: field.step,
+          value: Binding(get: { shown }, set: { model.setGesture(field, to: field.snap($0)) }), in: field.range,
           onEditingChanged: { model.continuousEdit(field.rawValue, began: $0) }
         )
         .labelsHidden()

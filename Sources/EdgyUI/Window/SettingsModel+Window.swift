@@ -89,6 +89,9 @@ public enum GestureField: String, CaseIterable, Sendable {
     }
   }
 
+  /// `value` rounded to the nearest `step` (the slider draws no tick marks; there would be hundreds).
+  public func snap(_ value: Double) -> Double { (value / step).rounded() * step }
+
   /// "8 mm", "300 ms" (proportional figures, a space before the unit).
   public func format(_ value: Double) -> String { "\(Int(value.rounded())) \(unit)" }
 }

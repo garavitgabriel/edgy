@@ -90,7 +90,7 @@ public enum WindowCopy {
   public static func offIn(_ app: String) -> String { "Edgy is off in \(app)" }
 
   /// The display name of an app profile: the installed app's name, else the bundle ID's last
-  /// part with its first letter capitalized ("com.example.wayfare" → "Wayfare").
+  /// part with its first letter capitalized ("com.example.wayfare" becomes "Wayfare").
   public static func appName(for bundleID: String, in apps: [InstalledApp]) -> String {
     if let app = apps.first(where: { $0.bundleID == bundleID }) { return app.name }
     let last = bundleID.split(separator: ".").last.map(String.init) ?? bundleID

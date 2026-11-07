@@ -112,8 +112,7 @@ struct PadLineView: View {
     }
     .padding(.horizontal, 14)
     .padding(.vertical, 8)
-    .background(
-      Tokens.windowTint.opacity(Tokens.windowTintOpacity), in: RoundedRectangle(cornerRadius: Tokens.radiusControl))
+    .background(Tokens.windowTint, in: RoundedRectangle(cornerRadius: Tokens.radiusControl))
   }
 }
 
@@ -151,20 +150,21 @@ struct OverlapNoteView: View {
   }
 }
 
-/// A small monochrome app mark: the app's own icon desaturated when we know where it is, else a
-/// plain outline symbol. Never a coloured square.
+/// A small monochrome app mark: the app's own icon, desaturated. When the icon isn't known (no
+/// installed app at that bundle ID) there's no mark at all: a placeholder square reads as a
+/// checkbox, and generic squares are on the kill list.
 struct AppMark: View {
   let path: String?
 
+  static func hasIcon(_ path: String?) -> Bool {
+    path.map { FileManager.default.fileExists(atPath: $0) } ?? false
+  }
+
   var body: some View {
-    Group {
-      if let path, FileManager.default.fileExists(atPath: path) {
-        Image(nsImage: NSWorkspace.shared.icon(forFile: path)).resizable().saturation(0)
-      } else {
-        Image(systemName: "app").resizable().foregroundStyle(Tokens.ink2)
-      }
+    if let path, Self.hasIcon(path) {
+      Image(nsImage: NSWorkspace.shared.icon(forFile: path)).resizable().saturation(0)
+        .aspectRatio(contentMode: .fit)
+        .frame(width: WindowMetrics.markSize, height: WindowMetrics.markSize)
     }
-    .aspectRatio(contentMode: .fit)
-    .frame(width: WindowMetrics.markSize, height: WindowMetrics.markSize)
   }
 }
