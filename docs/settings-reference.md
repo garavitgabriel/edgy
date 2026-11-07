@@ -29,9 +29,34 @@ Change with `updateAppSettings { $0.<field> = … }`.
 | `hapticTickStrength` | Int 1…6 (`AppSettings.hapticStrengthRange`) | 6 | Strength of light ticks (slide steps, gesture caught). Clamped on edit and on load. |
 | `hapticClickStrength` | Int 1…6 | 6 | Strength of clicks (slide limits, action fired). Clamped. |
 | `launchAtLogin` | Bool | `false` | Start Edgy at login. |
-| `unresponsiveDisplays` | Set of display keys | empty | External displays the user said ignore brightness commands ("No, turn off for this display"); brightness skips them. Set by the display check plate; the inspector's "Turn back on" removes one. |
-| `confirmedDisplays` | Set of display keys | empty | External displays the user confirmed respond; never asked again. |
-| `displayCheckAsks` | Display key → count | empty | How often Edgy asked about an unconfirmed display (at most 3). |
+| `unresponsiveDisplays` | Set of display keys | empty | External displays the user said ignore brightness commands ("No, turn off for this display"); brightness skips them (unavailable, "Turned off for this display."). Set by `answerDisplayCheck(key:responds: false)`; `turnDisplayBackOn(key:)` removes one. |
+| `confirmedDisplays` | Set of display keys | empty | External displays the user confirmed respond (`answerDisplayCheck(key:responds: true)`); never asked again. |
+| `displayCheckAsks` | Display key → count | empty | How often Edgy asked about an unconfirmed display (at most 3; `countDisplayCheckAsk(key:)`). |
+
+### The display check ("Did this screen change brightness?")
+
+A display key is `DisplayInfo.key`: the display's vendor and model in lowercase hex, plus its serial
+when it reports one (`"4c2d-7154-9"`), so it survives reconnects. A display with no identity is keyed
+by its name.
+
+- **Availability.** A monitor driven over DDC (a third-party display) can accept a brightness command
+  without applying it. While any such monitor is unconfirmed, `display.brightness` is
+  `limited("May not respond: some monitors accept brightness commands without applying them.")`.
+  Displays in `unresponsiveDisplays` are skipped as if unplugged; when nothing else takes brightness
+  the action is unavailable with "Turned off for this display.". Apple displays and the built-in
+  panel are never checked.
+- **When it's asked.** A brightness slide that changed the level on an unconfirmed, not-turned-off DDC
+  monitor asked fewer than 3 times ends with a `displayCheckDue(key:name:)` feed decision. The UI
+  shows the plate, calls `countDisplayCheckAsk(key:)`, and records the answer with
+  `answerDisplayCheck(key:responds:)`.
+- **Editor API** (each one undo step, through `updateAppSettings`):
+
+| Method | Effect |
+|---|---|
+| `displayCheckDue(key:)` | Whether the question is still due for that display. |
+| `countDisplayCheckAsk(key:)` | One more ask, capped at 3 (`SettingsEditor.displayCheckMaxAsks`). |
+| `answerDisplayCheck(key:responds:)` | Yes → `confirmedDisplays`. No → `unresponsiveDisplays`. Each removes the key from the other set. |
+| `turnDisplayBackOn(key:)` | Removes the key from `unresponsiveDisplays` ("Turn back on"). Not confirmed, so it may ask again while asks remain. |
 
 ## Gesture tuning: `GestureSettings`
 
@@ -71,6 +96,21 @@ app is frontmost.
 | Revert to the default | — (removes the app's binding) | `revertToDefault(_:forApp:)` |
 | Convert an old copied profile | — | `convertToInheriting(bundleID:)`. Bindings equal to the default are dropped, default slots the app lacked become "do nothing", and the app behaves exactly as before. |
 | Reset | — | `resetProfile(_:)`. Default profile → built-in preset. Inheriting app → no overrides. Full-replace app → a copy of the default. `resetAll()` → `EdgyConfig.defaults`. |
+
+### Presets (onboarding step 3)
+
+`Presets` (EdgyRuntime) holds three whole configs; only their default profile matters.
+`applyPreset(_ preset: Presets.Preset)` replaces the default profile with the preset's, run through
+`MachineDefaults` for this Mac (unavailable actions substituted or dropped). App settings, gesture
+tuning and app profiles stay. One undo step.
+
+| Preset | Bindings (zone, gesture → action) |
+|---|---|
+| `Presets.media` (= `EdgyConfig.defaults`) | right slide → `audio.volume` · left slide → `display.brightness` · bottom swipe left → `media.previous` · bottom swipe right → `media.next` · bottom double-tap → `media.playPause` · top-right double-tap → `audio.mute` · top-left double-tap → `mic.mute` |
+| `Presets.windows` | right slide → `audio.volume` · left slide → `display.brightness` · bottom swipe left → `window.leftHalf` · bottom swipe right → `window.rightHalf` · bottom long-press → `window.maximize` · bottom double-tap → `window.center` · top double-tap → `system.missionControl` · top-left double-tap → `system.showDesktop` · top-right double-tap → `audio.mute` |
+| `Presets.minimal` | right slide → `audio.volume` · left slide → `display.brightness` |
+
+Every binding validates with no issue at all (`PresetTests`).
 
 **Inheriting vs. full-replace.** For an inheriting app profile (`inheritsDefault: true`), the app's
 bindings are overrides. A binding replaces the default's binding on the same slot, and `edgy.none`
@@ -182,6 +222,25 @@ are stable.
 | `actionUnavailable` | warning | The action can't work on this Mac right now; the binding is kept. |
 | `tapWaitsForDoubleTap` | info | The zone has a tap and a double-tap, so a tap waits `doubleTapWindowMS` (`detail`, in ms) before it runs. |
 
+## A broken config file
+
+When the file on disk stops decoding or validating on reload, Edgy keeps running the last working
+settings:
+
+- `configProblem` (`ConfigProblem`: `message`, and `line` when the parser gave one) is set and
+  observers get a change with cause `.configProblem`.
+- Every edit, `undo` and `redo` throws `SettingsEditorError.readOnly(problem)`, so nothing
+  overwrites the user's file. A drag in progress is closed without saving.
+- `replaceFileWithCurrentSettings()` writes the running config over the file and clears the problem
+  (the UI confirms first).
+- It clears by itself when a reload reads a good file (`.external`, or `.configProblem` when the fixed
+  file equals the running config).
+
+Where it comes from: `reloadFromDisk()` (Reload Config; it also rethrows), `adoptExternal(_:)` (a
+file that *introduces* validation errors is not adopted; errors the running config already had stay
+exposed and never block), and `reportConfigProblem(_:)`, which the app calls from the watcher's new
+`ConfigStore.startWatching(onChange:onFailure:)`.
+
 There's no "hold and trigger on one long-press" note. A zone has one long-press slot, so a hold and a
 trigger can't share it.
 
@@ -193,4 +252,56 @@ These live on `Engine`, not in the config.
 |---|---|---|
 | Pause | `pause(until:)` / `resume()` | Timed pauses are driven by the app. |
 | Test Mode | `setTestMode(_:)`, `isTestMode`, `EngineStatus.testMode` | Gestures are recognized and routed, but no action runs. Each would-be action gives the "caught" haptic and a `wouldRun` feed decision. Switching either way drops in-flight gestures safely. |
-| Live feed | `observeFeed(on:_:)` / `removeFeedObserver(_:)` | Normalized touches per device (`down` / `claimed` / `rejected`), at most 60 Hz. Decisions as they happen: recognized, rejected (with the zone it landed in), action ran / failed / unavailable / would run. Runs only while someone observes and the engine is active. |
+| Live feed | `observeFeed(on:_:)` / `removeFeedObserver(_:)` | Normalized touches per device (`down` / `claimed` / `rejected`), at most 60 Hz. Decisions as they happen: recognized, rejected (with the zone it landed in and its `measure`), action ran (with its `outcome`) / updated / failed / unavailable / would run, and `displayCheckDue(key:name:)`. Runs only while someone observes and the engine is active. |
+
+### Feed decisions with numbers (v0.5)
+
+- `rejected(…, measure:)` carries the recognizer's `rejectionMeasures` entry for that contact.
+- `actionRan(…, outcome:)` carries what the action reported (`performReporting`): a level slide's
+  level at its first step, the held combo of `keyboard.hold` ("fn"), the display's name for external
+  brightness. `nil` for actions with nothing to show.
+- `actionUpdated(id, zone:, kind:, outcome:)` follows a slide after its first step, sent only when the
+  whole-percent level or the detail changes.
+- `displayCheckDue(key:name:)`: see "The display check" above.
+
+| Action | `level` | `detail` | `systemHUDShown` |
+|---|---|---|---|
+| `audio.volume` | after the change | — | true while `hud` is `native` |
+| `display.brightness`, built-in | after the change | — | true while `hud` is `native` |
+| `display.brightness`, external | after the change | the display's name | false (Edgy draws the level plate) |
+| `keyboard.backlight` | after the change | — | false |
+| `keyboard.hold` | — | the combo as read: "fn", "⌃⌥ Space", "⇧⌘ 4" | false |
+| `apps.switcher` | — | — | true (the system's switcher is the feedback) |
+| everything else | `nil` outcome | | |
+
+How the display-check request crosses modules: `ActionOutcome` is frozen and the runtime can't import
+Actions, so the external-brightness `detail` is "name" + `\u{1E}displayCheck:` + "key" when a check is
+due. The router splits it; the feed only ever shows the plain name.
+
+### Rejection measures (`GestureOutput.rejectionMeasures`)
+
+What each `RejectionReason` really measures in the pipeline, in `RejectionMeasure` units. "Limit" is
+the setting or threshold the touch crossed.
+
+| Reason | Where it's decided | `measured` | `limit` | Unit |
+|---|---|---|---|---|
+| `palm` | contact shape, at landing or as it spreads | major axis | `palmMajorAxisMM` (18) | mm |
+| `palm` (round blob) | same | minor axis | fixed 14 mm | mm |
+| `palm` (size / density only) | same | — (unitless device readings) | — | none |
+| `typing` | at landing, and while unclaimed | time since the last key | `typingSuppressionMS` (500) | ms |
+| `tooManyContacts` | every frame | non-palm contacts on the pad | `fingers` (1…2) | fingers |
+| `offAxisMotion`, corner | corner touch moving | travel from landing | fixed 3 mm | mm |
+| `offAxisMotion`, edge, outward | before the claim | sideways travel toward the edge | fixed 2.5 mm | mm |
+| `offAxisMotion`, edge, diagonal | before the claim, no axis dominant | total travel | fixed 3 mm | mm |
+| `offAxisMotion`, swipe that veered | swipe candidate lifting | travel across the edge | travel along it | mm |
+| `tooFast`, held too long | swipe candidate still down | time since landing | swipe limit: 350 ms (600 ms where no slide is bound) | ms |
+| `tooFast`, too short | swipe candidate lifting | travel along the edge | fixed 6 mm | mm |
+| `tooFast`, no clear axis at lift | swipe candidate lifting | — | — | none |
+| `startedOutsideZone` | a touch drifting into a mapped zone | how far in from that edge it landed | `edgeWidthMM`, or `cornerSizeMM` for a corner | mm |
+| `disabledZone` | landing in an unmapped part | — | — | none |
+| `systemGestureHandoff` | inward motion before the claim | — | — | none |
+| `physicalClick` | the button went down | — | — | none |
+
+`tooFast` never measures speed or dwell: a touch fast enough to be a swipe candidate is rejected
+when it then stays down past the swipe time limit or lifts too short. The feed doesn't report
+`startedOutsideZone` (ordinary pointer use), so its measure stays in the recognizer output.

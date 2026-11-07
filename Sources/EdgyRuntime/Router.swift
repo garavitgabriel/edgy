@@ -42,6 +42,14 @@ public final class Router {
   private var pendingHolds: [DiscreteKey: PendingHold] = [:]
   private var holdCounter = 0
 
+  /// What a slide in progress has reported to the feed (only while someone observes it).
+  private struct SlideReport {
+    var first: ActionOutcome?
+    var last: ActionOutcome?
+    var check: DisplayCheckDetail.Request?
+  }
+  private var slideReports: [DiscreteKey: SlideReport] = [:]
+
   public init(actions: ActionPerforming, logger: EdgyLogging) {
     self.actions = actions
     self.logger = logger
@@ -62,6 +70,7 @@ public final class Router {
   public func reset() {
     releaseHolds(reason: "reset")
     firedOnBegan.removeAll()
+    slideReports.removeAll()
   }
 
   /// Send `.press(down: false)` for every pending hold, oldest first, and forget them. The
@@ -111,14 +120,48 @@ public final class Router {
     if event.kind == .slide && event.phase == .began {
       actions.feedback(.gestureCaught, context: context)
     }
+    defer {
+      if event.kind == .slide && (event.phase == .ended || event.phase == .cancelled) {
+        finishSlideReport(key)
+      }
+    }
     do {
-      try actions.perform(binding.action, input: input, context: context)
+      let outcome = try actions.performReporting(binding.action, input: input, context: context)
       if case .trigger = input { actions.feedback(.actionFired, context: context) }
-      if firstOfGesture { onDecision?(.actionRan(binding.action, zone: event.zone, kind: event.kind)) }
+      report(outcome, binding.action, event, key: key, first: firstOfGesture)
     } catch {
       logger.log(.error, "Action \(binding.action.rawValue) failed: \(error)")
       if firstOfGesture { report(error, binding.action, event) }
     }
+  }
+
+  /// Feeds an action's outcome: `actionRan` with it on the gesture's first step; for a slide,
+  /// `actionUpdated` whenever the whole-percent level or the detail changes after that.
+  private func report(
+    _ outcome: ActionOutcome?, _ action: ActionID, _ event: GestureEvent, key: DiscreteKey, first: Bool
+  ) {
+    guard let onDecision else { return }
+    let (clean, check) = DisplayCheckDetail.split(outcome)
+    if first {
+      onDecision(.actionRan(action, zone: event.zone, kind: event.kind, outcome: clean))
+      if event.kind == .slide { slideReports[key] = SlideReport(first: clean, last: clean, check: check) }
+      return
+    }
+    guard event.kind == .slide, var slide = slideReports[key] else { return }
+    if let check { slide.check = check }
+    if let clean, !DisplayCheckDetail.samePlate(clean, slide.last) {
+      onDecision(.actionUpdated(action, zone: event.zone, kind: event.kind, outcome: clean))
+      slide.last = clean
+    }
+    slideReports[key] = slide
+  }
+
+  /// A slide ended: ask the display check if one is due and the slide really moved the level.
+  private func finishSlideReport(_ key: DiscreteKey) {
+    guard let slide = slideReports.removeValue(forKey: key), let check = slide.check,
+      let level = slide.last?.level, level != slide.first?.level
+    else { return }
+    onDecision?(.displayCheckDue(key: check.key, name: check.name))
   }
 
   private func report(_ error: Error, _ action: ActionID, _ event: GestureEvent) {
@@ -151,9 +194,9 @@ public final class Router {
     // Recorded before performing: even if the press fails part-way, the release still follows.
     pendingHolds[key] = PendingHold(action: binding.action, context: context, order: holdCounter)
     do {
-      try actions.perform(binding.action, input: .press(down: true), context: context)
+      let outcome = try actions.performReporting(binding.action, input: .press(down: true), context: context)
       actions.feedback(.actionFired, context: context)
-      onDecision?(.actionRan(binding.action, zone: event.zone, kind: event.kind))
+      onDecision?(.actionRan(binding.action, zone: event.zone, kind: event.kind, outcome: outcome))
     } catch {
       logger.log(.error, "Action \(binding.action.rawValue) failed: \(error)")
       report(error, binding.action, event)

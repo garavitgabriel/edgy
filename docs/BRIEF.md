@@ -28,7 +28,7 @@ Why this look: the owner picked it on taste in every round (rounds 1, 2 and 3; t
 | pad slab | `#F8E3CE → #EFCCAB` | `#4A3026 → #3A251D` | the mirror's surface, top-left lit |
 | window material | warm translucent, ~0.8 opacity over blur | `rgba(42,27,21,.82)` | system window material tinted warm; never let text drop below 4.5:1 |
 
-- **One hue.** No second colour anywhere: no blue selection, no amber warnings, no red errors. Warnings use weight plus an icon. The window buttons are neutral.
+- **One hue.** No second colour anywhere: no blue selection, no amber warnings, no red errors. Warnings use weight plus an icon. **Exception:** system-drawn chrome (window buttons, the system title bar) stays as the system draws it. Don't recolour or fake it.
 - **Type:** the system font only. One scale: **11** (picker group headers only) / **13** (everything else, the floor) / **17** (plate values, Continue) / **26** (the one confident line: the selected zone's name or the onboarding headline). Weights are regular and semibold. Use proportional figures everywhere, with no space before % ("64%").
 - **Radii:** the window has the system radius; controls 6–8; plates 12–14; zone bars fully rounded ends. Never one radius for everything, and never a radius nested inside a radius.
 - **Gesture icons:** one family, one stroke weight and one grid. Swipe up and swipe down must differ clearly.
@@ -59,19 +59,29 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
    - **Recognized:** a filled accent contact.
    - **Rejected:** a hollow, struck circle.
    - A rejection states the measured value against the limit: **"Ignored: palm, 21 mm wide, limit 18 mm"**. This plate was every critic's KEEP; build it exactly like that.
-   - **Copy pattern for every reason:** "Ignored: <reason>, <measured>, limit <limit>". Use the setting's own unit (mm or ms). When no number means anything, stop after the reason.
+   - **Copy pattern for every reason:** "Ignored: <reason>, <measured>, limit <limit>". Use the runtime's `RejectionMeasure` (measured, limit, unit) with its own unit (mm, ms, fingers). When the measure has no number (unit none), stop after the reason. Rewritten 2026-11-07 from the real measures in `.parallel-plans/done-batch-13.md`.
 
-     | Reason | Plate copy |
+     | Reason (variant) | Plate copy |
      |---|---|
-     | palm | Ignored: palm, 21 mm wide, limit 18 mm |
+     | palm (major axis) | Ignored: palm, 21 mm wide, limit 18 mm |
+     | palm (minor axis, round contact) | Ignored: palm, 15 mm across, limit 14 mm |
+     | palm (size or density only) | Ignored: palm |
      | typing | Ignored: typing, last key 200 ms ago, limit 500 ms |
-     | too many contacts | Ignored: 3 fingers, set to 1 |
-     | off-axis motion | Ignored: off-axis, 38° from the edge, limit 25° *(use the runtime's real measure; if it has none, "Ignored: off-axis")* |
-     | too fast (dwell) | Ignored: too quick, 60 ms, needs 120 ms |
-     | started outside a zone | Ignored: started 14 mm in, edge is 8 mm |
+     | too many contacts | Ignored: 2 fingers, set to 1 *(it counts every non-palm contact, so a resting thumb counts)* |
+     | off-axis, corner | Ignored: moved 3.4 mm before the long-press, limit 3 mm |
+     | off-axis, edge outward | Ignored: moved 2.8 mm toward the edge, limit 2.5 mm |
+     | off-axis, edge diagonal | Ignored: no clear direction, moved 3.4 mm, limit 3 mm |
+     | off-axis, swipe that veered | Ignored: swipe veered, 9 mm across, 5 mm along |
+     | too fast, held too long | Ignored: swipe too slow, 410 ms, limit 350 ms |
+     | too fast, too short | Ignored: swipe too short, 4 mm, needs 6 mm |
+     | too fast, no clear axis at lift | Ignored: swipe had no clear direction |
      | handed off to a system gesture | Ignored: system gesture |
      | click | Ignored: click |
-     | zone disabled / Edgy off in app | Ignored: Edgy is off in Huddle *(or "Ignored: zone off")* |
+     | zone disabled (unmapped part of an edge) | Ignored: nothing mapped here |
+     | Edgy off in this app | Ignored: Edgy is off in Huddle |
+
+     - **Started outside a zone is not shown.** The feed doesn't report it, because it's ordinary pointer use. The overlay must never surface it.
+     - Numbers use one decimal place only when the value is under 10 and not whole ("3.4 mm"); otherwise they're whole ("21 mm", "410 ms").
    - Recognized is louder.
 5. **You map on the pad.**
    - Clicking a zone selects it.

@@ -255,12 +255,14 @@ final class LiveDisplayBrightness: DisplayBrightnessControlling, @unchecked Send
         environment.system.localizedName(of: display.id) ?? candidate?.attributes?.name
         ?? (display.isBuiltIn ? "Built-in Display" : "Display \(index + 1)")
 
+      let key = DisplayKey.make(display: display, attributes: candidate?.attributes, name: name)
+
       func entry(_ backend: Backend, reason: String? = nil) -> Entry {
         let controllable = if case .none = backend { false } else { true }
         return Entry(
           info: DisplayInfo(
             id: display.id, name: name, kind: kind, brightnessControllable: controllable,
-            reason: controllable ? nil : reason),
+            reason: controllable ? nil : reason, key: key),
           backend: backend)
       }
 

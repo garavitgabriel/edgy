@@ -51,6 +51,7 @@ public final class ConfigStore: @unchecked Sendable {
   private var fileSource: DispatchSourceFileSystemObject?
   private var pendingReload: DispatchWorkItem?
   private var onChange: (@Sendable (EdgyConfig) -> Void)?
+  private var onFailure: (@Sendable (Error) -> Void)?
 
   public init(
     fileURL: URL = ConfigStore.defaultFileURL, debounce: TimeInterval = 0.3,
@@ -100,10 +101,21 @@ public final class ConfigStore: @unchecked Sendable {
   /// Watches the file (and its directory, so editors that save via rename are seen) and calls
   /// `onChange` on a background queue after edits settle for the debounce interval.
   public func startWatching(onChange: @escaping @Sendable (EdgyConfig) -> Void) {
+    startWatching(onChange: onChange, onFailure: nil)
+  }
+
+  /// `startWatching(onChange:)`, plus `onFailure` (same queue) when a changed file doesn't load
+  /// (`ConfigStoreError`). The app hands it to `SettingsEditor.reportConfigProblem(_:)`, which
+  /// keeps the last working settings and makes the settings window read-only until the file is
+  /// fixed. The same broken bytes are reported once.
+  public func startWatching(
+    onChange: @escaping @Sendable (EdgyConfig) -> Void, onFailure: (@Sendable (Error) -> Void)?
+  ) {
     try? FileManager.default.createDirectory(
       at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
     watchQueue.sync {
       self.onChange = onChange
+      self.onFailure = onFailure
       armDirectorySource()
       armFileSource()
     }
@@ -118,6 +130,7 @@ public final class ConfigStore: @unchecked Sendable {
       fileSource?.cancel()
       fileSource = nil
       onChange = nil
+      onFailure = nil
     }
   }
 
@@ -154,7 +167,15 @@ public final class ConfigStore: @unchecked Sendable {
   }
 
   private static func describe(_ error: Error) -> String {
-    if case .dataCorrupted(let ctx) = error as? DecodingError { return ctx.debugDescription }
+    if case .dataCorrupted(let ctx) = error as? DecodingError {
+      // The parser's own message names the line ("… around line 14, column 3.").
+      if let underlying = ctx.underlyingError as NSError?,
+        let message = underlying.userInfo[NSDebugDescriptionErrorKey] as? String
+      {
+        return message
+      }
+      return ctx.debugDescription
+    }
     if case .keyNotFound(let key, _) = error as? DecodingError { return "missing key '\(key.stringValue)'" }
     if case .typeMismatch(_, let ctx) = error as? DecodingError {
       return "wrong type at \(ctx.codingPath.map(\.stringValue).joined(separator: "."))"
@@ -208,6 +229,7 @@ public final class ConfigStore: @unchecked Sendable {
     } catch {
       lock.withLock { lastSeenData = data }
       logger.log(.error, "Config reload failed: \(error)")
+      onFailure?(error)
     }
   }
 }

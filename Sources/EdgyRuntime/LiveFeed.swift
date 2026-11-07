@@ -46,10 +46,25 @@ public enum LiveDecision: Hashable, Sendable {
   /// rate; the mirror shows the motion).
   case recognized(zone: Zone, kind: GestureKind, phase: GestureEvent.Phase, deviceID: UInt64)
   /// A touch was turned down as a gesture. `zone` is the mapped zone it landed in, when one did.
-  /// Ordinary pointer touches (`startedOutsideZone`) are not reported.
-  case rejected(contactID: Int32, zone: Zone?, reason: RejectionReason, deviceID: UInt64)
+  /// Ordinary pointer touches (`startedOutsideZone`) are not reported. `measure` is the number
+  /// behind the rejection ("21 mm wide, limit 18 mm") when the recognizer gave one
+  /// (`GestureOutput.rejectionMeasures`); never for a click or a system-gesture handoff.
+  case rejected(
+    contactID: Int32, zone: Zone?, reason: RejectionReason, deviceID: UInt64, measure: RejectionMeasure? = nil)
   /// The bound action ran (a discrete gesture, a hold's press, or a slide's first step).
-  case actionRan(ActionID, zone: Zone, kind: GestureKind)
+  /// `outcome` is what it reported (`ActionPerforming.performReporting`): the level after a level
+  /// slide's first step, the held combo ("fn"), the display's name… `nil` when it had nothing to say.
+  case actionRan(ActionID, zone: Zone, kind: GestureKind, outcome: ActionOutcome? = nil)
+  /// A slide's action reported a new outcome after its first step: sent when the level, rounded
+  /// to a whole percent, or the detail changes, so a level plate can follow the slide without a
+  /// decision per frame. The plate fades after the slide's `.ended` / `.cancelled` (`recognized`).
+  case actionUpdated(ActionID, zone: Zone, kind: GestureKind, outcome: ActionOutcome)
+  /// Ask "Did this screen change brightness?" about the external display with this
+  /// `DisplayInfo.key` (`name` for the copy). Sent when a brightness slide that changed the level
+  /// ends on a monitor that still needs the check (unconfirmed, not turned off, asked fewer than 3
+  /// times). The UI counts each time it shows the question (`SettingsEditor.countDisplayCheckAsk`)
+  /// and records the answer (`answerDisplayCheck`).
+  case displayCheckDue(key: String, name: String)
   /// The action threw; `message` is the error, for diagnostics.
   case actionFailed(ActionID, zone: Zone, kind: GestureKind, message: String)
   /// The action can't work on this Mac right now (`ActionError.unavailable`).

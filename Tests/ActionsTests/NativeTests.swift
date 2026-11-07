@@ -324,7 +324,8 @@ private let panel = DisplayInfo(id: 1, name: "Built-in Display", kind: .builtIn,
     h.display.isAvailable = false
     #expect(!h.registry.availability(of: "display.brightness").isUsable)
     h.displays.list = [external]
-    #expect(h.registry.availability(of: "display.brightness") == .available)
+    // Usable; limited until the user confirms the monitor responds (v0.5).
+    #expect(h.registry.availability(of: "display.brightness") == .limited(reason: Copy.mayNotRespond))
     h.displays.list = []
     #expect(!h.registry.availability(of: "display.brightness").isUsable)
   }
