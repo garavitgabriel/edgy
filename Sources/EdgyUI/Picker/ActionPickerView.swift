@@ -69,7 +69,9 @@ public struct ActionPickerView: View {
           .buttonStyle(.plain)
         }
       }
+      .padding(.bottom, PickerScrollEdge.inset)
     }
+    .mask(PickerScrollEdge())
   }
 
   // MARK: Actions
@@ -146,7 +148,11 @@ public struct ActionPickerView: View {
                 .padding(.horizontal, PickerRow.inset).frame(minHeight: PickerRow.height, alignment: .leading)
             }
           }
+          // The list ends clear of the panel's edge: a bottom inset equal to the panel's top one,
+          // and a 12 pt fade where rows scroll out (critique 22 should-fix 3).
+          .padding(.bottom, PickerScrollEdge.inset)
         }
+        .mask(PickerScrollEdge())
         .onChange(of: highlighted) { _, id in
           if let id { proxy.scrollTo(id) }
         }
@@ -266,5 +272,21 @@ struct PickerRow: View {
     .onHover { hovering = $0 }
     .allowsHitTesting(enabled)  // not `.disabled`: that fades `ink2` below 4.5:1
     .accessibilityAddTraits(isBound ? .isSelected : [])
+  }
+}
+
+/// The picker list's lower scroll edge: opaque, then a 12 pt fade to clear at the very bottom.
+struct PickerScrollEdge: View {
+  /// Space under the last row: the panel's own top inset.
+  static let inset: CGFloat = 12
+  /// The fade's height (bone 3's 12 pt fade).
+  static let fade: CGFloat = 12
+
+  var body: some View {
+    VStack(spacing: 0) {
+      Rectangle()
+      LinearGradient(colors: [.black, .black.opacity(0)], startPoint: .top, endPoint: .bottom)
+        .frame(height: Self.fade)
+    }
   }
 }

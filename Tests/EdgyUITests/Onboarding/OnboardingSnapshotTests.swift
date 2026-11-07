@@ -55,11 +55,12 @@ struct OnboardingSnapshotTests {
     let state = OnboardingState(model: model)
     state.setAccessibility(.granted)
     state.primary()
-    model.simulate(MirrorFixtures.touch(0.975, 0.55, .rejected))
+    // Staged on the bar's upper part, clear of the Volume tab (critique 24 should-fix 1).
+    model.simulate(MirrorFixtures.touch(0.975, 0.3, .rejected))
     state.receive([OnboardingFixtures.tooShort])
     #expect(state.rejection?.title == "Ignored: swipe too short, 4 mm, needs 6 mm")
     #expect(!state.isDone(.tryIt))
-    try shoot(state, "step2-rejected", folder: "batch-24")
+    try shoot(state, "step2-rejected", folder: "batch-25")
   }
 
   @Test(arguments: Presets.Preset.allCases)

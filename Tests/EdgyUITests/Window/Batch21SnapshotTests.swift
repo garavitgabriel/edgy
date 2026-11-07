@@ -15,20 +15,30 @@ import Testing
 enum IconApps {
   static let root = FileManager.default.temporaryDirectory.appendingPathComponent("edgy-batch21-apps")
 
-  static func app(_ name: String, _ bundleID: String, running: Bool) -> InstalledApp {
+  /// `icon`: the bundle ships its own `.icns` (Edgy's exported icon stands in for a real app's).
+  /// Without it the bundle is iconless and must draw the Open App tile (critique 22 must-fix).
+  static func app(_ name: String, _ bundleID: String, running: Bool, icon: Bool = false) -> InstalledApp {
     let url = root.appendingPathComponent("\(name).app")
     let contents = url.appendingPathComponent("Contents")
-    try? FileManager.default.createDirectory(at: contents, withIntermediateDirectories: true)
-    let plist: [String: String] = [
+    let resources = contents.appendingPathComponent("Resources")
+    try? FileManager.default.createDirectory(at: resources, withIntermediateDirectories: true)
+    var plist: [String: String] = [
       "CFBundleIdentifier": bundleID, "CFBundleName": name, "CFBundlePackageType": "APPL",
     ]
+    let icns = resources.appendingPathComponent("AppIcon.icns")
+    try? FileManager.default.removeItem(at: icns)
+    if icon {
+      plist["CFBundleIconFile"] = "AppIcon"
+      try? FileManager.default.copyItem(
+        at: Snapshot.repoRoot.appendingPathComponent("docs/design/assets/AppIcon.icns"), to: icns)
+    }
     (plist as NSDictionary).write(to: contents.appendingPathComponent("Info.plist"), atomically: true)
     return InstalledApp(name: name, bundleID: bundleID, path: url.path, isRunning: running)
   }
 
   static var list: [InstalledApp] {
     [
-      app("Wayfare", PreviewFixtures.wayfare, running: true),
+      app("Wayfare", PreviewFixtures.wayfare, running: true, icon: true),
       app("Huddle", PreviewFixtures.huddle, running: false),
       app("Quillpad", "com.example.quillpad", running: true),
       app("Ledgerly", "com.example.ledgerly", running: false),

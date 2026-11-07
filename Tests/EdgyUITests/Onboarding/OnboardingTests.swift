@@ -239,17 +239,50 @@ enum OnboardingFixtures {
     #expect(state.slideRecognized)
   }
 
-  @Test func newDecisionsFollowTheOverlapWithWhatWasSeen() {
+  /// Batch 25 item 6: new decisions are counted by `decisionSerial`, not inferred from overlap.
+  @Test func newDecisionsCountBySerial() {
     let a = LiveDecision.recognized(zone: .edge(.left), kind: .slide, phase: .began, deviceID: 1)
     let b = LiveDecision.recognized(zone: .edge(.left), kind: .slide, phase: .ended, deviceID: 1)
     let c = OnboardingFixtures.rightSlide
-    #expect(Array(OnboardingState.newDecisions(seen: [], current: [a, b])) == [a, b])
-    #expect(Array(OnboardingState.newDecisions(seen: [a, b], current: [a, b])).isEmpty)
-    #expect(Array(OnboardingState.newDecisions(seen: [a, b], current: [a, b, c])) == [c])
-    // Rolled: the cap dropped `a`.
-    #expect(Array(OnboardingState.newDecisions(seen: [a, b], current: [b, c])) == [c])
-    // Nothing in common: everything is new.
-    #expect(Array(OnboardingState.newDecisions(seen: [a, b], current: [c, c])) == [c, c])
+    #expect(Array(OnboardingState.newDecisions(serial: 2, baseline: 0, recent: [a, b])) == [a, b])
+    #expect(Array(OnboardingState.newDecisions(serial: 2, baseline: 2, recent: [a, b])).isEmpty)
+    #expect(Array(OnboardingState.newDecisions(serial: 3, baseline: 2, recent: [a, b, c])) == [c])
+    // A repeat of what was already there is still new (overlap inference got this wrong).
+    #expect(Array(OnboardingState.newDecisions(serial: 4, baseline: 2, recent: [a, b, a, b])) == [a, b])
+    // A serial behind the baseline never counts anything.
+    #expect(Array(OnboardingState.newDecisions(serial: 1, baseline: 2, recent: [a, b])).isEmpty)
+  }
+
+  /// The capped feed has wrapped: more new decisions than `recentDecisions` holds gives the whole
+  /// (capped) list, never more, and a baseline from before the wrap still holds.
+  @Test func newDecisionsBySerialAcrossTheWrappedCap() {
+    let limit = SettingsModel.recentDecisionLimit
+    let c = OnboardingFixtures.rightSlide
+    let recent = Array(repeating: c, count: limit)
+    #expect(OnboardingState.newDecisions(serial: 1000, baseline: 10, recent: recent).count == limit)
+    #expect(OnboardingState.newDecisions(serial: 1000, baseline: 997, recent: recent).count == 3)
+    #expect(OnboardingState.newDecisions(serial: 1000, baseline: 1000, recent: recent).isEmpty)
+  }
+
+  /// End to end: the model's serial drives the baseline after a wrap of identical decisions.
+  @Test func identicalSlidesAfterTheBaselineCount() async {
+    let model = OnboardingFixtures.model()
+    let state = OnboardingState(model: model)
+    state.start()
+    let limit = SettingsModel.recentDecisionLimit
+    let noise = LiveDecision.recognized(zone: .edge(.left), kind: .slide, phase: .began, deviceID: 1)
+    model.simulate(OnboardingFixtures.decisions(Array(repeating: noise, count: limit + 3)))
+    await OnboardingFixtures.settle()
+    state.quiet()
+    let baseline = model.decisionSerial
+    // The same decisions again: the feed looks unchanged, but the serial moved.
+    model.simulate(OnboardingFixtures.decisions(Array(repeating: noise, count: limit + 3)))
+    await OnboardingFixtures.settle()
+    #expect(model.decisionSerial == baseline + limit + 3)
+    #expect(!state.slideRecognized)
+    model.simulate(OnboardingFixtures.decisions([OnboardingFixtures.rightSlide]))
+    await OnboardingFixtures.settle { state.slideRecognized }
+    #expect(state.slideRecognized)
   }
 
   /// Ruling 3: a rejected slide on step 2 shows the one plate with bone 4's copy.

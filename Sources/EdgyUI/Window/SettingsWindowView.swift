@@ -116,7 +116,8 @@ public struct SettingsWindowView: View {
 
       HStack {
         Spacer()
-        Text(toggle.label)
+        // Read-only: the label goes `ink2` like the footer and the tabs (critique 22 should-fix 4).
+        Text(toggle.label).foregroundStyle(readOnly ? Tokens.ink2 : Tokens.ink)
         Toggle(toggle.label, isOn: Binding(get: { toggle.isOn }, set: model.setTopSwitch))
           .toggleStyle(.switch).labelsHidden().tint(Tokens.accent)
           .disabled(readOnly)

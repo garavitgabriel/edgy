@@ -8,10 +8,11 @@ import Testing
 @testable import EdgyUI
 
 extension View {
-  /// Window shots show the exported small app icon (the app gets it from its bundled `.icns`; the
-  /// test host's own icon is a generic one).
+  /// Window shots show the exported V3 app icon at the title bar's 26 pt (the 32 pt @2x drawing,
+  /// under 128 px: the small drawing). The app gets it from its bundled `.icns`; the test host's
+  /// own icon is a generic one.
   func withExportedAppIcon() -> some View {
-    let url = Snapshot.repoRoot.appendingPathComponent("docs/design/assets/AppIcon.iconset/icon_16x16@2x.png")
+    let url = Snapshot.repoRoot.appendingPathComponent("docs/design/assets/AppIcon.iconset/icon_32x32@2x.png")
     return environment(\.edgyAppIcon, NSImage(contentsOf: url))
   }
 }
@@ -173,7 +174,9 @@ struct Batch22SnapshotTests {
   @Test func miniHoverLineCopy() {
     let model = InspectorFixtures.model()
     let bottom = model.mirrorZones(forApp: nil, unavailableAsUnmapped: true).first { $0.zone == .edge(.bottom) }
-    #expect(MiniMirrorView.hoverLine(bottom) == "Bottom edge: Previous Track, Next Track, Play/Pause")
+    // Before the ruling (critique 22, design answer 1: the hover line shortens the zone name):
+    // #expect(MiniMirrorView.hoverLine(bottom) == "Bottom edge: Previous Track, Next Track, Play/Pause")
+    #expect(MiniMirrorView.hoverLine(bottom) == "Bottom: Previous Track, Next Track, Play/Pause")
     #expect(MiniMirrorView.hoverLine(nil) == "")
     #expect(bottom?.actions.count == 3)
   }

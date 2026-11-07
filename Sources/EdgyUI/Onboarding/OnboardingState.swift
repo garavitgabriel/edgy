@@ -83,8 +83,8 @@ public final class OnboardingState {
   /// Runs before `actions.finish` (the controller closes the window).
   @ObservationIgnored var beforeFinish: (@MainActor () -> Void)?
   @ObservationIgnored private var watching = false
-  /// `model.recentDecisions` as last read; decisions past it are new (the step-2 baseline).
-  @ObservationIgnored private var seenDecisions: [LiveDecision] = []
+  /// `model.decisionSerial` as last read: decisions past it are new (the step-2 baseline).
+  @ObservationIgnored private var seenSerial = 0
   @ObservationIgnored private let logger: EdgyLogging = SystemLogger(category: "onboarding")
 
   public init(model: SettingsModel, actions: OnboardingActions = .none) {
@@ -136,7 +136,7 @@ public final class OnboardingState {
     guard !watching else { return }
     watching = true
     // Everything already in the feed predates step 2; only later decisions count.
-    seenDecisions = model.recentDecisions
+    seenSerial = model.decisionSerial
     watchDecisions()
   }
 
@@ -207,16 +207,12 @@ public final class OnboardingState {
     return false
   }
 
-  /// The decisions in `current` that came after `seen`. `recentDecisions` is a capped rolling
-  /// suffix, so `current` is `(seen + new).suffix(limit)`: the new ones follow the longest run
-  /// where `seen`'s tail is `current`'s head. When that is ambiguous (a repeated pattern), the
-  /// longest run is taken, so a decision from before the baseline is never counted as new.
-  static func newDecisions(seen: [LiveDecision], current: [LiveDecision]) -> ArraySlice<LiveDecision> {
-    for overlap in stride(from: min(seen.count, current.count), through: 1, by: -1)
-    where seen.suffix(overlap).elementsEqual(current.prefix(overlap)) {
-      return current.dropFirst(overlap)
-    }
-    return current[...]
+  /// The decisions that arrived after `baseline`: `decisionSerial` counts every decision ever
+  /// received, and `recentDecisions` is its capped tail, so the new ones are the last
+  /// `min(serial − baseline, recent.count)` of it. Exact even when the feed has wrapped or
+  /// repeats itself (no overlap inference).
+  static func newDecisions(serial: Int, baseline: Int, recent: [LiveDecision]) -> ArraySlice<LiveDecision> {
+    recent.suffix(min(max(serial - baseline, 0), recent.count))
   }
 
   /// A slide on the right edge that the engine recognized (or ran, or would have run).
@@ -238,7 +234,7 @@ public final class OnboardingState {
     if step == .tryIt { rejection = nil }
     step = next
     // The baseline: decisions already seen never count on step 2 (critique 19 fix list 2).
-    if next == .tryIt { seenDecisions = model.recentDecisions }
+    if next == .tryIt { seenSerial = model.decisionSerial }
     if next == .preset { model.editor.beginContinuousEdit(Self.presetEditKey) }
   }
 
@@ -269,11 +265,11 @@ public final class OnboardingState {
     }
   }
 
-  /// Re-reads `recentDecisions` after every change, without taking them, and passes on only the
-  /// ones that are new since the last read.
+  /// Re-reads the feed after every new decision (`decisionSerial`), without taking them, and
+  /// passes on only the ones that are new since the last read.
   private func watchDecisions() {
     withObservationTracking {
-      _ = model.recentDecisions
+      _ = model.decisionSerial
     } onChange: { [weak self] in
       Task { @MainActor in
         guard let self else { return }
@@ -284,9 +280,9 @@ public final class OnboardingState {
   }
 
   private func readNewDecisions() {
-    let current = model.recentDecisions
-    let fresh = Self.newDecisions(seen: seenDecisions, current: current)
-    seenDecisions = current
+    let serial = model.decisionSerial
+    let fresh = Self.newDecisions(serial: serial, baseline: seenSerial, recent: model.recentDecisions)
+    seenSerial = serial
     if !fresh.isEmpty { receive(Array(fresh)) }
   }
 }

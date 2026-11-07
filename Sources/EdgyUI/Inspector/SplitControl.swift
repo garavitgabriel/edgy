@@ -67,8 +67,8 @@ enum SplitNaming {
   }
 
   /// The one-line info note shown before a split change takes effect, when it moves or drops
-  /// bindings (§ Split control): what each new part ends up with under `SplitPlan` (the runtime's
-  /// rule today), e.g. "Upper half keeps Volume; lower half starts empty." `nil` when the edge has
+  /// bindings (§ Split control): what each new part ends up with under `SplitPlan` (the first part
+  /// keeps the bindings), e.g. "Upper third keeps Volume; the other two start empty." `nil` when the edge has
   /// nothing mapped or the count doesn't change.
   static func note(
     bindings: [EdgyCore.Binding], edge: Zone.Edge, from count: Int, to parts: Int, name: (ActionID) -> String
@@ -97,7 +97,7 @@ enum SplitNaming {
       var empty: [String] = []
       for (index, zone) in segments.enumerated() {
         guard case .edge(_, let segment, _) = zone else { continue }
-        let heading = heading(edge: edge, segment: segment, segments: parts)
+        let heading = noteName(edge: edge, segment: segment, segments: parts)
         if kept[index].isEmpty {
           empty.append(heading)
         } else {
@@ -117,6 +117,14 @@ enum SplitNaming {
     guard !clauses.isEmpty else { return nil }
     let sentence = clauses.joined(separator: "; ")
     return sentence.prefix(1).uppercased() + sentence.dropFirst() + "."
+  }
+
+  /// A part's name in the note: the zone's own words for halves and thirds ("Upper third",
+  /// BRIEF § Split control's example), the heading for quarters ("Part 2").
+  static func noteName(edge: Zone.Edge, segment: Int, segments: Int) -> String {
+    guard segments == 2 || segments == 3 else { return heading(edge: edge, segment: segment, segments: segments) }
+    let part = ZoneNaming.part(edge: edge, segment: segment, segments: segments)
+    return part.prefix(1).uppercased() + part.dropFirst()
   }
 
   private static func joined(_ names: [String]) -> String {
