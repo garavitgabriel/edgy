@@ -4,7 +4,7 @@ tag: EDGY-MIRROR
 branch: worktree-edgy-mirror
 worktree_path: ~/Projects/edgy/.claude/worktrees/edgy-mirror
 completed_at: 2026-11-07
-verification: swift build ✓ · swift test ✓ (all suites; EdgyUITests 80 tests, 6 suites) · swift format lint --strict ✓ · token greps empty · denylist empty
+verification: swift build ✓ · swift test ✓ (all suites; EdgyUITests 142 tests, 15 suites, after merging batch 15) · swift format lint --strict ✓ · token greps empty · denylist empty
 ---
 
 # Done — batch 14: the pad mirror (big and mini)
@@ -20,20 +20,20 @@ verification: swift build ✓ · swift test ✓ (all suites; EdgyUITests 80 test
 | Labels joined to zones; label rule written | ✓ | `ZoneLabel` doc comment (rule below); tests `defaultLabelsReadAsInTheRender`, `labelRuleOrders…`, `labelsAreJoinedToTheirZone` |
 | App-profile marks (ink dot, "Off here") | ✓ | `pad-wayfare-*`; test `appTabShowsEffectiveBindingsWithSourceMarks` |
 | Live touches: recognized filled + press-in, rejected hollow struck | ✓ | `pad-live-slide-right-*`, `pad-rejected-touch-*`; `ContactView` |
-| Click selects; zone frame published for the picker | ✓ | `SettingsModel.selectZone`; test `clickingAZoneSelects…`; `PadMirrorView.ZoneAnchor` (= `ZoneAnchorKey`) |
+| Click selects; zone frame published for the picker | ✓ | `SettingsModel.selectZone`; test `clickingAZoneSelects…`; batch 15's `.pickerAnchor(for:)` on every zone + `.pickerMirrorBounds()` on the pad (and `PadMirrorView.ZoneAnchor`); `window-picker-bottom-*` shows the real window with the picker anchored to the bottom bar with its arrow (render B's state) |
 | States: no trackpad, disabled, off in app | ✓ | `pad-no-trackpad-*`, `pad-disabled-*`, `pad-huddle-off-*`; test `systemStatesFollowThePrecedence` |
 | Two pads: outline cross-fades 150 ms | ✓ (code) | `.id(device?.id).transition(.opacity)` with `.animation(.easeInOut(duration: 0.15), value: device?.id)`; motion is judged on the device |
 | `MiniMirrorView`: same drawing at `miniMirrorPointsPerMM`, no labels, active profile + last touch | ✓ (active profile: see blocker #1) | `mini-idle-*`, `mini-last-touch-*`, `mini-no-trackpad-*`, `mini-paused-*`, `mini-huddle-off-*` |
 | Snapshots light + dark, every listed state | ✓ | `docs/design/build-shots/batch-14/` (16 pairs, below) |
-| ≥ 12 tests | ✓ | 16 test functions in `MirrorTests.swift` (30 cases with arguments) + 17 snapshot tests |
+| ≥ 12 tests | ✓ | 16 test functions in `MirrorTests.swift` (30 cases with arguments) + 18 snapshot tests |
 
-Snapshots (each `-light.png` and `-dark.png`): `pad-default-idle`, `pad-split-bottom4-long-label` (in-bar text truncates inside a quarter bar), `pad-right-selected`, `pad-live-slide-right`, `pad-rejected-touch`, `pad-split-bottom2-right3`, `pad-wayfare`, `pad-huddle-off`, `pad-no-trackpad`, `pad-disabled`, `pad-built-in` (134 × 87 mm with a live bottom touch), `mini-idle`, `mini-last-touch`, `mini-no-trackpad`, `mini-paused`, `mini-huddle-off`, `preset-media-minimal`.
+Snapshots (each `-light.png` and `-dark.png`): `window-picker-bottom` (whole window, picker open on the bottom edge), `pad-default-idle`, `pad-split-bottom4-long-label` (in-bar text truncates inside a quarter bar), `pad-right-selected`, `pad-live-slide-right`, `pad-rejected-touch`, `pad-split-bottom2-right3`, `pad-wayfare`, `pad-huddle-off`, `pad-no-trackpad`, `pad-disabled`, `pad-built-in` (134 × 87 mm with a live bottom touch), `mini-idle`, `mini-last-touch`, `mini-no-trackpad`, `mini-paused`, `mini-huddle-off`, `preset-media-minimal`.
 
 ## Verification (run in this session, after the last change)
 
 ```
 swift build                                     → Build complete!
-swift test                                      → every suite passed (EdgyUITests: 80 tests in 6 suites)
+swift test                                      → every suite passed (EdgyUITests: 142 tests in 15 suites, after merging main 50776d9)
 swift format lint --strict -r Sources Tests Package.swift → exit 0, no output
 token greps (shared brief rule 7, plus no .custom fonts / second hue / Unicode arrows in Mirror) → no output
 git grep -niE -f ~/.config/edgy-names-denylist → no output
@@ -145,6 +145,15 @@ Kill list: no rulers, no grey drop-shadowed rectangle (warm slab gradient from t
 11. **Whole edge plus segments on the same edge:** a config holding both `.edge(.bottom)` and split `.edge(.bottom, segment:, segments: 2)` bindings is drawn at the finest split. The whole-edge binding isn't drawn. The validator's `overlappingZones` warning fires only when the two share a gesture, so the chief may want a mirror rule here (open question).
 12. **In-bar labels truncate** with "…" inside their bar (`pad-split-bottom4-long-label`). Tabs keep their natural width.
 13. **`PadMirrorView` calls `model.startFeed()` on appear and never `stopFeed()`.** The feed is shared, and the window that hosts the mirror should own stopping it.
+
+## Picker anchoring (after batch 15 merged)
+
+- **Found:** `.pickerMirrorBounds()` is an `anchorPreference`, which replaces its subtree's value for the key. Applied on the pad itself, it erased every zone's `.pickerAnchor(for:)`, and the picker never appeared.
+- **Fix (inside the Mirror folder):** the mirror bounds are published from a `Color.clear` background sibling, so the values merge through `PickerAnchorKey.reduce`.
+- **Batch 15 may want:** to switch `pickerMirrorBounds()` to `transformAnchorPreference` so it is safe on any container.
+- **Reader-first, `window-picker-bottom` vs B:**
+  - Matches: the popover is anchored to the bottom bar with the arrow down, the bar carries the ink ring, and the header reads "Tap, bottom edge".
+  - Differs: the bubble overlaps the middle of the top bar and comes close to the side tabs. That placement is batch 15's `PickerPlacement`; bone 5 says it never covers neighbouring zones.
 
 ## Needs Gabriel (human-only)
 

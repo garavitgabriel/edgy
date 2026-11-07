@@ -7,8 +7,9 @@ import SwiftUI
 /// - Draws the effective bindings of `model.selectedProfile` (Default, or what will actually
 ///   happen in that app) with the zone geometry of `Gestures.PadLayout` at
 ///   `Tokens.mirrorPointsPerMM`, from `model.mirroredDevice` (the pad touched last).
-/// - Clicking a zone sets `model.selectedZone`. Every zone's drawn frame is published through
-///   `PadMirrorView.ZoneAnchor` (`ZoneAnchorKey`) for the picker popover's arrow.
+/// - Clicking a zone sets `model.selectedZone`. Every zone's drawn frame is published for the
+///   picker popover's arrow, both as batch 15's `.pickerAnchor(for:)` (with the pad's bounds as
+///   `.pickerMirrorBounds()`, read by `.actionPickerHost(model:)`) and as `PadMirrorView.ZoneAnchor`.
 /// - System states on the pad: no trackpad (dashed outline, zones from the last-known size,
 ///   still editable, "Connect a trackpad to see it here."), off in this app (faded to 40%, every
 ///   zone a hairline), disabled (faded to 40%). Paused, and the "Edgy is off in <App> · Turn on"
@@ -35,7 +36,8 @@ public struct PadMirrorView: View {
         geometry: geometry, zones: model.mirrorZones(forApp: app), selected: model.selectedZone,
         touches: device == nil ? [] : model.liveTouches, faded: state.faded, dashedOutline: state == .noTrackpad,
         message: Self.message(for: state),
-        onSelect: { model.selectZone($0) }
+        onSelect: { model.selectZone($0) },
+        publishesPickerAnchors: true
       )
       .id(device?.id)
       .transition(.opacity)
