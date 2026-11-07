@@ -259,6 +259,8 @@ if ask("18. Volume HUD: slide volume up 3/16 and back with headphones or earbuds
 }
 if ask("19. App switcher: open it, move 2 apps right, 1 back, then select (cmd stays down until the end)?") {
   let switcher: ActionID = "apps.switcher"
+  // The one-stroke switcher (keep-open off); step 29 tries the batch 20 session across strokes.
+  let ctx = ActionContext(frontmostBundleID: nil, parameters: ["keepOpenMS": "0", "step": "0.1"])
   check("switcher") {
     for (delta, phase) in [(0.0, GestureEvent.Phase.began), (0.1, .changed), (0.1, .changed), (-0.1, .changed)] {
       try registry.perform(switcher, input: .delta(delta, phase: phase), context: ctx)
@@ -397,6 +399,81 @@ if ask("28. Shortcuts: list your Shortcuts through the shortcuts command?") {
   } else {
     print("  FAILED: no answer within 15 s")
   }
+}
+// Batch 20: the shared slide feel. Motions are synthesized at 120 Hz on a 100 mm zone.
+@MainActor func stroke(
+  _ id: ActionID, mm: Double, speed: Double, _ parameters: [String: String], restAtEnd: Double = 0
+) throws {
+  let frame = 1.0 / 120.0
+  var time = Date().timeIntervalSinceReferenceDate
+  func send(_ deltaMM: Double, _ phase: GestureEvent.Phase, atEnd: Int = 0) throws {
+    let context = ActionContext(
+      frontmostBundleID: nil, parameters: parameters,
+      motion: SlideMotion(deltaMM: deltaMM, timestamp: time, atEnd: atEnd))
+    try registry.perform(id, input: .delta(deltaMM / 100, phase: phase), context: context)
+  }
+  try send(0, .began)
+  let perFrame = speed * frame * (mm < 0 ? -1 : 1)
+  for _ in 0..<Int(abs(mm) / abs(perFrame)) {
+    time += frame
+    try send(perFrame, .changed)
+    settle(frame)
+  }
+  for _ in 0..<Int(restAtEnd / frame) {
+    time += frame
+    try send(0, .changed, atEnd: mm < 0 ? -1 : 1)
+    settle(frame)
+  }
+  try send(0, .ended)
+}
+if ask("29. Short-stroke switching: open 8+ apps first. Five short 6 mm strokes, 0.25 s apart (keep-open 400 ms)?") {
+  check("short strokes") {
+    for _ in 0..<5 {
+      try stroke("apps.switcher", mm: 6, speed: 60, ["speedUp": "off"])
+      settle(0.25)
+    }
+  }
+  settle(1.0)
+  print("  Did one switcher stay open across all five strokes (no flicker) and move about 3-4 apps,")
+  print("  then pick the app about 0.4 s after the last stroke? Command must be up afterwards.")
+  if ask("   Again, but click the mouse during the pause after the 3rd stroke (it should pick at once)?") {
+    check("click selects") {
+      for index in 0..<3 {
+        try stroke("apps.switcher", mm: 9, speed: 60, ["speedUp": "off", "keepOpenMS": "1000"])
+        if index < 2 { settle(0.25) }
+      }
+      print("  Click now (you have 1 s)…")
+      settle(1.2)
+    }
+    print("  Did it pick the app on the click, not later? Same check moving the pointer instead of clicking.")
+  }
+}
+if ask("30. Flick speed: the same 24 mm slowly (40 mm/s), then as a quick flick (400 mm/s)?") {
+  check("slow") { try stroke("apps.switcher", mm: 24, speed: 40, ["keepOpenMS": "0"]) }
+  settle(1.0)
+  check("flick") { try stroke("apps.switcher", mm: 24, speed: 400, ["keepOpenMS": "0"]) }
+  settle(1.0)
+  print("  Slow should move 3 apps; the flick clearly more (up to 9). Did the flick feel proportionate?")
+}
+if ask("31. End stepping: slide 9 mm then rest at the end for 2 s (expect a click, then ~10 more apps)?") {
+  check("end stepping") { try stroke("apps.switcher", mm: 9, speed: 60, ["keepOpenMS": "0"], restAtEnd: 2) }
+  settle(1.0)
+  print("  Did it pause briefly, then step faster and steadily (about 6 apps/s), with a stronger click at the start?")
+  print("  On the real pad: slide to the very end of the edge and stop; it should keep going until you move or lift.")
+}
+if ask("32. Push-to-talk while pointing (by hand): bind Hold Keys to a corner, hold it, then move the pointer with another finger?") {
+  print("  Run Edgy with Hold Keys on a corner (holdMS 300). Hold the corner with your thumb; after it starts,")
+  print("  move the pointer with your index finger for a few seconds. Expect: the keys stay down, the pointer")
+  print("  moves freely, and the keys come up only when the thumb lifts. A click while holding still lets go.")
+}
+if ask("33. Does fn reach your dictation app? Hold fn through Hold Keys for 3 s with the app set to fn?") {
+  let fnContext = ActionContext(frontmostBundleID: nil, parameters: ["keys": "fn"])
+  check("fn down") { try registry.perform("keyboard.hold", input: .press(down: true), context: fnContext) }
+  settle(3.0)
+  check("fn up") { try registry.perform("keyboard.hold", input: .press(down: false), context: fnContext) }
+  settle()
+  print("  Did the app listen while fn was held? If not, set the app to a non-fn key (e.g. right option or")
+  print("  ctrl+opt+space) and note it in the done report: synthetic fn may not reach every app.")
 }
 print("\nNot run here: system.lockScreen and system.sleepDisplay (they end the session). Bind them and try by hand.")
 
