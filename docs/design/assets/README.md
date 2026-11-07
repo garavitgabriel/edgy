@@ -18,7 +18,7 @@ Exported 2026-11-07 from the final design source (look 26F-1TVB, render F for th
 - **Format:** single-page vector PDF, pure black (`#000000`) on a transparent page, no raster content.
 - **Template image:** add to the asset catalog with "Render As: Template Image" (or set `image.isTemplate = true`) so macOS tints it for light, dark and highlighted menu bars. The PDFs carry no opacity. Disabled and No trackpad look like Normal at 40% opacity; apply that in code (for example `button.appearsDisabled = true` or `alphaValue = 0.4`).
 - **Test Mode dot:** 3.2 pt diameter at 1× (r 1.6). That clears the ≥2 pt rule in the brief, so it is the source size, unchanged.
-- **Precedence** when several states apply: No Accessibility > No trackpad > Paused > Disabled > Test Mode. Show the top one only.
+- **Precedence** when several states apply (per BRIEF): Broken config > No Accessibility > No trackpad > Paused > Disabled > Test Mode. Show the top one only.
 
 ## App icon
 
