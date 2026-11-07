@@ -256,11 +256,33 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
   - Unanswered, it fades after 15 s and asks again next time, at most 3 times.
   - When the user says No, the inspector's brightness binding gets a second line in `ink2` with a re-enable path: "Off for Desk 34: it ignores brightness commands." · **Turn back on**.
 
-### Test Mode: what it does (decided)
+### Test Mode: what it does (decided; two behaviours)
 
-Render D shows real values ("Volume 64%") while Test Mode is on. The runtime as built is a dry run: gestures are recognized but nothing runs.
+The owner wants both. The runtime has both (`Engine.setTestMode`, the `wouldRun` feed decision).
 
-**The build chief's proposal:** the UI's Test Mode switch shows the overlay **while actions still run**, so you can test in real work and the plates show real values. The dry-run switch stays in the runtime, unused by the UI for now. **Confirmed by the owner (2026-11-07): Test Mode shows the overlay and actions still run.**
+**Control: in the popover only.**
+- Under the Test Mode switch, indented 24 pt, there's a checkbox: **"Don't run actions"**.
+- It's visible only while Test Mode is on, off by default, and **not persisted**: it resets when Test Mode turns off or Edgy quits. That way no one is left with an Edgy that silently does nothing.
+- No other surface gets a control for it.
+
+**1. Test Mode (default): actions run, and the overlay shows real results.** These are the plates as designed: "Volume 64%" / "Right edge, slide", rejections with their measures, and holds.
+
+**2. Dry run ("Don't run actions" checked): gestures are recognized, nothing runs, and the overlay shows what would have run.**
+- **Mark:** the recognized contact in **outline**: a 2 pt accent stroke, no fill.
+  - It stays distinct from the rejection mark (a hollow `ink2` circle **with a strike**) by colour role *and* by the strike.
+  - It's still the one accent, because it means a live, recognized gesture (bone 4).
+- **Copy:** the value line (17) starts with **"Would"** and carries no level, because nothing changed. The second line (13, `ink2`) is unchanged.
+
+  | Kind | Value line | Second line |
+  |---|---|---|
+  | continuous | Would set Volume | Right edge, slide |
+  | trigger | Would run Play/Pause | Bottom edge, double-tap |
+  | with a parameter | Would open Quillpad | Bottom-right corner, double-tap |
+  | hold | Would hold fn (while held) → "Would release fn" on release, then the same 0.6 s + 200 ms fade | Bottom edge, long-press |
+  | rejection | unchanged ("Ignored: palm, 21 mm wide, limit 18 mm") | — |
+
+- **What dry run doesn't show:** the level plate for external brightness or the keyboard, and the system HUD. Nothing changed, so there's no level to show (bone 9).
+- **Glyph:** unchanged. The Test Mode dot is enough; the "Would" plates say the rest once, where it happens.
 
 ### System states (spec, 2026-11-07)
 
