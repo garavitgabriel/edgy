@@ -116,10 +116,18 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
    - **One plate component** is shared by the overlay and the onboarding feedback: same radius, same 17/13 type pair, same inset. In the render, C and D look like two products; don't build that.
    - **The plate is always dark** (the espresso plate of renders D and S8) in both system appearances. Over dark documents it gets a 0.5 pt light edge (`rgba(255,230,210,.24)`).
    - **Contacts on a plate** (filled accent, or the dry-run ring) get a 1 pt cream rim (`#FBEADB` at 70%) for ≥3:1, like the app icon's dot. It's a stroke, never a halo.
-   - **Run-mode trigger plates** show the bare action name ("Play/Pause"). The display check is the one plate exempt from the 17/13 pair.
+   - **Run-mode trigger plates** show the bare action name ("Play/Pause"). Actions with a parameter keep a past-tense verb plus the object ("Opened Quillpad", "Pressed ⇧⌘ 4", "Ran <name>"), pairing with dry run's "Would …". The plate edge is always drawn; it isn't gated on the backdrop. The display check is the one plate exempt from the 17/13 pair.
 10. **The menu-bar popover** (not a plain menu):
     - **Top half:** a live mini mirror (zones of the active profile plus the last touch where it landed), profile chips, and **Enabled** and **Test Mode** switches.
     - **Profile chips don't select anything.** Profiles follow the frontmost app automatically. The chip of the profile in effect is filled; the others are outlined. Clicking a chip opens Settings on that profile's tab. If the frontmost app has its own profile, its chip comes first.
+    - **The mini mirror shows what every mapped zone does** (owner, 2026-11-07: "it only shows the mute and microphone actions"):
+      - Every mapped zone carries its **action icon** from the action-icon family, at 10 pt, in `ink`, centred in the bar or corner tile. The live zone keeps its icon; the accent stays on the bar's border and the contact.
+      - **Several bindings on one edge:** show up to **two** icons along the bar (side by side on top/bottom, stacked on left/right), in gesture order: slide, swipe, tap, double-tap, long-press. Don't show more; the hover line names them all.
+      - **Split edges:** each segment shows its own icon(s) by the same rule.
+      - **Unavailable actions:** the zone is drawn unmapped, with no icon.
+      - **Hover:** hovering a zone shows **one line under the mirror** (13, `ink2`): the zone, a colon, and its actions as a comma list, e.g. "Bottom edge: Previous Track, Next Track, Play/Pause". There are no middots, and a line too long for the width clips with the 12 pt fade.
+      - The line's height is always reserved so the popover never jumps. With no hover it's empty. There's no idle "profile" text, because the filled chip already says which profile is live (bone 8).
+      - The full-size mirror in the window is unchanged: it keeps its text tabs and doesn't add icons on edges.
     - **Two trackpads attached:** the mirrors (window, popover, onboarding) show **the pad touched last**, with no picker. Its outline follows that device's real proportions. When it switches, the outline cross-fades (150 ms).
     - **Bottom half:** a plain list at native menu-row height, with an **`ink` hover wash (10%)**, not the system accent highlight (one hue): Pause for 1 hour, Settings… ⌘,, About Edgy, Quit Edgy ⌘Q. **No config-file items:** everything is controlled in the UI, and the file reloads itself on save. "Open config file" appears only as recovery in the broken-config state (owner, 2026-11-07).
     - No power button, hero numeral or cards on cards.

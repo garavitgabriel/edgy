@@ -179,8 +179,19 @@ func rejectionText(
           BuiltInAction.keyboardBacklight, zone: .edge(.left), kind: .slide, outcome: ActionOutcome(level: 0.6))))
     #expect(content.kind == .level)
     #expect(content.title == "Keyboard 60%")
-    #expect(content.detail == "Keyboard")
+    #expect(content.detail == "Built-in keyboard")
     #expect(content.displayName == nil)
+  }
+
+  /// Critique 18 ruling 5: the keyboard plate names the device; an external keyboard by its name.
+  @Test func keyboardPlateNamesAnExternalKeyboard() throws {
+    let content = try #require(
+      plate(
+        .actionRan(
+          BuiltInAction.keyboardBacklight, zone: .edge(.left), kind: .slide,
+          outcome: ActionOutcome(level: 0.6, detail: "Studio Keys"))))
+    #expect(content.title == "Keyboard 60%")
+    #expect(content.detail == "Studio Keys")
   }
 
   @Test func noLevelPlateWhenTheSystemHUDShowed() throws {

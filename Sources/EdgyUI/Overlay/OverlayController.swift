@@ -16,12 +16,23 @@ struct OverlayScreen: Equatable {
   var visibleFrame: CGRect
 }
 
-/// Where the overlay gets its screens. Live: `NSScreen`.
+/// What the user is working on, which plates keep clear of (AppKit global coordinates).
+struct OverlayWorkArea: Equatable {
+  /// The focused text element's frame: a plate never covers it (bone 9).
+  var text: CGRect?
+  /// The focused window's frame: a plate keeps `PlateDocking.workGap` from it when it can.
+  var window: CGRect?
+}
+
+/// Where the overlay gets its screens. Live: `NSScreen` plus the focused element through
+/// Accessibility; tests use a fake.
 @MainActor
 protocol OverlayScreenProviding: AnyObject {
   var screens: [OverlayScreen] { get }
   /// The screen with the key window (where the user is working), else the first.
   var mainScreenID: String? { get }
+  /// The focused text element and its window, read when a plate is about to show (never per tick).
+  func workArea() -> OverlayWorkArea
 }
 
 /// One plate placed on a screen, ready to draw.
@@ -85,6 +96,8 @@ public final class OverlayController {
   }
   /// Where the display check was first placed.
   private var checkFrame: CGRect?
+  /// What the plates keep clear of, read once per batch of new plates.
+  private(set) var workArea = OverlayWorkArea()
 
   public convenience init(model: SettingsModel) {
     self.init(model: model, screens: LiveScreens(), presenter: PanelPresenter(), clock: RunLoopClock())
@@ -133,6 +146,12 @@ public final class OverlayController {
     let dryRun = model.isDryRun
     let context = PlateContext.current(model: model)
     let catalog = model.mirrorCatalog
+    let newestBefore = timeline.entries.map(\.id).max() ?? 0
+    defer {
+      // Read the work area only when a plate that wasn't up appears (ids only grow on append):
+      // never for a slide's updates, which arrive every tick, nor for decisions with no plate.
+      if (timeline.entries.map(\.id).max() ?? 0) > newestBefore { workArea = screens.workArea() }
+    }
     for decision in decisions {
       if case .recognized(let zone, let kind, let phase, _) = decision {
         timeline.gesture(zone: zone, kind: kind, phase: phase, now: now)
@@ -186,6 +205,7 @@ public final class OverlayController {
     let now = clock.now
     var used: [String: Int] = [:]
     var levelFrames: [String: (CGRect, Zone?)] = [:]
+    var placed: [String: [CGRect]] = [:]
     var result: [PlatePlacement] = []
     // The check docks beside its display's level plate, so place it last.
     let ordered =
@@ -193,25 +213,30 @@ public final class OverlayController {
     for entry in ordered {
       let content = entry.content
       let screen = screen(for: content, in: all) ?? fallback
+      let visible = screen.visibleFrame
       let size = presenter.size(of: content)
+      let others = placed[screen.id, default: []]
       let frame: CGRect
       if content.isDisplayCheck {
         // Once placed, the question stays put while the level plate beside it fades.
         if let pinned = checkFrame {
           frame = pinned
         } else if let (level, zone) = levelFrames[screen.id] {
-          frame = PlateDocking.beside(level, size: size, zone: zone, in: screen.visibleFrame)
+          let beside = PlateDocking.beside(level, size: size, zone: zone, in: visible)
+          frame = PlateDocking.settle(beside, zone: zone, in: visible, work: workArea, plates: others)
         } else {
-          frame = PlateDocking.frame(zone: nil, size: size, in: screen.visibleFrame)
+          let docked = PlateDocking.frame(zone: nil, size: size, in: visible)
+          frame = PlateDocking.settle(docked, zone: nil, in: visible, work: workArea, plates: others)
         }
         checkFrame = frame
       } else {
         let key = "\(screen.id)|\(PlateDocking.dockKey(content.zone))"
-        frame = PlateDocking.frame(
-          zone: content.zone, size: size, in: screen.visibleFrame, stack: used[key, default: 0])
+        let docked = PlateDocking.frame(zone: content.zone, size: size, in: visible, stack: used[key, default: 0])
+        frame = PlateDocking.settle(docked, zone: content.zone, in: visible, work: workArea, plates: others)
         used[key, default: 0] += 1
         if content.kind == .level { levelFrames[screen.id] = (frame, content.zone) }
       }
+      placed[screen.id, default: []].append(frame)
       result.append(
         PlatePlacement(
           id: entry.id, content: content, screenID: screen.id, frame: frame,
@@ -247,6 +272,61 @@ final class LiveScreens: OverlayScreenProviding {
   }
 
   var mainScreenID: String? { NSScreen.main.map(Self.id) }
+
+  private let log = Logger(subsystem: "com.garavit.edgy", category: "overlay")
+  private var loggedUntrusted = false
+  /// Each Accessibility read may block this long at most (the frontmost app answers the IPC).
+  static let messagingTimeout: Float = 0.1
+
+  /// The frontmost app's focused element and focused window, through Accessibility. Empty (plates
+  /// simply dock at the edge) when Accessibility isn't granted or the app doesn't answer.
+  func workArea() -> OverlayWorkArea {
+    guard AXIsProcessTrusted() else {
+      if !loggedUntrusted {
+        log.info("work area: Accessibility not granted; plates dock without avoiding the text")
+        loggedUntrusted = true
+      }
+      return OverlayWorkArea()
+    }
+    guard let pid = NSWorkspace.shared.frontmostApplication?.processIdentifier,
+      pid != ProcessInfo.processInfo.processIdentifier
+    else { return OverlayWorkArea() }
+    let app = AXUIElementCreateApplication(pid)
+    AXUIElementSetMessagingTimeout(app, Self.messagingTimeout)
+    let text = element(app, kAXFocusedUIElementAttribute).flatMap(frame(of:))
+    let window = element(app, kAXFocusedWindowAttribute).flatMap(frame(of:))
+    if text == nil && window == nil { log.debug("work area: the frontmost app reported no focused element") }
+    return OverlayWorkArea(text: text, window: window)
+  }
+
+  private func element(_ parent: AXUIElement, _ attribute: String) -> AXUIElement? {
+    var value: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(parent, attribute as CFString, &value) == .success, let value,
+      CFGetTypeID(value) == AXUIElementGetTypeID()
+    else { return nil }
+    let element = unsafeDowncast(value, to: AXUIElement.self)
+    AXUIElementSetMessagingTimeout(element, Self.messagingTimeout)
+    return element
+  }
+
+  /// An element's frame, flipped from Accessibility's top-left origin to AppKit's bottom-left.
+  private func frame(of element: AXUIElement) -> CGRect? {
+    var origin = CGPoint.zero
+    var size = CGSize.zero
+    guard let position = axValue(element, kAXPositionAttribute), AXValueGetValue(position, .cgPoint, &origin),
+      let extent = axValue(element, kAXSizeAttribute), AXValueGetValue(extent, .cgSize, &size),
+      size.width > 0, size.height > 0, let primary = NSScreen.screens.first
+    else { return nil }
+    return CGRect(x: origin.x, y: primary.frame.maxY - origin.y - size.height, width: size.width, height: size.height)
+  }
+
+  private func axValue(_ element: AXUIElement, _ attribute: String) -> AXValue? {
+    var value: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(element, attribute as CFString, &value) == .success, let value,
+      CFGetTypeID(value) == AXValueGetTypeID()
+    else { return nil }
+    return unsafeDowncast(value, to: AXValue.self)
+  }
 
   static func id(of screen: NSScreen) -> String {
     let number = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber

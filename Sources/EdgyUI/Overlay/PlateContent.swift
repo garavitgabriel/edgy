@@ -108,9 +108,6 @@ extension PlateContent {
       return PlateContent(
         kind: .failed, mark: .none, title: "\(PlateNaming.name(id, catalog: catalog)) can't run here",
         detail: reason, zone: zone)
-
-    default:
-      return nil
     }
   }
 
@@ -119,8 +116,10 @@ extension PlateContent {
   public static let displayCheckQuestion = "Did this screen change brightness?"
   public static let displayCheckYes = "Yes"
   public static let displayCheckNo = "No, turn off for this display"
-  /// The second line of the keyboard backlight's level plate.
-  public static let keyboardDevice = "Keyboard"
+  /// The second line of the keyboard backlight's level plate when the outcome names no keyboard
+  /// (an external keyboard's name comes in `ActionOutcome.detail`): "Keyboard 60%" / "Built-in
+  /// keyboard" (critique 18 ruling 5, the same pattern as the display name).
+  public static let keyboardDevice = "Built-in keyboard"
 
   /// The plate a hold turns into when it comes up: "Released fn" (or "Would release fn" in dry
   /// run), and ", finger left the zone" when the hold was cancelled. `nil` for any other plate.
