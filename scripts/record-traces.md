@@ -242,16 +242,85 @@ swift run edgy-trace record --label push-to-talk-hold-bottom-left --seconds 5 --
   --expect "Hold the bottom-left corner about 2 s. Expect: one hold, began then ended at lift."
 ```
 
+## v0.4 scenarios — physical clicks and taps that wait
+
+Frames now carry `buttonDown` (the live line shows `BUTTON` while the trackpad is clicked), so a
+click can be recorded. For each click take, press until the trackpad clicks; on a force-touch pad,
+a firm press is enough. Record each on both trackpads (`-external` suffix on the Magic Trackpad).
+
 ### 23. `click-drag-right-edge`
 
-Click the trackpad down inside the right edge strip and drag up along it (as when resizing a
-window from its right side). Kept for the click blocker: no assertion until the frame carries the
-button state.
+Click down inside the right edge strip and drag up along it, as when resizing a window from its
+right side. Keep the button down for the whole drag.
 
 ```bash
 swift run edgy-trace record --label click-drag-right-edge --seconds 4 --out Fixtures/traces/click-drag-right-edge.json \
-  --expect "Physical click-and-drag up the right edge. Expect (once frames carry the button): nothing fires."
+  --expect "Physical click-and-drag up the right edge. Expect: nothing fires, nothing claimed."
 ```
+
+### 24. `click-drag-left-edge`
+
+Same on the left edge, dragging down.
+
+```bash
+swift run edgy-trace record --label click-drag-left-edge --seconds 4 --out Fixtures/traces/click-drag-left-edge.json \
+  --expect "Physical click-and-drag down the left edge. Expect: nothing fires, nothing claimed."
+```
+
+### 25. `click-drag-top-edge`
+
+Click inside the top edge strip and drag right along it (selecting text in the top line of a
+window).
+
+```bash
+swift run edgy-trace record --label click-drag-top-edge --seconds 4 --out Fixtures/traces/click-drag-top-edge.json \
+  --expect "Physical click-and-drag right along the top edge. Expect: nothing fires, nothing claimed."
+```
+
+### 26. `click-drag-bottom-edge`
+
+Click inside the bottom edge strip and drag left along it (the thumb-click-and-drag many people
+use on a trackpad).
+
+```bash
+swift run edgy-trace record --label click-drag-bottom-edge --seconds 4 --out Fixtures/traces/click-drag-bottom-edge.json \
+  --expect "Physical click-and-drag left along the bottom edge. Expect: nothing fires, nothing claimed."
+```
+
+### 27. `click-top-right-corner`
+
+Click once in the top-right corner without moving: press, click, release, lift. Do it three
+times, a second apart.
+
+```bash
+swift run edgy-trace record --label click-top-right-corner --seconds 5 --out Fixtures/traces/click-top-right-corner.json \
+  --expect "Three plain clicks in the top-right corner. Expect: no tap, no double-tap."
+```
+
+### 28. `force-click-top-left-corner`
+
+Rest a finger in the top-left corner and press through to a force click (or a firm click) within
+about a quarter second; hold it down for about 1 s, then lift.
+
+```bash
+swift run edgy-trace record --label force-click-top-left-corner --seconds 4 --out Fixtures/traces/force-click-top-left-corner.json \
+  --expect "Force click held in the top-left corner. Expect: no hold (long-press) fires."
+```
+
+### 29. `tap-then-double-tap-top-right`
+
+With **tap-to-click off and then again with it on** (record twice; add `-taptoclick` to the
+second label and file name), tap the top-right corner once, wait about 1 s, then double-tap it.
+The replay test binds both a tap and a double-tap there, so the single tap waits for the
+double-tap window.
+
+```bash
+swift run edgy-trace record --label tap-then-double-tap-top-right --seconds 4 --out Fixtures/traces/tap-then-double-tap-top-right.json \
+  --expect "One tap, a pause, then a double-tap, top-right corner. Expect (taps wait): tap, then one double-tap."
+```
+
+With tap-to-click on, watch the live line: if `BUTTON` shows while the finger is still down
+during a plain tap, taps would be rejected as clicks; note it in the done report.
 
 ## After the session
 

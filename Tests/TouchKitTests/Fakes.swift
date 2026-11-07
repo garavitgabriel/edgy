@@ -64,6 +64,31 @@ final class FakeBackend: MultitouchBackend, @unchecked Sendable {
   }
 }
 
+/// Scriptable button state. Counts lifecycle calls; `startResult` false simulates a failed start.
+final class FakeButtonState: ButtonStateSource, @unchecked Sendable {
+  private let lock = NSLock()
+  private var _down = false
+  private var _starts = 0
+  private var _stops = 0
+  let startResult: Bool
+
+  init(startResult: Bool = true) { self.startResult = startResult }
+
+  var down: Bool {
+    get { lock.withLock { _down } }
+    set { lock.withLock { _down = newValue } }
+  }
+  var starts: Int { lock.withLock { _starts } }
+  var stops: Int { lock.withLock { _stops } }
+
+  func start() -> Bool {
+    lock.withLock { _starts += 1 }
+    return startResult
+  }
+  func stop() { lock.withLock { _stops += 1 } }
+  var isDown: Bool { down }
+}
+
 final class FakeNotifier: DeviceChangeNotifying, @unchecked Sendable {
   private let lock = NSLock()
   private var handler: (@Sendable (DeviceChangeEvent) -> Void)?

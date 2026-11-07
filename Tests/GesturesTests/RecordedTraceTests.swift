@@ -24,6 +24,9 @@ enum RecordedTraces {
     case noHold
     /// A slide may be claimed and let go, but produces no output and nothing else fires.
     case noOutput
+    /// With a double-tap bound in this zone (taps wait for the window), exactly these discrete
+    /// gestures, in this zone, after flushing at the end of the trace.
+    case waitingTaps(Zone, [GestureKind])
   }
 
   /// Hold scenarios bind a long-press where the preset has none.
@@ -52,12 +55,24 @@ enum RecordedTraces {
     "inward-swipe-from-right-one-finger": .nothing,
     "long-press-drift-top-left": .noHold,
     "push-to-talk-hold-bottom-left": .hold(.corner(.bottomLeft)),
+    // v0.4 additions (batch 10: physical clicks, taps that wait for a double-tap).
+    "click-drag-right-edge": .nothing,
+    "click-drag-left-edge": .nothing,
+    "click-drag-top-edge": .nothing,
+    "click-drag-bottom-edge": .nothing,
+    "click-top-right-corner": .nothing,
+    "force-click-top-left-corner": .noHold,
+    "tap-then-double-tap-top-right": .waitingTaps(.corner(.topRight), [.tap, .doubleTap]),
   ]
 
-  static let deviceSuffixes = ["-external", "-builtin"]
+  /// Recording-condition suffixes, stripped (in any order, stacked) to find the scenario.
+  static let deviceSuffixes = ["-external", "-builtin", "-taptoclick"]
 
   static func scenario(for label: String) -> String {
-    for suffix in deviceSuffixes where label.hasSuffix(suffix) { return String(label.dropLast(suffix.count)) }
+    var label = label
+    while let suffix = deviceSuffixes.first(where: { label.hasSuffix($0) }) {
+      label = String(label.dropLast(suffix.count))
+    }
     return label
   }
 
@@ -109,6 +124,17 @@ enum RecordedTraces {
       #expect(run.events.allSatisfy { $0.kind == .slide }, "\(name): fired", sourceLocation: sourceLocation)
     case .noHold:
       #expect(!run.events.contains { $0.kind == .longPress }, "\(name): held", sourceLocation: sourceLocation)
+    case .waitingTaps(let zone, let kinds):
+      let recognizer = makeGestureRecognizer()
+      let waiting = replay(
+        trace.frames, device: trace.device, zones: Preset.zones.union(holdZones).union([zone]),
+        slideZones: Preset.slideZones, longPressZones: holdZones, doubleTapZones: [zone], recognizer: recognizer)
+      // A recording stops getting frames after the last lift: wake the recognizer as the engine would.
+      let end = (trace.frames.last?.timestamp ?? 0) + 1
+      let tail = (recognizer as? DeferredGestureFlushing)?.flush(now: end).events ?? []
+      let discrete = (waiting.events + tail).filter { $0.kind != .slide }
+      #expect(discrete.map(\.kind) == kinds, "\(name): \(discrete.map(\.kind))", sourceLocation: sourceLocation)
+      #expect(discrete.allSatisfy { $0.zone == zone }, "\(name): wrong zone", sourceLocation: sourceLocation)
     }
   }
 }
@@ -122,8 +148,10 @@ enum RecordedTraces {
 /// The checker itself, against synthetic stand-ins for a few recording labels, so a broken table
 /// can't pass silently while `Fixtures/traces/` is empty.
 @Test func recordedTraceCheckerAcceptsSyntheticStandIns() {
-  func trace(_ label: String, _ strokes: [Stroke]) -> TraceFile {
-    TraceBuilder(strokes).trace(label: label, expectation: "synthetic stand-in")
+  func trace(_ label: String, _ strokes: [Stroke], buttons: [ClosedRange<Double>] = []) -> TraceFile {
+    var builder = TraceBuilder(strokes)
+    builder.buttonDown = buttons
+    return builder.trace(label: label, expectation: "synthetic stand-in")
   }
   let standIns = [
     trace("deliberate-slide-right-up", [Stroke(id: 1, [(0, 146, 30), (0.15, 146, 30), (0.75, 146, 60)])]),
@@ -139,6 +167,20 @@ enum RecordedTraces {
     trace(
       "thumb-rest-right-index-moves",
       [Stroke(id: 1, [(0, 146, 20), (1.4, 146, 20)]), Stroke(id: 2, [(0.4, 80, 50), (0.5, 80, 50), (1.2, 110, 65)])]),
+    trace(
+      "click-drag-right-edge", [Stroke(id: 1, [(0, 146, 30), (0.15, 146, 30), (0.75, 146, 60)])],
+      buttons: [0.05...0.75]),
+    trace(
+      "click-top-right-corner-taptoclick-external", [Stroke(id: 1, [(0, 146, 90), (0.15, 146, 90)])],
+      buttons: [0.04...0.1]),
+    trace("force-click-top-left-corner", [Stroke(id: 1, [(0, 4, 91), (1.2, 4, 91)])], buttons: [0.3...1.2]),
+    trace(
+      "tap-then-double-tap-top-right",
+      [
+        Stroke(id: 1, [(0, 146, 90), (0.08, 146, 90)]),
+        Stroke(id: 2, [(1.0, 146, 90), (1.08, 146, 90)]),
+        Stroke(id: 3, [(1.2, 146, 90), (1.28, 146, 90)]),
+      ]),
   ]
   for standIn in standIns {
     #expect(RecordedTraces.expectations[RecordedTraces.scenario(for: standIn.label)] != nil, "\(standIn.label)")

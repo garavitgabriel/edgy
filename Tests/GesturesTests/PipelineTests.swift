@@ -39,7 +39,7 @@ private let rightEdge: Set<Zone> = [.edge(.right)]
 }
 
 @Test func twoFingerSlideWhenConfigured() {
-  var settings = GestureSettings.defaults
+  var settings = GestureSettings.test
   settings.fingers = 2
   let frames = TraceBuilder([
     Stroke(id: 1, [(0, 145, 30), (0.03, 145, 30), (0.6, 145, 50)]),
@@ -146,7 +146,7 @@ private let rightEdge: Set<Zone> = [.edge(.right)]
 }
 
 @Test func zoneGeometryClassifiesInMillimetres() {
-  let geometry = ZoneGeometry(device: TraceBuilder.defaultDevice, settings: .defaults)
+  let geometry = ZoneGeometry(device: TraceBuilder.defaultDevice, settings: .test)
   #expect(geometry.region(at: Point2D(x: 75, y: 47)) == nil)
   #expect(geometry.region(at: Point2D(x: 143, y: 47)) == .edge(.right))
   #expect(geometry.region(at: Point2D(x: 141, y: 47)) == nil)

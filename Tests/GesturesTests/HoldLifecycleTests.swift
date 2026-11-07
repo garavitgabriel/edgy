@@ -106,7 +106,7 @@ import Testing
   let frames = TraceBuilder([Stroke(id: 1, [(0, 4, 91), (1.0, 4, 91)])]).frames()
   let pipeline = makeGestureRecognizer()
   let context = GestureContext(
-    settings: .defaults, enabledZones: [.corner(.topLeft)], secondsSinceLastKeyPress: nil)
+    settings: .test, enabledZones: [.corner(.topLeft)], secondsSinceLastKeyPress: nil)
   let device = TraceBuilder.defaultDevice
   let resetAt = 84  // 0.7 s: the hold began at 0.5 s
   var before: [GestureOutput] = []

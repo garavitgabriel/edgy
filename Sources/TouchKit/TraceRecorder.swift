@@ -61,7 +61,7 @@ public enum FrameFormatter {
         format: "[%d %@ (%.3f,%.3f) v(%.2f,%.2f) %.1fx%.1fmm]", c.id, short(c.state), c.position.x, c.position.y,
         c.velocity.dx, c.velocity.dy, c.majorAxisMM, c.minorAxisMM)
     }
-    return ([head] + contacts).joined(separator: " ")
+    return ([head] + (frame.buttonDown ? ["BUTTON"] : []) + contacts).joined(separator: " ")
   }
 
   static func short(_ state: TouchContact.State) -> String {
