@@ -29,7 +29,7 @@ Why this look: the owner picked it on taste in every round (rounds 1, 2 and 3; t
 | window material | warm translucent, ~0.8 opacity over blur | `rgba(42,27,21,.82)` | system window material tinted warm; never let text drop below 4.5:1 |
 
 - **One hue.** No second colour anywhere: no blue selection, no amber warnings, no red errors. Warnings use weight plus an icon. **Exception:** system-drawn chrome (window buttons, the system title bar) stays as the system draws it. Don't recolour or fake it.
-- **Type:** the system font only. One scale: **11** (picker group headers only) / **13** (everything else, the floor) / **17** (plate values, Continue) / **26** (the one confident line: the selected zone's name or the onboarding headline). Weights are regular and semibold. Use proportional figures everywhere, with no space before % ("64%").
+- **Type:** the system font only. One scale: **11** (action-picker group headers only; app-list section headers are 13 semibold `ink2`) / **13** (everything else, the floor) / **17** (plate values, Continue) / **26** (the one confident line: the selected zone's name or the onboarding headline). Weights are regular and semibold. Use proportional figures everywhere, with no space before % ("64%").
 - **Radii:** the window has the system radius; controls 6–8; plates 12–14; zone bars fully rounded ends. Never one radius for everything, and never a radius nested inside a radius.
 - **Gesture icons:** one family, one stroke weight and one grid. Swipe up and swipe down must differ clearly.
 
@@ -270,6 +270,7 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
 | `keepOpenMS` | Switch Apps | Keep open between strokes | slider 0–1000 ms, value "400 ms" | "Lift and slide again to keep going; it picks the app when you stop, click or move the pointer." |
 | `holdMS` | Hold Keys | Hold before it starts | slider 100–1500 ms, preset 300 ms | "How long to press before the keys go down." |
 | `holdMS` | any other long-press | Press time | slider 100–1500 ms; shows "Default (500 ms)" until changed, with **Reset** beside a changed value | "How long to press before it runs." |
+| `maxSeconds` | Hold Keys | Let go after | slider over `holdMaxSecondsRange`, value "120 s" | "If a lift is missed, the keys come back up after this long." |
 
 - At 0 ms, `keepOpenMS` reads "Off" instead of "0 ms".
 - A slider set to its default shows the value in `ink2`; a changed value shows in `ink`. There's no other changed-state mark.
