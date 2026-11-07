@@ -29,6 +29,10 @@ public struct ActionPickerView: View {
   }
 
   public var body: some View {
+    content.environment(\.gestureIconHorizontal, GestureIcon.isHorizontal(model.picking?.zone))
+  }
+
+  @ViewBuilder private var content: some View {
     let _ = model.revision
     if let target = model.picking {
       let gesture = target.gesture ?? chosenGesture

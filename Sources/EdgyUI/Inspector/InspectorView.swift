@@ -18,6 +18,10 @@ public struct InspectorView: View {
   static let inset: CGFloat = 22
 
   public var body: some View {
+    content.environment(\.gestureIconHorizontal, GestureIcon.isHorizontal(model.selectedZone))
+  }
+
+  @ViewBuilder private var content: some View {
     let _ = model.revision
     ScrollView(.vertical) {
       Group {

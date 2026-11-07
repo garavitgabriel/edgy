@@ -6,6 +6,9 @@ import SwiftUI
 /// the head points.
 struct GestureIcon: View {
   var gesture: GestureKind
+  /// Gesture icons follow the edge (BRIEF § Tokens): a slide on the top/bottom edge is drawn
+  /// horizontal (the vertical glyph rotated 90°). Set by the inspector and picker for their zone.
+  @Environment(\.gestureIconHorizontal) private var horizontal
   static let size: CGFloat = 16
   static let stroke: CGFloat = 1.5
 
@@ -73,7 +76,25 @@ struct GestureIcon: View {
       context.fill(fill, with: .color(Tokens.ink))
     }
     .frame(width: Self.size, height: Self.size)
+    .rotationEffect(horizontal && gesture == .slide ? .degrees(90) : .zero)
     .accessibilityHidden(true)
+  }
+
+  /// Top and bottom edges slide horizontally.
+  static func isHorizontal(_ zone: Zone?) -> Bool {
+    guard case .edge(let edge, _, _) = zone else { return false }
+    return edge == .top || edge == .bottom
+  }
+}
+
+private struct GestureIconHorizontalKey: EnvironmentKey {
+  static let defaultValue = false
+}
+
+extension EnvironmentValues {
+  var gestureIconHorizontal: Bool {
+    get { self[GestureIconHorizontalKey.self] }
+    set { self[GestureIconHorizontalKey.self] = newValue }
   }
 }
 
