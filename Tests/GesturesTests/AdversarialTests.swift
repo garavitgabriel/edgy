@@ -13,9 +13,18 @@ enum Preset {
     EdgyConfig.defaults.defaultProfile.bindings.filter { $0.gesture == .slide }.map(\.zone))
   static let longPressZones: Set<Zone> = []
 
-  static func run(_ strokes: [Stroke], typing: Double? = nil, longPress: Set<Zone> = longPressZones) -> Replay {
-    replay(
-      TraceBuilder(strokes).frames(), zones: zones, secondsSinceLastKeyPress: typing, slideZones: slideZones,
+  /// Settings for the whole suite; `cornerSizeMM` is pinned (see `GestureSettings.test`).
+  static let settings = GestureSettings.test
+
+  /// `buttons`: when the physical button is down, seconds from the start of the trace.
+  static func run(
+    _ strokes: [Stroke], typing: Double? = nil, longPress: Set<Zone> = longPressZones,
+    buttons: [ClosedRange<Double>] = []
+  ) -> Replay {
+    var builder = TraceBuilder(strokes)
+    builder.buttonDown = buttons
+    return replay(
+      builder.frames(), zones: zones, settings: settings, secondsSinceLastKeyPress: typing, slideZones: slideZones,
       longPressZones: longPress)
   }
 }
@@ -220,14 +229,11 @@ extension Replay {
 
 // MARK: - Physical click
 
-@Test(
-  .disabled(
-    "blocker: TouchFrame/TouchContact carry no button state, so a physical click-and-drag can't be told from a slide. See .parallel-plans/blockers-batch-9.md"
-  ))
-func physicalClickAndDragStartingInAnEdgeStripIsNotOurs() {
-  // A click-drag (button down) from the right edge strip up along it — a window resize or a text
-  // selection. Today it is indistinguishable from a deliberate volume slide, so it claims.
-  let run = Preset.run([Stroke(id: 1, [(0, 146, 30), (0.15, 146, 30), (0.75, 146, 60)])])
+@Test func physicalClickAndDragStartingInAnEdgeStripIsNotOurs() {
+  // A click-drag (button down from 50 ms, before the dwell) from the right edge strip up along it —
+  // a window resize or a text selection. Without the button it would be a volume slide.
+  let run = Preset.run([Stroke(id: 1, [(0, 146, 30), (0.15, 146, 30), (0.75, 146, 60)])], buttons: [0.05...0.75])
   #expect(run.neverClaimed)
   #expect(run.events.isEmpty)
+  #expect(run.reasons(1) == [.physicalClick])
 }

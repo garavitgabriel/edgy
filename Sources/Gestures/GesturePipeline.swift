@@ -15,8 +15,13 @@ import EdgyCore
 ///   begun the touch is frozen: no swipe, no slide output, no off-axis rejection. `reset()` emits
 ///   nothing; whoever resets (the engine) owns closing any hold it was told about.
 /// - The first tap emits `.tap`; a second tap in the same zone within the double-tap window emits
-///   `.doubleTap` instead of a second `.tap`. (There are no timers, so a tap cannot be delayed.)
-final class GesturePipeline: GestureRecognizing {
+///   `.doubleTap` instead of a second `.tap`.
+/// - In a zone of `context.doubleTapZones` the first tap is held back instead (see `PendingTap`):
+///   it is emitted once the double-tap window passes with no second tap, or dropped when the second
+///   tap turns it into a `.doubleTap`. Elsewhere taps fire at once.
+/// - A physical click (`frame.buttonDown`) rejects every live candidate with `.physicalClick`
+///   (cancelling a claimed slide or hold, as a palm does). Rejected fingers stay not-ours until lift.
+final class GesturePipeline: GestureRecognizing, DeferredGestureFlushing {
   let tuning: Tuning
   private var devices: [UInt64: DeviceState] = [:]
 
@@ -33,9 +38,35 @@ final class GesturePipeline: GestureRecognizing {
     return output
   }
 
+  /// Drops every touch and every pending tap.
   func reset() {
     devices = [:]
   }
+
+  var nextFlushDeadline: Double? {
+    // A device with fingers down keeps sending frames, and `process` releases what is due.
+    devices.values.filter(\.tracks.isEmpty).flatMap(\.pendingTaps).map(\.deadline).min()
+  }
+
+  func flush(now: Double) -> GestureOutput {
+    var events: [GestureEvent] = []
+    for id in devices.keys.sorted() {
+      guard var state = devices[id], state.tracks.isEmpty else { continue }
+      events += state.releasePendingTaps(now: now, tuning: tuning)
+      devices[id] = state
+    }
+    let claimed = devices.values.flatMap { $0.candidates.filter(\.claims).flatMap(\.members) }
+    return GestureOutput(events: events, claimedContactIDs: Set(claimed))
+  }
+}
+
+/// A single tap held back because its zone also has a double-tap bound.
+struct PendingTap: Sendable {
+  /// The `.tap` exactly as it would have fired at lift (position and timestamp of the lift).
+  let event: GestureEvent
+  let liftTime: Double
+  /// `liftTime` + the double-tap window: a second touch in the zone born by then may still pair.
+  let deadline: Double
 }
 
 /// One finger (or palm) seen on the sensor.
@@ -105,6 +136,29 @@ struct DeviceState: Sendable {
   var nextKey = 0
   /// Lift time of the last unpaired tap per zone.
   var lastTap: [Zone: Double] = [:]
+  /// Taps waiting for a possible double-tap, in lift order.
+  var pendingTaps: [PendingTap] = []
+
+  /// Whether a live candidate in `pending`'s zone could still end as the second tap of a
+  /// double-tap: born inside the window, not yet anything else, still short and still enough.
+  func mayPair(_ pending: PendingTap, now: Double, tuning: Tuning) -> Bool {
+    candidates.contains {
+      $0.zone == pending.event.zone && $0.birthTime >= pending.liftTime && $0.birthTime <= pending.deadline
+        && !$0.longPressFired && ($0.phase == .pending || ($0.phase == .sliding && !$0.slide.emittedMotion))
+        && now - $0.birthTime <= tuning.tapMaxDurationS && $0.maxTravel <= tuning.tapMaxTravelMM
+    }
+  }
+
+  /// Releases the pending taps that are due: the window has passed and nothing may still pair, or
+  /// (`settled`) something else already happened in the zone, which makes the earlier tap final.
+  mutating func releasePendingTaps(now: Double, tuning: Tuning, settled: Set<Zone> = []) -> [GestureEvent] {
+    let due = pendingTaps.map {
+      settled.contains($0.event.zone) || (now > $0.deadline && !mayPair($0, now: now, tuning: tuning))
+    }
+    let released = zip(pendingTaps, due).filter(\.1).map(\.0.event)
+    pendingTaps = zip(pendingTaps, due).filter { !$0.1 }.map(\.0)
+    return released
+  }
 }
 
 /// Processing of one frame against one device's state.
@@ -145,11 +199,17 @@ struct FrameStep {
     for contact in down {
       observe(contact)
     }
+    // Lifts are settled first: a click needs a finger pressing, so a button that goes down as a
+    // finger lifts (tap-to-click reports its click after the lift) does not undo that tap.
+    if frame.buttonDown {
+      rejectForPhysicalClick()
+    }
     enforceContactCount()
     for key in state.candidates.map(\.key) {
       advance(key)
     }
     reportDriftIntoZones()
+    releasePendingTaps()
     let claimed = Set(state.candidates.filter(\.claims).flatMap(\.members))
     return GestureOutput(events: events, claimedContactIDs: claimed, rejections: rejections)
   }
@@ -166,6 +226,25 @@ struct FrameStep {
       || contact.minorAxisMM > tuning.palmMinorAxisMM
       || contact.size >= tuning.palmSize
       || (contact.size >= tuning.palmSoftSize && contact.density < tuning.palmMaxDensity)
+  }
+
+  /// The button is down: whatever is on the pad is pressing, dragging or selecting. Every live
+  /// candidate is rejected (claimed slides and holds are cancelled); its fingers are `finished`,
+  /// so they never become a candidate again before they lift. A finger that lands while the button
+  /// is down becomes a candidate in `birth` and is rejected here in the same frame.
+  mutating func rejectForPhysicalClick() {
+    for key in state.candidates.map(\.key) {
+      rejectCandidate(key, .physicalClick)
+    }
+  }
+
+  /// Emits the taps that stopped waiting, ahead of this frame's events (they happened earlier).
+  mutating func releasePendingTaps() {
+    guard !state.pendingTaps.isEmpty else { return }
+    // Anything but a dwell claim (which may still lift as the second tap) settles the zone.
+    let settled = Set(
+      events.filter { $0.kind != .doubleTap && !($0.kind == .slide && $0.phase == .began) }.map(\.zone))
+    events.insert(contentsOf: state.releasePendingTaps(now: now, tuning: tuning, settled: settled), at: 0)
   }
 
   // MARK: - Contacts
@@ -460,11 +539,25 @@ struct FrameStep {
       candidate.birthTime - last <= timing.doubleTapWindow
     {
       state.lastTap[candidate.zone] = nil
+      // The double-tap replaces the first tap if it is still held back.
+      state.pendingTaps.removeAll { $0.event.zone == candidate.zone }
       emit(candidate, .doubleTap, phase: .ended, deltaMM: 0)
     } else {
       state.lastTap[candidate.zone] = now
-      emit(candidate, .tap, phase: .ended, deltaMM: 0)
+      let tap = event(candidate, .tap, phase: .ended, deltaMM: 0)
+      if waitsForDoubleTap(candidate.zone) {
+        state.pendingTaps.append(PendingTap(event: tap, liftTime: now, deadline: now + timing.doubleTapWindow))
+      } else {
+        events.append(tap)
+      }
     }
+  }
+
+  /// Taps wait in the zones with a double-tap bound. The context doesn't say which zones have a
+  /// tap bound, so the wait set is `doubleTapZones` itself; where no tap is bound the router drops
+  /// the delayed tap, so the wait costs nothing there. `nil` → no zone waits.
+  func waitsForDoubleTap(_ zone: Zone) -> Bool {
+    context.doubleTapZones?.contains(zone) ?? false
   }
 
   func swipeDirection(_ candidate: Candidate, elapsed: Double) -> SwipeDirection? {
@@ -529,12 +622,15 @@ struct FrameStep {
   }
 
   mutating func emit(_ candidate: Candidate, _ kind: GestureKind, phase: GestureEvent.Phase, deltaMM: Double) {
-    events.append(
-      GestureEvent(
-        zone: candidate.zone, kind: kind, fingers: candidate.members.count, phase: phase,
-        delta: deltaMM / geometry.zoneLength(candidate.zone),
-        position: geometry.position(in: candidate.zone, at: candidate.current),
-        timestamp: now, deviceID: frame.deviceID))
+    events.append(event(candidate, kind, phase: phase, deltaMM: deltaMM))
+  }
+
+  func event(_ candidate: Candidate, _ kind: GestureKind, phase: GestureEvent.Phase, deltaMM: Double) -> GestureEvent {
+    GestureEvent(
+      zone: candidate.zone, kind: kind, fingers: candidate.members.count, phase: phase,
+      delta: deltaMM / geometry.zoneLength(candidate.zone),
+      position: geometry.position(in: candidate.zone, at: candidate.current),
+      timestamp: now, deviceID: frame.deviceID)
   }
 
   // MARK: - Lookup

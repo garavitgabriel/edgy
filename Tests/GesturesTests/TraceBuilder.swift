@@ -58,6 +58,8 @@ struct TraceBuilder {
   var hz = 120.0
   var startTime = 100.0
   var strokes: [Stroke] = []
+  /// When the physical button is down, seconds from the start of the trace (inclusive).
+  var buttonDown: [ClosedRange<Double>] = []
 
   init(_ strokes: [Stroke] = []) {
     self.strokes = strokes
@@ -82,9 +84,11 @@ struct TraceBuilder {
           contacts.append(contact(stroke, frame: range.upperBound, state: .lifting))
         }
       }
+      let t = Double(index) / hz
       frames.append(
         TouchFrame(
-          deviceID: device.id, timestamp: time(ofFrame: index), frameNumber: Int32(index), contacts: contacts))
+          deviceID: device.id, timestamp: time(ofFrame: index), frameNumber: Int32(index), contacts: contacts,
+          buttonDown: buttonDown.contains { $0.contains(t) }))
     }
     return frames
   }
