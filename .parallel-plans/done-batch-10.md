@@ -98,6 +98,7 @@ No misfire scenario changed. All three are pinned at 12 mm now, so flipping the 
 ## Needs Gabriel
 - **Record the new scenarios** (`scripts/record-traces.md` §23–29) on the MacBook and on the Mac mini with the Magic Trackpad (`-external`). Record §29 with tap-to-click off and on (`-taptoclick`). Drop them in `Fixtures/traces/`. The replay test picks them up automatically.
 - **Click-drag a window edge on both Macs:** resize a window from its right edge, and select text starting low on the pad. Nothing should fire, and the pointer must never freeze. In `edgy-trace live`, confirm `BUTTON` appears on the first frame after the click on both trackpads.
+- **Button source smoke:** after a click-release, `BUTTON` must disappear on the very next frame. A sampler stuck at true would silently kill every gesture. If `BUTTON` never appears, or sticks, the fallback is contained in TouchKit. Swap `HIDButtonState.isDown` to read `NSEvent.pressedMouseButtons` (same per-frame sampling, same protocol, a one-line change). No redesign is needed.
 - **Tap-to-click on:** tap and double-tap a corner. Both must still fire.
 - **Feel the 300 ms tap delay** on a zone with tap + double-tap. This needs the engine wiring first (blocker note).
 

@@ -35,6 +35,11 @@ A single tap in a waiting zone would otherwise sit until the next touch. Engine 
    call `flush(now:)`, and handle the output exactly like a `process` output: pointer guard from
    `claimedContactIDs` (all devices' live claims), route `events` with the current frontmost app's
    profile, log rejections (there are none).
+   **Your call:** a flushed tap happened under the profile active at lift, but it's routed under the
+   profile at flush time, about 300 ms later. If the frontmost app changed in between, it lands in
+   the new app's binding. That's the same tradeoff the engine already makes for holds across an app
+   switch. If you'd rather drop it, compare the frontmost bundle at the last frame against flush time
+   and discard on a change.
 4. `quiesce()` already calls `recognizer.reset()`, which drops pending taps. Cancel the timer there too.
 
 A test for the engine side: a fake recognizer that adopts `DeferredGestureFlushing`, or the real one
