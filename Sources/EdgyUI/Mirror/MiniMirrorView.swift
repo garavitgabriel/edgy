@@ -11,16 +11,15 @@ import SwiftUI
 /// connected", no zones), paused, disabled, off in the frontmost app (faded to 40%; the popover
 /// says the words).
 ///
-/// **Active profile.** `MiniMirrorView(model:)` follows the frontmost app itself: it reads it on
-/// appear and on every app activation (`NSWorkspace.didActivateApplicationNotification`, read
-/// only), ignoring Edgy's own activations, and draws `effectiveBindings(forApp:)` for it, which is
-/// Default for an app without a profile. `MiniMirrorView(model:frontmostApp:)` pins the app instead
-/// (tests, previews, or a host that already knows it).
+/// **Active profile.** `MiniMirrorView(model:)` follows `model.frontmostBundleID` (set by the app
+/// on activation, never Edgy's own) and draws `effectiveBindings(forApp:)` for it, which is Default
+/// for an app without a profile. `MiniMirrorView(model:frontmostApp:)` pins the app instead (tests,
+/// previews, or a host that already knows it). It reads `model.revision`, so edits made in
+/// Settings show at once.
 public struct MiniMirrorView: View {
   @Bindable var model: SettingsModel
   /// `nil` = follow the frontmost app; `.some(app)` = pinned (`.some(nil)` = Default).
   let pinnedApp: String??
-  @State private var observedApp: String?
   @State private var lastTouches: [LiveTouch] = []
   @State private var lastKnownSize: Size2D?
   /// The host already fades the mirror for these states (the popover applies its one 40%), so
@@ -47,7 +46,9 @@ public struct MiniMirrorView: View {
   }
 
   /// The app whose profile the mirror draws.
-  var activeApp: String? { pinnedApp ?? observedApp }
+  /// Unpinned, it is `model.frontmostBundleID` (set by the app on activation, never Edgy itself), the
+  /// same source the popover chips read, so the mirror and the chips always agree.
+  var activeApp: String? { pinnedApp ?? model.frontmostBundleID }
 
   /// The frontmost app after an activation: Edgy's own activation (opening its window or
   /// popover) keeps the app that was in front before.
@@ -57,12 +58,13 @@ public struct MiniMirrorView: View {
   }
 
   public var body: some View {
+    let _ = model.revision  // redraw on every settings change, wherever it was made
     let frontmostApp = activeApp
     let state = model.mirrorState(forApp: frontmostApp)
     let device = model.mirroredDevice
     let sizeMM =
       state == .noTrackpad
-      ? MirrorGeometry.defaultSensorSizeMM : device?.sensorSizeMM ?? lastKnownSize ?? MirrorGeometry.defaultSensorSizeMM
+      ? MirrorGeometry.defaultSensorSizeMM : device?.sensorSizeMM ?? model.lastKnownPadSizeMM ?? lastKnownSize ?? MirrorGeometry.defaultSensorSizeMM
     let geometry = MirrorGeometry(
       sensorSizeMM: sizeMM, settings: model.editor.config.gestures, pointsPerMM: Tokens.miniMirrorPointsPerMM)
     ZStack {
@@ -76,18 +78,6 @@ public struct MiniMirrorView: View {
       .transition(.opacity)
     }
     .animation(MirrorMotion.padSwitch, value: device?.id)
-    .onAppear {
-      guard pinnedApp == nil else { return }
-      observedApp = Self.frontmost(
-        afterActivating: NSWorkspace.shared.frontmostApplication?.bundleIdentifier, own: Bundle.main.bundleIdentifier,
-        previous: observedApp)
-    }
-    .onReceive(NSWorkspace.shared.notificationCenter.publisher(for: NSWorkspace.didActivateApplicationNotification)) {
-      guard pinnedApp == nil else { return }
-      let app = $0.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
-      observedApp = Self.frontmost(
-        afterActivating: app?.bundleIdentifier, own: Bundle.main.bundleIdentifier, previous: observedApp)
-    }
     .onChange(of: model.liveTouches, initial: true) { _, new in
       if !new.isEmpty { lastTouches = new }
     }

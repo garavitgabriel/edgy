@@ -122,7 +122,8 @@ struct MirrorPad: View {
       .compositingGroup()
       .opacity(faded ? Self.fadedOpacity : 1)
       if !dashedOutline {
-        ForEach(touches, id: \.id) { contact($0) }.allowsHitTesting(false)
+        ForEach(Self.drawnTouches(touches, geometry: geometry, mapped: mapped), id: \.id) { contact($0) }
+          .allowsHitTesting(false)
       }
       if let message { messageView(message, size: size) }
     }
@@ -440,6 +441,13 @@ struct MirrorPad: View {
   }
 
   // MARK: Touches (bone 4)
+
+  /// Only touches inside a mapped zone are drawn: a candidate, a claim or a rejection there. Plain
+  /// pointer use in the middle of the pad is not (the mirror shows absolute finger position while
+  /// the cursor moves relatively, so a drifting dot reads as out of sync; chief, 2026-11-07).
+  static func drawnTouches(_ touches: [LiveTouch], geometry: MirrorGeometry, mapped: Set<Zone>) -> [LiveTouch] {
+    touches.filter { geometry.zone(atNormalized: $0.position, mapped: mapped) != nil }
+  }
 
   @ViewBuilder private func contact(_ touch: LiveTouch) -> some View {
     let point = geometry.point(forNormalized: touch.position)

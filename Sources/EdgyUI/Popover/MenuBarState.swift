@@ -73,6 +73,10 @@ public final class MenuBarState {
   public var configProblem: ConfigProblem?
   /// The frontmost app, so its profile's chip comes first and the live chip is right.
   public var frontmostBundleID: String?
+
+  /// The app in front: the model's (`SettingsModel.frontmostBundleID`, set by the app), else this
+  /// state's own. One source for the chips, the live chip and the mini mirror.
+  public func frontmost(model: SettingsModel) -> String? { model.frontmostBundleID ?? frontmostBundleID }
   /// Installed apps, for chip names and marks (empty is fine: names fall back to the bundle ID).
   public var installedApps: [InstalledApp] = []
 

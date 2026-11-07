@@ -216,19 +216,37 @@ struct LabeledParameter<Control: View>: View {
   var help: String? = nil
   @ViewBuilder var control: Control
 
+  /// The least a control gets beside its label before the label moves above it.
+  static var controlMinWidth: CGFloat { 140 }
+
   var body: some View {
     VStack(alignment: .leading, spacing: 2) {
-      HStack(alignment: .parameterRow, spacing: 8) {
-        Text(label).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
-          .lineLimit(1)
-          .frame(width: labelWidth, height: ParameterRowsView.rowHeight, alignment: .leading)
-        control.frame(maxWidth: .infinity, alignment: .trailing)
+      // A label never breaks mid-word: when label and control don't fit one 28 pt row, the label
+      // takes its own line above the control (chief, 2026-11-07, from the live window).
+      ViewThatFits(in: .horizontal) {
+        HStack(alignment: .parameterRow, spacing: 8) {
+          labelText
+            .lineLimit(1)
+            .fixedSize()
+            .frame(minWidth: labelWidth, minHeight: ParameterRowsView.rowHeight, alignment: .leading)
+          control.frame(minWidth: Self.controlMinWidth, maxWidth: .infinity, alignment: .trailing)
+        }
+        VStack(alignment: .leading, spacing: 2) {
+          labelText.fixedSize(horizontal: false, vertical: true)
+          control.frame(maxWidth: .infinity, alignment: .trailing)
+        }
       }
       if let help {
         Text(help).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
           .fixedSize(horizontal: false, vertical: true)
       }
     }
+  }
+}
+
+extension LabeledParameter {
+  fileprivate var labelText: some View {
+    Text(label).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
   }
 }
 

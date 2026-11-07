@@ -108,8 +108,9 @@ func modelWithFakeEngine() -> (SettingsModel, FakeEngine) {
 }
 
 @Test func pauseRowIsHiddenWhilePaused() {
-  #expect(MenuRow.visible(paused: false) == [.pause, .settings, .openConfigFile, .reloadConfig, .about, .quit])
-  #expect(MenuRow.visible(paused: true) == [.settings, .openConfigFile, .reloadConfig, .about, .quit])
+  // The config file rows left the list (chief, 2026-11-07); recovery stays in the broken-config block.
+  #expect(MenuRow.visible(paused: false) == [.pause, .settings, .about, .quit])
+  #expect(MenuRow.visible(paused: true) == [.settings, .about, .quit])
 }
 
 @Test func listCopyAndShortcutsMatchTheBrief() {

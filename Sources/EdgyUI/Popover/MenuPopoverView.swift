@@ -22,6 +22,7 @@ public struct MenuPopoverView: View {
   private var state: MenuBarState { injected ?? fallback }
 
   public var body: some View {
+    let _ = model.revision  // chips, switches and the mirror follow edits made in Settings
     VStack(alignment: .leading, spacing: 0) {
       top
         .padding(.horizontal, PopoverMetrics.inset)
@@ -81,7 +82,7 @@ public struct MenuPopoverView: View {
       let size = PopoverMetrics.padSize(model.mirroredDevice)
       // The chips and the mirror share one source for the app in front; the popover owns the one
       // 40% fade (Disabled, Paused, off in the app in front).
-      MiniMirrorView(model: model, frontmostApp: state.frontmostBundleID)
+      MiniMirrorView(model: model, frontmostApp: state.frontmost(model: model))
         .fadedByHost()
         .frame(width: size.width, height: size.height)
         .opacity(mirror.faded ? PopoverMetrics.fadedOpacity : 1)
@@ -101,7 +102,7 @@ public struct MenuPopoverView: View {
 
   private var chips: some View {
     ChipFlow(spacing: PopoverMetrics.chipGap) {
-      ForEach(ProfileChip.chips(model: model, frontmost: state.frontmostBundleID, apps: state.installedApps)) { chip in
+      ForEach(ProfileChip.chips(model: model, frontmost: state.frontmost(model: model), apps: state.installedApps)) { chip in
         ChipView(chip: chip) {
           model.selectProfile(chip.ref)
           actions.openSettings()
