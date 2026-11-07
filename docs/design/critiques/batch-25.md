@@ -68,3 +68,10 @@ Not regressions: the title-bar row changes in every re-shot window (superseded, 
 
 ## Design answers (chief, 2026-11-07)
 1. **Split preview on side edges:** fade **only the label text**. The tab keeps its shape, and the bar, selection ring and tab silhouette all stay drawn, so the zone never disappears. Once the two re-shots show this, design signs off on the window, popover and onboarding. The title-bar mark is re-checked separately in its own small batch.
+
+## Sign-off (chief, 2026-11-07, after batch 27 / 84328c7)
+- **Side-edge split regression: FIXED.** In `batch-25/window-split-hover-right-thirds-*`, the right edge keeps its bar, ring and tab shape; only the "Volume" text fades; the thirds dividers preview at `ink` 50%; the note "Upper third keeps Volume; the other two start empty." is present.
+- **Ink mark (`batch-27/title-bar-zoom-*`, `window-identity-*`):** the V3 shape with no tile, in `ink`, vertically centred on the tab pill. The gap after the traffic lights can't be measured headlessly, so it goes to G1.
+- **Push-to-talk:** the Hold Keys sub-line and search aliases are verbatim in `PickerCatalog.swift:96,102`. `inspector-hold-keys-empty-*` shows "Needs keys", "Click to record" and the exact helper line under the recorder.
+
+**DESIGN SIGNS OFF on the settings window, the menu-bar popover, onboarding and the Test Mode overlay.** What remains is the owner's G1 device checklist (above) and any of his taste calls from it.
