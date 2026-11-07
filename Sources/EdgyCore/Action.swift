@@ -106,13 +106,34 @@ public struct ActionParameter: Sendable, Hashable {
   public var defaultValue: String?
   /// Label for the settings UI.
   public var displayName: String
+  /// One helper line under the row (BRIEF § Binding parameters: tuning rows only). `nil` = none.
+  public var helpText: String?
+  /// Unit shown after a number's value ("mm", "ms"). `nil` = none.
+  public var unit: String?
+  /// What a number reads as at 0 (e.g. "Off"). `nil` = the number.
+  public var zeroLabel: String?
+  /// When the parameter is absent, the value comes from this app-wide setting instead of
+  /// `defaultValue` (e.g. a hold time that falls back to `GestureSettings.longPressMS`); the UI
+  /// shows "Default (<that value>)" and a Reset once changed.
+  public var fallback: Fallback?
 
-  public init(key: String, kind: Kind, required: Bool, defaultValue: String? = nil, displayName: String) {
+  public enum Fallback: String, Sendable, Hashable {
+    case longPressMS
+  }
+
+  public init(
+    key: String, kind: Kind, required: Bool, defaultValue: String? = nil, displayName: String,
+    helpText: String? = nil, unit: String? = nil, zeroLabel: String? = nil, fallback: Fallback? = nil
+  ) {
     self.key = key
     self.kind = kind
     self.required = required
     self.defaultValue = defaultValue
     self.displayName = displayName
+    self.helpText = helpText
+    self.unit = unit
+    self.zeroLabel = zeroLabel
+    self.fallback = fallback
   }
 }
 
