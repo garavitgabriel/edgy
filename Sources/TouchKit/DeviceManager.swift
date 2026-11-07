@@ -67,10 +67,12 @@ public struct DeviceDiff: Equatable, Sendable {
 }
 
 /// Owns the set of registered devices: enumerates, diffs, (re-)registers callbacks exactly once
-/// per live device, and reports device-list changes.
+/// per live device, and reports device-list changes. Stamps each frame's `buttonDown` from the
+/// button-state source as the frame is handed out.
 public final class DeviceManager: @unchecked Sendable {
   private let backend: MultitouchBackend
   private let notifier: DeviceChangeNotifying
+  private let buttonState: ButtonStateSource
 
   /// Serializes refreshes and protects registration bookkeeping.
   private let refreshLock = NSLock()
@@ -82,10 +84,17 @@ public final class DeviceManager: @unchecked Sendable {
   private let handlerLock = NSLock()
   private var onFrame: (@Sendable (TouchFrame) -> Void)?
   private var onDevicesChanged: (@Sendable ([TouchDeviceInfo]) -> Void)?
+  /// The button source started and may be read (false before `start`, after `stop`, or if it failed).
+  private var buttonStateLive = false
 
-  public init(backend: MultitouchBackend, notifier: DeviceChangeNotifying) {
+  /// - Parameter buttonState: started on `start` (before any device registers, so the first frame
+  ///   is already stamped) and stopped on `stop`. Defaults to none: every frame reads button up.
+  public init(
+    backend: MultitouchBackend, notifier: DeviceChangeNotifying, buttonState: ButtonStateSource = NoButtonState()
+  ) {
     self.backend = backend
     self.notifier = notifier
+    self.buttonState = buttonState
   }
 
   public var devices: [TouchDeviceInfo] {
@@ -113,6 +122,8 @@ public final class DeviceManager: @unchecked Sendable {
       return running
     }
     if !wasRunning {
+      let live = buttonState.start()
+      handlerLock.withLock { buttonStateLive = live }
       let ok = notifier.start { [weak self] event in self?.handle(event) }
       if !ok { TouchKitLog.touch.error("hot-plug notifications unavailable; device list will not auto-refresh") }
     }
@@ -129,7 +140,9 @@ public final class DeviceManager: @unchecked Sendable {
     handlerLock.withLock {
       onFrame = nil
       onDevicesChanged = nil
+      buttonStateLive = false
     }
+    buttonState.stop()
   }
 
   public func handle(_ event: DeviceChangeEvent) {
@@ -171,7 +184,10 @@ public final class DeviceManager: @unchecked Sendable {
   }
 
   private func deliver(_ frame: TouchFrame) {
-    let handler = handlerLock.withLock { onFrame }
-    handler?(frame)
+    let (handler, live) = handlerLock.withLock { (onFrame, buttonStateLive) }
+    guard let handler else { return }
+    var stamped = frame
+    stamped.buttonDown = frame.buttonDown || (live && buttonState.isDown)
+    handler(stamped)
   }
 }

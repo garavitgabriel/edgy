@@ -23,7 +23,8 @@ final class LiveTouchSource: TouchSource, @unchecked Sendable {
     let m = lock.withLock { () -> DeviceManager in
       if let manager { return manager }
       let created = DeviceManager(
-        backend: LiveMultitouchBackend(framework: framework), notifier: LiveDeviceChangeNotifier())
+        backend: LiveMultitouchBackend(framework: framework), notifier: LiveDeviceChangeNotifier(),
+        buttonState: HIDButtonState())
       manager = created
       return created
     }
@@ -32,6 +33,39 @@ final class LiveTouchSource: TouchSource, @unchecked Sendable {
 
   func stop() {
     lock.withLock { manager }?.stop()
+  }
+}
+
+/// Button state read from the HID system state at frame time (`CGEventSource.buttonState`).
+///
+/// Chosen over a listen-only event tap: the read is synchronous when the frame is handed out, and
+/// the HID system state changes as the HID event is processed, before the event reaches any tap.
+/// So it can't lag the frame the way a tap callback (a WindowServer hop, then a run loop that may
+/// be busy) can. It needs no permission and has nothing a timeout can disable. It covers every
+/// pointing device the system knows (built-in and Bluetooth trackpads alike). It also doesn't say
+/// which device clicked, so a mouse click while a thumb rests on a trackpad edge rejects the thumb.
+/// Primary or secondary: a secondary click ("click in the bottom-right corner") is a press too.
+final class HIDButtonState: ButtonStateSource, @unchecked Sendable {
+  private let lock = NSLock()
+  private var source: CGEventSource?
+
+  func start() -> Bool {
+    guard let created = CGEventSource(stateID: .hidSystemState) else {
+      TouchKitLog.touch.error("button state unavailable: no HID system event source; clicks read as touches")
+      return false
+    }
+    lock.withLock { source = created }
+    return true
+  }
+
+  func stop() {
+    lock.withLock { source = nil }
+  }
+
+  var isDown: Bool {
+    guard lock.withLock({ source != nil }) else { return false }
+    return CGEventSource.buttonState(.hidSystemState, button: .left)
+      || CGEventSource.buttonState(.hidSystemState, button: .right)
   }
 }
 

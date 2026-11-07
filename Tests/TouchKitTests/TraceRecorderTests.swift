@@ -33,6 +33,43 @@ import Testing
     #expect(abs((loaded.frames.last?.timestamp ?? 0) - 0.016) < 1e-9)
   }
 
+  @Test func buttonDownRoundTripsThroughATraceFile() throws {
+    let recorder = try TraceRecorder(label: "click-drag-right-edge", expectation: "never a gesture")
+    recorder.append(TouchFrame(deviceID: 7, timestamp: 50, frameNumber: 1, contacts: [contact(1, x: 0.96)]))
+    recorder.append(
+      TouchFrame(deviceID: 7, timestamp: 50.008, frameNumber: 2, contacts: [contact(1, x: 0.96)], buttonDown: true))
+    recorder.append(TouchFrame(deviceID: 7, timestamp: 50.016, frameNumber: 3, contacts: []))
+    let trace = recorder.makeTrace(device: device(7))
+
+    let dir = FileManager.default.temporaryDirectory.appendingPathComponent("edgy-trace-\(UUID().uuidString)")
+    try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+    defer { try? FileManager.default.removeItem(at: dir) }
+    let url = dir.appendingPathComponent("click-drag-right-edge.json")
+    try trace.write(to: url)
+    let loaded = try TraceFile.load(from: url)
+    #expect(loaded.frames.map(\.buttonDown) == [false, true, false])
+    #expect(loaded == trace)
+    #expect(try String(contentsOf: url, encoding: .utf8).contains("\"buttonDown\" : true"))
+  }
+
+  @Test func traceWithoutButtonDownDecodesAsButtonUp() throws {
+    // Traces recorded before v0.4 have no `buttonDown` key.
+    let json = """
+      {"schemaVersion": 1, "label": "old", "expectation": "",
+       "device": {"id": 7, "kind": "builtInTrackpad", "sensorSizeMM": {"width": 150, "height": 95}, "familyID": 0},
+       "frames": [{"deviceID": 7, "timestamp": 0, "frameNumber": 1, "contacts": []}]}
+      """
+    let trace = try JSONDecoder().decode(TraceFile.self, from: Data(json.utf8))
+    #expect(trace.frames.map(\.buttonDown) == [false])
+  }
+
+  @Test func liveLineMarksTheButton() {
+    let down = TouchFrame(deviceID: 7, timestamp: 1, frameNumber: 1, contacts: [], buttonDown: true)
+    let up = TouchFrame(deviceID: 7, timestamp: 1, frameNumber: 1, contacts: [])
+    #expect(FrameFormatter.line(down).contains("BUTTON"))
+    #expect(!FrameFormatter.line(up).contains("BUTTON"))
+  }
+
   @Test func locksOntoOneDevice() throws {
     let recorder = try TraceRecorder(label: "palm-rest-right", expectation: "nothing fires")
     recorder.append(TouchFrame(deviceID: 2, timestamp: 1, frameNumber: 1, contacts: []))
