@@ -379,9 +379,9 @@ The same 640 × 520 glass window, with a step row at the top ("1 Accessibility �
 - The window watches the permission live. When it turns granted, the step row shows ✓, the body becomes "Access granted.", and the primary becomes **Continue**.
 - A quiet text button, **Skip for now**, continues without access; the No Accessibility state above then applies.
 
-**Mirrors in onboarding:** steps 1–3 may use a fitted scale, but **one scale for all of them**. The step 1 mirror is illustrative: zone shapes and corner icons only, no label tabs.
+**Mirrors in onboarding:** steps 1 and 2 may use a fitted scale, but **the same one for both**. Step 3's preset thumbnails are 120 pt (the under-200 pt mirror rule). The step 1 mirror is illustrative: zone shapes and corner icons only, no label tabs.
 
-**Step 2 extras:** Continue is always enabled; a landed slide only adds the ✓. A rejected slide shows the struck contact plus the one dark plate beside the mirror, with the bone-4 copy. The system volume indicator appears wherever the system draws it.
+**Step 2 extras:** Continue is always enabled; a landed slide only adds the ✓. A rejected slide shows the struck contact plus the one dark plate **under the mirror, centred on it**, with the bone-4 copy. The demo contact sits clear of every tab. The system volume indicator appears wherever the system draws it.
 
 **Step 3: Pick a preset.** The headline is "Pick a starting point". Three radio rows, each with a 120 pt mini mirror showing that preset's zones (normal zone shapes), the name, and one line:
 
