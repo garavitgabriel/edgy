@@ -170,7 +170,7 @@ import Testing
     func ids(_ id: ActionID) -> [String] {
       ParameterEditor.editors(for: catalog.first { $0.id == id }).map(\.id)
     }
-    #expect(ids("audio.volume") == ["sensitivity", "haptics"])
+    #expect(ids("audio.volume") == ["speedUp", "sensitivity", "haptics"])
     #expect(ids("app.open") == ["bundleID", "whenFrontmost", "haptics"])
     #expect(ids("media.next") == ["haptics"])
     #expect(ActionNaming.orderedChoices(["stay", "hide"], parameter: "whenFrontmost") == ["hide", "stay"])

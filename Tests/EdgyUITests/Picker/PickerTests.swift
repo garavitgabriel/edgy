@@ -39,7 +39,7 @@ import Testing
   @Test func searchFiltersGroupsAndTheDisclosure() {
     let found = catalog(.tap, query: "keyboard")
     #expect(Set(found.sections.flatMap(\.items).map(\.title)) == ["Keyboard Backlight On / Off", "Keyboard Shortcut…"])
-    #expect(found.others.map(\.title) == ["Keyboard Brightness"])
+    #expect(found.others.map(\.title) == ["Keyboard Brightness…"])
     #expect(found.othersTitle == "1 more needs a slide")
     #expect(catalog(.tap, query: "zzz").sections.isEmpty)
   }

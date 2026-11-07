@@ -10,7 +10,8 @@ You own `Sources/EdgyUI/Mirror/**`, `Sources/EdgyUI/Inspector/**`, `Sources/Edgy
 3. **Chief rulings already made:** "Split into" hidden on app tabs; picker height capped at the pad's interior (already merged — keep it); `InspectorDrafts` may stay a side table (document it).
 4. **Labels on the pad** per bone 3 as updated: never "…" on the pad; parameter short value → action short name → clip with a 12 pt fade.
 5. **From batch 17:** `MiniMirrorView` must not fade for Disabled when the popover already applies 0.4 (one fade only — keep the popover's); unify the two `ConfigProblem` types by making the Window one a thin wrapper or typealias over `EdgyRuntime.ConfigProblem` plus the file name (keep `WindowConditions` source-compatible for EdgyApp).
-6. Use the catalog's `displayName` everywhere; never re-spell action names in the UI (batch 20 normalises the catalog spellings).
+6. **From batch 20 (merged):** levels and stepped slides now carry optional tuning parameters (`speedUp`, `stepMM`, `keepOpenMS`, `holdMS`). In the picker, end a name in "…" only when the action has a **required** parameter (Volume / Keyboard Brightness must not read "Volume…"); update `PickerTests.searchFiltersGroupsAndTheDisclosure` back to "Keyboard Brightness". Draw `.choice(["on","off"])` (`speedUp`) as a checkbox row. Add the long-press "Press time" row from `ConfigValidator.pressTimeParameter` (see done-batch-20.md).
+7. Use the catalog's `displayName` everywhere; never re-spell action names in the UI (batch 20 normalises the catalog spellings).
 
 ## Acceptance
 - Every must-fix and should-fix in the three critiques ticked in the done report with the snapshot that shows it (or the BRIEF rule that overrides it).
