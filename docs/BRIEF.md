@@ -55,6 +55,10 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
    - Corner labels are tabs flush to the corner tile.
    - Labels are never floating pills, never rotated, and ≥13 pt.
    - The selected zone needs no chip, because the inspector names it.
+   - **Long labels never use "…"** (that means "needs a parameter"). In order: the parameter's short value (app name, key combo); the action's short name ("Shortcut", "Repeat keys", "Mic off", "Link"); otherwise clip with a 12 pt fade. The full name is always in the inspector.
+   - **"Off here"** is a tab too: a hairline outline, no fill, `ink2` text.
+   - Mirrors under about 200 pt wide (presets, the popover mini mirror) may drop the corner action icons; the solid tile still means mapped.
+   - Action names are the catalog's display names, spelled the same everywhere.
 4. **Recognized vs rejected by shape.**
    - **Recognized:** a filled accent contact.
    - **Rejected:** a hollow, struck circle.
