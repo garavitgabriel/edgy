@@ -126,7 +126,7 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
       - **Several bindings on one edge:** show up to **two** icons along the bar (side by side on top/bottom, stacked on left/right), in gesture order: slide, swipe, tap, double-tap, long-press. Don't show more; the hover line names them all.
       - **Split edges:** each segment shows its own icon(s) by the same rule.
       - **Unavailable actions:** the zone is drawn unmapped, with no icon.
-      - **Hover:** hovering a zone shows **one line under the mirror** (13, `ink2`): the zone, a colon, and its actions as a comma list, e.g. "Bottom edge: Previous Track, Next Track, Play/Pause". There are no middots, and a line too long for the width clips with the 12 pt fade.
+      - **Hover:** hovering a zone shows **one line under the mirror** (13, `ink2`), at the popover's full content width: a short zone name, a colon, and its actions as a comma list, e.g. "Bottom: Previous Track, Next Track, Play/Pause". There are no middots. If it's too long, use the pad-tab short action names; clip with the 12 pt fade only as the last resort.
       - The line's height is always reserved so the popover never jumps. With no hover it's empty. There's no idle "profile" text, because the filled chip already says which profile is live (bone 8).
       - The full-size mirror in the window is unchanged: it keeps its text tabs and doesn't add icons on edges.
     - **Two trackpads attached:** the mirrors (window, popover, onboarding) show **the pad touched last**, with no picker. Its outline follows that device's real proportions. When it switches, the outline cross-fades (150 ms).
@@ -445,7 +445,7 @@ The owner found the small numeric segmented control unclear. The split is shown,
 - **Accessibility names:** "Whole edge", "2 parts", "3 parts", "4 parts".
 - **Hidden on corners and on app tabs** (§ App profiles).
 - **A split edge's bindings group by segment in the inspector:** a 13 semibold `ink2` heading per segment ("Upper half" / "Lower half"; "Top third" / "Middle third" / "Bottom third"; "Left half" / "Right half" for horizontal edges; "Part 1" to "Part 4" for quarters), each followed by its own gesture rows.
-- Changing the split is one undo step. What happens to bindings is as the runtime's SplitPlan does today. If bindings will be moved or dropped, a one-line info note appears under the row before the click takes effect: "Upper half keeps Volume; lower half starts empty."
+- Changing the split is one undo step. **The first part keeps the edge's bindings and the other parts start empty** (first = upper for side edges, left for top/bottom). Going back to fewer parts keeps the first part's bindings and drops the rest. A one-line info note says what will happen before the click takes effect: "Upper third keeps Volume; the other two start empty."
 
 ### Picker clarity: icons and rhythm (spec, 2026-11-07)
 
@@ -472,6 +472,8 @@ The owner found the picker cluttered and asked for more order, "maybe adding ico
 | Keyboard | a keycap (Keyboard Shortcut) · a keycap with up/down ticks (Slide to Repeat Keys) · a keycap pressed down (Hold Keys) |
 | Shortcuts | three stacked rounded steps (Run Shortcut) |
 | — | a circle with a slash (Do nothing here) |
+
+**Order within a group:** the icon table's order (most-used first), never alphabetical. Search results keep it.
 
 **Group rhythm:**
 - Group headers are 11 pt semibold `ink2` with 14 pt above and 4 pt below.
