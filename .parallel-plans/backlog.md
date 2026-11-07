@@ -34,3 +34,6 @@ Items found in testing or left open by builders, to fold into a future round.
 ## From batch 24
 - `SettingsModel.decisionSerial` (monotonic) so onboarding step 2 counts new decisions exactly (today: overlap inference, can only miss a decision repeating a full 32-window).
 - ~~Rejected mark rim?~~ Resolved by design: no rim on the struck mark (ink2 on the dark plate already clears 3:1); PlateView stays as is.
+
+## Switch Apps opens on contact (Gabriel, MBP, 2026-11-07) → batch 26
+- Top-edge Switch Apps opens without a real slide: a 120 ms rest claims the slide and `.began` opens the switcher. Fix in batch 26: it opens after one `stepMM` of travel; strokes that never reach that press nothing.
