@@ -123,6 +123,14 @@ enum V04Catalog {
     #expect(try h.onDisk() == h.editor.config)
   }
 
+  @Test func nonFiniteWindowInAHandEditedFileDoesNotTrap() {
+    var config = EdgyConfig.defaults
+    config.defaultProfile.bindings.append(Self.bottomTap)
+    config.gestures.doubleTapWindowMS = .nan
+    let note = validator.validate(config).first { $0.code == .tapWaitsForDoubleTap }
+    #expect(note?.detail == "300")
+  }
+
   @Test func otherZonesAndSegmentsDoNotWait() {
     var config = EdgyConfig.defaults
     config.defaultProfile.bindings += [

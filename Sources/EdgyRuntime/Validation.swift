@@ -326,7 +326,7 @@ public struct ConfigValidator: Sendable {
     in resolved: Profile, as ref: ProfileRef, settings: GestureSettings, involving: Set<BindingKey>? = nil
   ) -> [ValidationIssue] {
     let keys = Set(resolved.bindings.map(\.key))
-    let wait = String(Int(settings.doubleTapWindowMS.rounded()))
+    let wait = String(Int(GestureSettingsLimits.clamped(settings).doubleTapWindowMS.rounded()))
     return resolved.bindings.compactMap { tap in
       guard tap.gesture == .tap else { return nil }
       let doubleTap = BindingKey(zone: tap.zone, gesture: .doubleTap)

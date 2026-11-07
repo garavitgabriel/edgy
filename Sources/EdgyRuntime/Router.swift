@@ -21,7 +21,7 @@ import Foundation
 public final class Router {
   public private(set) var actions: ActionPerforming
   /// Route without performing (see the type's docs). The engine flips it with its own reset.
-  public var testMode = false
+  public internal(set) var testMode = false
   /// The live feed's decision sink; `nil` when nobody observes, so nothing is built.
   var onDecision: ((LiveDecision) -> Void)?
   private let logger: EdgyLogging
