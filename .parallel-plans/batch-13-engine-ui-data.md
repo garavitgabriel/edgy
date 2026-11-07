@@ -13,7 +13,7 @@ Read `CLAUDE.md`, `.parallel-plans/2026-11-07-edgy-v05.md`, `docs/BRIEF.md` § B
 - **Runtime:** `SettingsEditor` API to record a check answer (yes → confirmed; no → unresponsive), to count an ask, and to "Turn back on" a display; a feed decision (`displayCheckDue(key:name:)` or similar) the overlay batch will draw. Tests on fakes.
 
 ## 3. Presets and the broken-config state
-- **Presets** (onboarding step 3): `Presets.media` = `EdgyConfig.defaults`; `Presets.windows` and `Presets.minimal` exactly as BRIEF § Onboarding steps lists them — **validate every binding**; BRIEF's "top swipe down → Mission Control" is not supported on the top edge (top/bottom edges swipe left/right only): use top-edge **double-tap** → Mission Control instead and say so in the done report. Each preset passes `MachineDefaults` before it's applied. A `SettingsEditor` method applies a preset (one undo step).
+- **Presets** (onboarding step 3): `Presets.media` = `EdgyConfig.defaults`; `Presets.windows` and `Presets.minimal` exactly as BRIEF § Onboarding steps lists them (already corrected to supported gestures: bottom long-press → maximize, top double-tap → Mission Control) — **validate every binding** and report any that fail. Each preset passes `MachineDefaults` before it's applied. A `SettingsEditor` method applies a preset (one undo step).
 - **Broken config on reload** (BRIEF § Issue states): when the file on disk stops decoding or validating, keep the last working config running, expose `configProblem` (message + line if available) on `SettingsEditor`, make edits throw a read-only error while it stands, and offer `replaceFileWithCurrentSettings()` (writes the running config; the UI confirms first). Clears when the file is fixed and reloads.
 
 ## Acceptance
