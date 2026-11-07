@@ -19,7 +19,7 @@ verification: pass
 - [✓] `docs/settings-reference.md` is complete. `theReferenceDocumentsEverySettingAndCode` fails if a field, validation code or editor method goes undocumented. The Mirror walks fail if a field is added to `AppSettings` or `GestureSettings` without an edit entry.
 - [✓] Existing runtime tests keep their intent. 5 were edited (listed below).
 - [✓] Verification triple green, denylist clean.
-- [✓] No blockers. Nothing outside the allowed glob was touched.
+- [~] **One blocker, partial:** the audit walk covers every parameter *kind* (fake catalog) but not the real catalog. Runtime tests can't import `Actions`, and `IntegrationTests` is off-limits. A ready-to-paste test for the chief is in `blockers-batch-12.md`. Nothing outside the allowed glob was touched.
 
 ## Verification
 - `swift build`: `Build complete!`
