@@ -365,6 +365,10 @@ private let panel = DisplayInfo(id: 1, name: "Built-in Display", kind: .builtIn,
   @Test func fullLifecycle() throws {
     let h = Harness()
     try h.slide(Self.id, 0, phase: .began, Self.off)
+    // Batch 26 ruling (the switcher opens on one step of travel, never on contact): `.began` presses nothing.
+    // Before: #expect(h.keyboard.events == ["cmd down", "cmd+tab down", "cmd+tab up"])
+    #expect(h.keyboard.events.isEmpty)
+    try h.slide(Self.id, 0.1, Self.off)  // one step: the opening
     #expect(h.keyboard.events == ["cmd down", "cmd+tab down", "cmd+tab up"])
     #expect(h.keyboard.heldModifiers == [.cmd])
     try h.slide(Self.id, 0.25, Self.off)  // two steps of 0.1 (0.05 carried)
@@ -383,6 +387,8 @@ private let panel = DisplayInfo(id: 1, name: "Built-in Display", kind: .builtIn,
   @Test func cancelSendsEscapeThenReleases() throws {
     let h = Harness()
     try h.slide(Self.id, 0, phase: .began, Self.off)
+    // Batch 26 ruling (the switcher opens on one step of travel, never on contact): one step opens it (before, `.began` did).
+    try h.slide(Self.id, 0.1, Self.off)
     try h.slide(Self.id, 0, phase: .cancelled, Self.off)
     #expect(Array(h.keyboard.events.suffix(3)) == ["cmd+escape down", "cmd+escape up", "cmd up"])
     #expect(h.keyboard.allReleased)
@@ -390,8 +396,11 @@ private let panel = DisplayInfo(id: 1, name: "Built-in Display", kind: .builtIn,
 
   @Test func newBeganWithoutEndCancelsTheOldSessionFirst() throws {
     let h = Harness()
+    // Batch 26 ruling (the switcher opens on one step of travel, never on contact): each session opens on one step of travel (before, each `.began` opened it).
     try h.slide(Self.id, 0, phase: .began, Self.off)
+    try h.slide(Self.id, 0.1, Self.off)
     try h.slide(Self.id, 0, phase: .began, Self.off)
+    try h.slide(Self.id, 0.1, Self.off)
     #expect(
       h.keyboard.events == [
         "cmd down", "cmd+tab down", "cmd+tab up",
@@ -406,7 +415,9 @@ private let panel = DisplayInfo(id: 1, name: "Built-in Display", kind: .builtIn,
     let h = Harness()
     try h.slide(Self.id, 0, phase: .began, Self.off)
     // One app forward first: a step back from the starting point would cancel (batch 20).
-    try h.slide(Self.id, 0.1, Self.off)
+    // Batch 26 ruling (the switcher opens on one step of travel, never on contact): the first step is the opening, so one app forward takes two.
+    // Before: try h.slide(Self.id, 0.1, Self.off)
+    try h.slide(Self.id, 0.2, Self.off)
     h.keyboard.failOnEvent = "shift+cmd+tab down"
     #expect(throws: ActionError.unavailable(Self.id, reason: "key event failed")) {
       try h.slide(Self.id, -0.1, Self.off)
@@ -420,11 +431,14 @@ private let panel = DisplayInfo(id: 1, name: "Built-in Display", kind: .builtIn,
     #expect(h.keyboard.allReleased)
   }
 
-  @Test func errorOpeningTheSwitcherReleasesTheModifier() {
+  @Test func errorOpeningTheSwitcherReleasesTheModifier() throws {
     let h = Harness()
     h.keyboard.failOnEvent = "cmd+tab down"
+    // Batch 26 ruling (the switcher opens on one step of travel, never on contact): the opening (and so its failure) comes with the first step, not `.began`.
+    // Before: #expect(throws: …) { try h.slide(Self.id, 0, phase: .began) }
+    try h.slide(Self.id, 0, phase: .began)
     #expect(throws: ActionError.unavailable(Self.id, reason: "key event failed")) {
-      try h.slide(Self.id, 0, phase: .began)
+      try h.slide(Self.id, 0.1)
     }
     #expect(h.keyboard.allReleased)
     #expect(h.keyboard.events == ["cmd down", "cmd+escape down", "cmd+escape up", "cmd up"])
@@ -433,8 +447,11 @@ private let panel = DisplayInfo(id: 1, name: "Built-in Display", kind: .builtIn,
   @Test func commandFailingToGoDownLeavesNoSession() throws {
     let h = Harness()
     h.keyboard.failOnEvent = "cmd down"
+    // Batch 26 ruling (the switcher opens on one step of travel, never on contact): command goes down with the first step, not `.began`.
+    // Before: #expect(throws: …) { try h.slide(Self.id, 0, phase: .began) }
+    try h.slide(Self.id, 0, phase: .began)
     #expect(throws: ActionError.unavailable(Self.id, reason: "key event failed")) {
-      try h.slide(Self.id, 0, phase: .began)
+      try h.slide(Self.id, 0.1)
     }
     try h.slide(Self.id, 0.3)
     try h.slide(Self.id, 0, phase: .cancelled)
@@ -453,15 +470,21 @@ private let panel = DisplayInfo(id: 1, name: "Built-in Display", kind: .builtIn,
   @Test func stepAndSensitivityScaleTravel() throws {
     let h = Harness()
     try h.slide(Self.id, 0, phase: .began, ["step": "0.2", "sensitivity": "2"])
-    try h.slide(Self.id, 0.2, ["step": "0.2", "sensitivity": "2"])  // 0.4 of travel → two tabs
-    #expect(h.keyboard.events.filter { $0 == "cmd+tab down" }.count == 3)
+    try h.slide(Self.id, 0.2, ["step": "0.2", "sensitivity": "2"])  // 0.4 of travel → two steps
+    // Batch 26 ruling (the switcher opens on one step of travel, never on contact): the first of the two steps is the opening tab.
+    // Before: #expect(h.keyboard.events.filter { $0 == "cmd+tab down" }.count == 3)
+    #expect(h.keyboard.events.filter { $0 == "cmd+tab down" }.count == 2)
   }
 
   @Test func oneTickPerTab() throws {
     let h = Harness()
     try h.slide(Self.id, 0, phase: .began)
     try h.slide(Self.id, 0.3)
-    #expect(h.haptics.ticks == 3)
+    // Batch 26 ruling (the switcher opens on one step of travel, never on contact): three steps = the opening (the `actionFired` click) + two apps (a tick each).
+    // Before: #expect(h.haptics.ticks == 3)
+    #expect(h.haptics.ticks == 2)
+    #expect(h.haptics.strongTicks == 1)
+    #expect(h.keyboard.events.filter { $0 == "cmd+tab down" }.count == 3)
   }
 
   @Test func updatesWithoutASessionDoNothing() throws {

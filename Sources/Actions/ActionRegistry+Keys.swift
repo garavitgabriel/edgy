@@ -1,8 +1,9 @@
 import EdgyCore
 import Foundation
 
-/// The app switcher session in progress: command is down until it ends. It spans strokes while
-/// `keepOpenMS` lets it linger.
+/// The app switcher session in progress. It starts armed (nothing pressed) and opens after one
+/// step of travel; once open, command is down until it ends. It spans strokes while `keepOpenMS`
+/// lets it linger.
 struct SwitcherSession: Equatable {
   /// Travel per app, carry, speed and end stepping (kept across strokes).
   var stepper: SlideStepper
@@ -14,6 +15,9 @@ struct SwitcherSession: Equatable {
   var position = 0
   /// A stroke ended and the session waits for the next one.
   var lingering = false
+  /// Command is down and the switcher is showing. False while the session is only armed (batch 26:
+  /// a finger resting on the edge, or travel short of one step, presses nothing).
+  var opened = false
 
   /// Whether one step from `position` wraps the highlight around the list. The highlight is on
   /// list index `1 + position` (the switcher opens on index 1, the app after the frontmost).
@@ -36,8 +40,13 @@ extension ActionRegistry {
 
   /// `apps.switcher`, one session across strokes:
   ///
-  /// - **Open.** The first `.began` holds command and sends one tab (the switcher opens on the next
-  ///   app). That app is the session's starting point (`position` 0).
+  /// - **Arm.** A fresh `.began` arms a session and presses nothing. A finger resting on the edge
+  ///   (the recognizer claims a slide after its dwell, with no travel) never opens the switcher.
+  /// - **Open.** When the stroke's travel reaches one `stepMM`, in either direction, command goes
+  ///   down and one tab opens the switcher on the next app. That step is the opening (consumed);
+  ///   that app is the session's starting point (`position` 0). Travel while armed counts 1:1
+  ///   (no speed-up), and end stepping never opens it. A stroke that ends or is interrupted before
+  ///   opening does nothing at all (batch 26).
   /// - **Move.** One tab (toward top/right) or shift-tab per `stepMM` of travel, with the shared
   ///   slide feel (`SlideFeel`: speed-up, end stepping). A tick per app; a stronger click when the
   ///   highlight wraps past the last app (when the app count is known) or when end stepping starts.
@@ -48,6 +57,8 @@ extension ActionRegistry {
   ///   monitor (`SwitcherInputMonitor`) watches for a click or clear pointer movement (select now)
   ///   and Escape (the system closes its switcher; command is released). The monitor runs only
   ///   while a session lingers.
+  /// - **Report.** The outcome, the `actionFired` haptic and the idle watchdog belong to an open
+  ///   switcher: none of them happen while it is only armed.
   /// - **Select.** Command up, when the window passes or on a click / pointer movement.
   ///   `keepOpenMS` 0: `.ended` selects at once and `.cancelled` cancels (escape, then command up),
   ///   exactly the pre-batch-20 behaviour.
@@ -56,41 +67,64 @@ extension ActionRegistry {
   /// Command is never left down: every error releases it, a `.began` that arrives while a stroke is
   /// still live (its end was lost) cancels that session first, and a session that hears nothing for
   /// `switcherIdleTimeout` is cancelled by its watchdog.
+  ///
+  /// Returns whether the switcher was showing during this update (open after it, opened by it, or
+  /// open when this end arrived), for the outcome report.
+  @discardableResult
   func performSwitcher(
     _ id: ActionID, delta: Double, phase: GestureEvent.Phase, context: ActionContext
-  ) throws {
+  ) throws -> Bool {
     keyLock.lock()
     defer {
       rearmSwitcherWatchdog()
       keyLock.unlock()
     }
+    var shown = false
     switch phase {
     case .began:
       if switcher?.lingering == true {
         try continueSwitcher(id, context: context)
       } else {
-        try openSwitcher(id, context: context)
+        try armSwitcher(id, context: context)
       }
-      try switcherTravel(id, delta: delta, context: context)
+      shown = try switcherTravel(id, delta: delta, context: context)
     case .changed:
-      try switcherTravel(id, delta: delta, context: context)
+      shown = try switcherTravel(id, delta: delta, context: context)
     case .ended, .cancelled:
-      if phase == .ended { try switcherTravel(id, delta: delta, context: context) }
+      if phase == .ended { shown = try switcherTravel(id, delta: delta, context: context) }
+      shown = shown || switcher?.opened == true
       strokeEnded(cancelled: phase == .cancelled)
     }
+    return shown || switcher?.opened == true
   }
 
-  /// A fresh session: command down, then the opening tab.
-  private func openSwitcher(_ id: ActionID, context: ActionContext) throws {
+  /// A fresh session, armed: nothing is pressed until the stroke travels one step. The binding's
+  /// parameters are checked now, so a bad value fails the gesture at its start.
+  private func armSwitcher(_ id: ActionID, context: ActionContext) throws {
     endSwitcher(cancel: true)
     let feel = try switcherFeel(id, delta: 0, context: context)
-    // The session (and so the release) exists only once command is really down.
-    try unavailable(id) { try keyboard.setModifiers([Self.switcherModifier], down: true) }
     keySessionGeneration += 1
     switcher = SwitcherSession(
       stepper: SlideStepper(step: feel.unit.step, speedUp: feel.speedUp), keepOpen: feel.keepOpen,
       appCount: switcherInput.switcherAppCount())
+  }
+
+  /// The armed session earned its first step: command down, then the opening tab.
+  private func openSwitcher(_ id: ActionID, context: ActionContext) throws {
+    do {
+      try unavailable(id) { try keyboard.setModifiers([Self.switcherModifier], down: true) }
+    } catch {
+      // Nothing is down, so there is nothing to release; the rest of the gesture does nothing.
+      switcher = nil
+      throw error
+    }
+    // From here on every exit releases command.
+    switcher?.opened = true
     try releasingSwitcherOnError(id) { try tapSwitcher(forward: true) }
+    actionsLog.debug("app switcher: opened after one step of travel")
+    if settings.allowsHaptic(.actionFired, parameters: context.parameters) {
+      haptics.strongTick(strength: settings.hapticClickStrength)
+    }
   }
 
   /// The next stroke within the keep-open window: same session, nothing pressed.
@@ -117,9 +151,15 @@ extension ActionRegistry {
     return (unit, try speedUp(id, in: context), keepOpen / 1000)
   }
 
-  /// A stroke ended (lift or interruption): linger for the next stroke, or finish now.
+  /// A stroke ended (lift or interruption): linger for the next stroke, or finish now. A session
+  /// that never opened just goes away: no key events, and no command-up for a command never pressed.
   private func strokeEnded(cancelled: Bool) {
     guard let session = switcher else { return }
+    guard session.opened else {
+      actionsLog.debug("switcher: stroke ended before opening")
+      switcher = nil
+      return
+    }
     guard session.keepOpen > 0 else {
       endSwitcher(cancel: cancelled)
       return
@@ -157,24 +197,41 @@ extension ActionRegistry {
   }
 
   /// Tabs for `delta` of travel. No session (its start failed, or it was cancelled) → nothing.
-  private func switcherTravel(_ id: ActionID, delta: Double, context: ActionContext) throws {
-    guard var session = switcher else { return }
+  /// An armed session opens on its first whole step. Returns whether this update opened it.
+  private func switcherTravel(_ id: ActionID, delta: Double, context: ActionContext) throws -> Bool {
+    guard var session = switcher else { return false }
     let feel = try releasingSwitcherOnError(id) { try switcherFeel(id, delta: delta, context: context) }
     session.stepper.step = feel.unit.step
+    let armed = !session.opened
+    if armed {
+      // End stepping never opens the switcher: only real travel does.
+      if let motion = feel.unit.motion, motion.atEnd != 0, motion.deltaMM == 0 { return false }
+      // Travel while armed counts 1:1, so the opening always takes one full step.
+      session.stepper.speedUp = false
+    }
     let result = session.stepper.advance(
       travel: feel.unit.travel(delta) * Self.sensitivity(context), motion: feel.unit.motion)
+    if armed { session.stepper.speedUp = feel.speedUp }
     switcher = session
-    guard result.steps != 0 else { return }
-    let forward = result.steps > 0
+    guard result.steps != 0 else { return false }
+    var steps = result.steps
+    if armed {
+      try openSwitcher(id, context: context)
+      // The first step is the opening. Further steps in the same update move on only forward:
+      // stepping back from where it just opened would cancel it in the same frame.
+      steps = max(steps - 1, 0)
+      guard steps != 0 else { return true }
+    }
+    let forward = steps > 0
     let tick = settings.allowsHaptic(.slideSteps, parameters: context.parameters)
     let click = settings.allowsHaptic(.slideLimits, parameters: context.parameters)
     var strong = result.endStarted
-    for _ in 0..<abs(result.steps) {
-      guard let current = switcher else { return }
+    for _ in 0..<abs(steps) {
+      guard let current = switcher else { return armed }
       if !forward && current.position <= 0 {
         actionsLog.info("app switcher: slid back past the start; cancelling")
         endSwitcher(cancel: true)
-        return
+        return armed
       }
       try releasingSwitcherOnError(id) { try tapSwitcher(forward: forward) }
       let wrapped = current.wraps(forward: forward)
@@ -186,6 +243,7 @@ extension ActionRegistry {
       }
       strong = false
     }
+    return armed
   }
 
   private func tapSwitcher(forward: Bool) throws {
@@ -205,7 +263,8 @@ extension ActionRegistry {
   }
 
   /// Ends the switcher session, if any: escape first when cancelling, then release command. Stops
-  /// the keep-open timer and the input monitor. Best effort — a failure here can't be reported to
+  /// the keep-open timer and the input monitor. A session that never opened pressed nothing, so it
+  /// ends silently. Best effort — a failure here can't be reported to
   /// anyone who could act on it, so it is logged.
   func endSwitcher(cancel: Bool) {
     keyLock.lock()
@@ -217,6 +276,7 @@ extension ActionRegistry {
     guard let session = switcher else { return }
     switcher = nil
     if session.lingering { switcherInput.stop() }
+    guard session.opened else { return }
     let held: Set<KeyCombo.Modifier> = [Self.switcherModifier]
     do {
       if cancel {
@@ -233,11 +293,12 @@ extension ActionRegistry {
     }
   }
 
-  /// Restarts the idle watchdog after any switcher event; no open session → no watchdog.
+  /// Restarts the idle watchdog after any switcher event; no open session → no watchdog (an armed
+  /// session holds nothing, so there is nothing to rescue).
   private func rearmSwitcherWatchdog() {
     switcherWatchdog?.cancel()
     switcherWatchdog = nil
-    guard switcher != nil else { return }
+    guard switcher?.opened == true else { return }
     let generation = keySessionGeneration
     switcherWatchdog = scheduler.schedule(after: Self.switcherIdleTimeout) { [weak self] in
       self?.switcherWatchdogFired(generation: generation)
@@ -247,7 +308,7 @@ extension ActionRegistry {
   func switcherWatchdogFired(generation: Int) {
     keyLock.lock()
     defer { keyLock.unlock() }
-    guard switcher != nil, generation == keySessionGeneration else { return }
+    guard switcher?.opened == true, generation == keySessionGeneration else { return }
     actionsLog.notice(
       "app switcher: no event for \(Self.switcherIdleTimeout, privacy: .public) s; cancelling and releasing command")
     endSwitcher(cancel: true)

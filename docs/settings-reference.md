@@ -195,7 +195,7 @@ On/off parameters are a two-value choice, `"on"` / `"off"`; the inspector draws 
 
 | Key | Applies to | Kind, default | Label · unit | Helper line |
 |---|---|---|---|---|
-| `stepMM` | `apps.switcher` | number 4…20, default 8 | "Distance per app" · mm | "Slide this far to move one app." |
+| `stepMM` | `apps.switcher` | number 4…20, default 8 | "Distance per app" · mm | "Slide this far to open the switcher and move one app." |
 | `stepMM` | `keyboard.slideSteps` | number 4…20, default 8 | "Distance per press" · mm | "Slide this far for one key press." |
 | `speedUp` | `apps.switcher` | choice `on` / `off`, default `on` | "Faster when you flick" | "A quick flick skips several apps." |
 | `speedUp` | `keyboard.slideSteps` | choice `on` / `off`, default `on` | "Faster when you flick" | "A quick flick sends several presses." |
@@ -227,8 +227,13 @@ Both lists are public on `ConfigValidator`: `legacyParameters` and `pressTimePar
 - Resting at an end of the zone (the recognizer's `atEnd`, a 6 mm end band) keeps a stepped slide
   stepping toward that end: 2 steps/s easing to 6 steps/s over 0.6 s, until the finger moves or
   lifts. A tick per step; a stronger click when end stepping starts. Levels don't end-step.
-- **App switcher session.** The first stroke holds command and opens the switcher on the next app.
-  When a stroke ends (or is interrupted by a palm or a second finger), command stays down for
+- **App switcher session.** The switcher opens after one step of travel (`stepMM`, default 8 mm),
+  never on contact (batch 26): a fresh stroke arms it and presses nothing; when its travel reaches
+  one step (either direction, counted 1:1 with no speed-up, never by end stepping) command goes
+  down and it opens on the next app. That first step is the opening. A stroke that ends or is
+  interrupted before then does nothing at all (no key events), so a finger resting on the edge, a
+  tap, or a short nudge never opens it. The `actionFired` click, the outcome
+  (`systemHUDShown`) and the idle watchdog all start at the opening. When a stroke ends (or is interrupted by a palm or a second finger), command stays down for
   `keepOpenMS`; a stroke that begins within that time continues the same session. It selects
   when the time passes, or at once on a click or clear pointer movement (40 pt); Escape closes it
   without selecting. Sliding back past the app it opened on cancels (escape). A stronger click

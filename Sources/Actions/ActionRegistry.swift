@@ -216,7 +216,8 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
   /// - **`keyboard.hold`**: `detail` is the combo as the user reads it (`KeyCombo.displayText`,
   ///   e.g. "fn", "⌃⌥ Space").
   /// - **`apps.switcher`**: no level; `systemHUDShown` is true (the system's app switcher is the
-  ///   feedback).
+  ///   feedback) once the switcher is open. While a stroke has armed it but not yet travelled one
+  ///   step, nothing is showing and the outcome is `nil` (batch 26).
   /// - Everything else: `nil`.
   public func performReporting(_ id: ActionID, input: ActionInput, context: ActionContext) throws
     -> ActionOutcome?
@@ -231,8 +232,8 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
         try performKeySteps(id, delta: delta, phase: phase, context: context)
         return nil
       case BuiltInAction.appSwitcher:
-        try performSwitcher(id, delta: delta, phase: phase, context: context)
-        return ActionOutcome(systemHUDShown: true)
+        let shown = try performSwitcher(id, delta: delta, phase: phase, context: context)
+        return shown ? ActionOutcome(systemHUDShown: true) : nil
       default:
         return try performLevel(id, delta: delta, phase: phase, context: context)
       }

@@ -260,9 +260,13 @@ if ask("18. Volume HUD: slide volume up 3/16 and back with headphones or earbuds
 if ask("19. App switcher: open it, move 2 apps right, 1 back, then select (cmd stays down until the end)?") {
   let switcher: ActionID = "apps.switcher"
   // The one-stroke switcher (keep-open off); step 29 tries the batch 20 session across strokes.
+  // Batch 26: the first step of travel opens it, so it takes one more step than before.
   let ctx = ActionContext(frontmostBundleID: nil, parameters: ["keepOpenMS": "0", "step": "0.1"])
   check("switcher") {
-    for (delta, phase) in [(0.0, GestureEvent.Phase.began), (0.1, .changed), (0.1, .changed), (-0.1, .changed)] {
+    let strokes: [(Double, GestureEvent.Phase)] = [
+      (0.0, .began), (0.1, .changed), (0.1, .changed), (0.1, .changed), (-0.1, .changed),
+    ]
+    for (delta, phase) in strokes {
       try registry.perform(switcher, input: .delta(delta, phase: phase), context: ctx)
       settle(0.5)
     }
@@ -274,6 +278,7 @@ if ask("19. App switcher: open it, move 2 apps right, 1 back, then select (cmd s
   if ask("   Now try a cancelled switch (opens, then escapes back without switching)?") {
     check("switcher cancel") {
       try registry.perform(switcher, input: .delta(0, phase: .began), context: ctx)
+      try registry.perform(switcher, input: .delta(0.1, phase: .changed), context: ctx)
       settle(0.8)
       try registry.perform(switcher, input: .delta(0, phase: .cancelled), context: ctx)
     }
@@ -428,8 +433,9 @@ if ask("28. Shortcuts: list your Shortcuts through the shortcuts command?") {
 }
 if ask("29. Short-stroke switching: open 8+ apps first. Five short 6 mm strokes, 0.25 s apart (keep-open 400 ms)?") {
   check("short strokes") {
-    for _ in 0..<5 {
-      try stroke("apps.switcher", mm: 6, speed: 60, ["speedUp": "off"])
+    for index in 0..<5 {
+      // Batch 26: the first stroke also travels the 8 mm that open the switcher.
+      try stroke("apps.switcher", mm: index == 0 ? 14 : 6, speed: 60, ["speedUp": "off"])
       settle(0.25)
     }
   }
@@ -453,7 +459,7 @@ if ask("30. Flick speed: the same 24 mm slowly (40 mm/s), then as a quick flick 
   settle(1.0)
   check("flick") { try stroke("apps.switcher", mm: 24, speed: 400, ["keepOpenMS": "0"]) }
   settle(1.0)
-  print("  Slow should move 3 apps; the flick clearly more (up to 9). Did the flick feel proportionate?")
+  print("  Slow should open on the next app and move 2 more; the flick clearly more (up to 9). Did the flick feel proportionate?")
 }
 if ask("31. End stepping: slide 9 mm then rest at the end for 2 s (expect a click, then ~10 more apps)?") {
   check("end stepping") { try stroke("apps.switcher", mm: 9, speed: 60, ["keepOpenMS": "0"], restAtEnd: 2) }
@@ -474,6 +480,37 @@ if ask("33. Does fn reach your dictation app? Hold fn through Hold Keys for 3 s 
   settle()
   print("  Did the app listen while fn was held? If not, set the app to a non-fn key (e.g. right option or")
   print("  ctrl+opt+space) and note it in the done report: synthetic fn may not reach every app.")
+}
+if ask("34. Switch Apps opens on travel, never on contact: rest, tap, a short nudge (nothing), then one step (opens)?") {
+  // Batch 26. Each part waits so you can see that nothing flashes.
+  check("rest") {
+    var time = Date().timeIntervalSinceReferenceDate
+    func send(_ phase: GestureEvent.Phase) throws {
+      let context = ActionContext(
+        frontmostBundleID: nil, parameters: ["speedUp": "off"],
+        motion: SlideMotion(deltaMM: 0, timestamp: time, atEnd: 0))
+      try registry.perform("apps.switcher", input: .delta(0, phase: phase), context: context)
+    }
+    try send(.began)
+    settle(1.5)
+    time += 1.5
+    try send(.ended)
+  }
+  settle(1.0)
+  check("tap") {
+    let context = ActionContext(frontmostBundleID: nil, parameters: ["speedUp": "off"])
+    try registry.perform("apps.switcher", input: .delta(0, phase: .began), context: context)
+    settle(0.04)
+    try registry.perform("apps.switcher", input: .delta(0, phase: .cancelled), context: context)
+  }
+  settle(1.0)
+  check("short nudge") { try stroke("apps.switcher", mm: 5, speed: 60, ["speedUp": "off"]) }
+  settle(1.0)
+  print("  So far: did NOTHING open or flash (rest 1.5 s, a tap, a 5 mm nudge)?")
+  check("one step") { try stroke("apps.switcher", mm: 8, speed: 60, ["speedUp": "off"]) }
+  settle(1.0)
+  print("  Did the switcher open on the next app with the one 8 mm step, and pick it about 0.4 s later?")
+  print("  On the real pad: rest a finger on the switcher edge, tap it, nudge it; only a real slide opens it.")
 }
 print("\nNot run here: system.lockScreen and system.sleepDisplay (they end the session). Bind them and try by hand.")
 
