@@ -423,6 +423,7 @@ The owner found the small numeric segmented control unclear. The split is shown,
 - **Hover preview:** hovering a segment previews that split on the mirror. The edge shows its dividers as `ink` hairlines at 50% until the user clicks or leaves.
 - **Accessibility names:** "Whole edge", "2 parts", "3 parts", "4 parts".
 - **Hidden on corners and on app tabs** (§ App profiles).
+- **A split edge's bindings group by segment in the inspector:** a 13 semibold `ink2` heading per segment ("Upper half" / "Lower half"; "Top third" / "Middle third" / "Bottom third"; "Left half" / "Right half" for horizontal edges; "Part 1" to "Part 4" for quarters), each followed by its own gesture rows.
 - Changing the split is one undo step. What happens to bindings is as the runtime's SplitPlan does today. If bindings will be moved or dropped, a one-line info note appears under the row before the click takes effect: "Upper half keeps Volume; lower half starts empty."
 
 ### Picker clarity: icons and rhythm (spec, 2026-11-07)
@@ -459,6 +460,10 @@ The owner found the picker cluttered and asked for more order, "maybe adding ico
 **Unavailable actions:** the icon and name are in `ink2`. The sub-line gives the reason ("Needs a backlit keyboard"). They're still selectable.
 
 **Limited actions:** the icon and name are in `ink`. The sub-line gives the note ("Uses the system Control–Left shortcut").
+
+**Scrolling and placement:**
+- Under the interior cap, long lists scroll. On open, the list scrolls so the checked (currently bound) action is visible; with nothing bound, it starts at the top.
+- When the picker is anchored to a side edge, it centres vertically on the anchor but is clamped so it clears the corner tiles **and their tabs**. If it can't, it gets shorter.
 
 **Search:** filtering keeps the group headers of groups that still have matches. With no matches at all: "No actions match "xyz"." (13, `ink2`).
 

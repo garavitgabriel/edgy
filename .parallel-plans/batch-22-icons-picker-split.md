@@ -15,6 +15,8 @@ Read `CLAUDE.md` (incl. "Design and brand"), `.parallel-plans/2026-11-07-edgy-v0
 
 6. **Window identity and Advanced** per BRIEF § "Window identity and Advanced": the 18 pt app icon (small, dotless drawing — `docs/design/assets/AppIcon.iconset/icon_16x16@2x.png` or the small-icon SVG) + "Edgy" wordmark after the traffic lights; Advanced… as a quiet footer text button with the `ui-advanced` icon. (Dock visibility while Settings is open is already wired by the chief in EdgyApp.)
 
+7. **Render notes (design session, BRIEF wins over the renders S9–S12 in `docs/design/final/supp/`):** follow the catalog's spellings ("Play/Pause", "Keyboard Backlight On/Off"), not the renders'; on open, scroll the picker so the bound (checkmarked) row is visible, else start at the top; a picker anchored to a side edge is vertically centred on the anchor but clamped to clear the corner tiles AND their tabs (shorten if needed); split diagrams are `split-*-N.svg` at 12×40 / 40×12 (`-selected` = filled); a split edge's bindings in the inspector group under 13 semibold ink2 headings per segment (Upper/Lower half, Top/Middle/Bottom third, Part 1–4); the renders predate § Window identity — follow BRIEF for the title bar and Advanced.
+
 ## Acceptance
 - Phase A: every catalog action has an icon (test), icon sheet + split glyph shots, token greps clean (icons use `Tokens` colours only).
 - Phase B: picker and split shots in light/dark (picker at catalog scale, searched, empty search, unavailable + limited rows, bound checkmark; split for each edge orientation and count, hover preview, the info note), tests for search/headers/empty state, split change + undo + note.
