@@ -9,7 +9,7 @@ Read `CLAUDE.md` (incl. "Design and brand"), `.parallel-plans/2026-11-07-edgy-v0
 2. A **split-control drawing** (from the exported split diagrams where provided): `EdgySplitGlyph(edge:parts:selected:)` — this edge in its orientation (40×12 top/bottom, 12×40 left/right), divided into 1–4 parts, selected one filled `ink`, no numbers.
 3. Snapshots: an icon sheet (all actions, light/dark, 16 pt and 2×) and the split glyphs (both orientations, every count, selected/unselected).
 
-**Phase B — after batch 21 merges (the chief messages you; `git merge main`, no rebase):** your glob grows to `Sources/EdgyUI/Picker/**`, `Sources/EdgyUI/Inspector/**` and their tests (batch 21 will be done by then).
+**Phase B — batch 21 has MERGED (b099cfd); phase B may start as soon as phase A is done (`git merge main` first, no rebase):** your glob grows to `Sources/EdgyUI/Picker/**`, `Sources/EdgyUI/Inspector/**` and their tests (batch 21 will be done by then).
 4. **Picker rows** per § Picker clarity: 16 pt icon in a 24 pt column, name 13 ink, trailing checkmark on the bound action, 28 / 44 pt rows, group header rhythm (11 semibold ink2, 14 above / 4 below, no separators), unavailable/limited styling, search keeps headers of groups with matches, empty state copy exactly as BRIEF.
 5. **Split control** per § Split control replacing "Split into 1 2 3 4": label + four glyphs, hover previews dividers on the mirror (publish the hover state through `SettingsModel` extension in your folder or a closure — not by editing Mirror/; if the mirror needs a hook, write a blocker), accessibility names, hidden on corners and app tabs, one undo step, the info note before bindings move or drop.
 
