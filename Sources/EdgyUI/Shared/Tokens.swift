@@ -47,7 +47,7 @@ public enum Tokens {
   // MARK: Pad drawing
 
   /// Points per millimetre on the settings-window mirror (to scale: the mirror is the pad).
-  public static let mirrorPointsPerMM: CGFloat = 5.4
+  public static let mirrorPointsPerMM: CGFloat = 3.7
   /// The menu-bar popover's mini mirror.
   public static let miniMirrorPointsPerMM: CGFloat = 2.6
 

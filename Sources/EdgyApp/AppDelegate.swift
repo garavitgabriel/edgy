@@ -74,7 +74,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       editor: editor, engine: engine, installedApps: makeLiveInstalledAppsProvider(),
       shortcuts: makeLiveShortcutsListing(), keyRecorder: makeLiveKeyComboRecorder())
     self.settingsModel = settingsModel
-    settingsWindow = SettingsWindowController(model: settingsModel)
+    settingsWindow = SettingsWindowController(
+      model: settingsModel,
+      commands: WindowCommands(
+        openAccessibilitySettings: { [weak self] in self?.grantAccessibility() },
+        openConfigFile: { [weak self] in self?.openConfigFile() },
+        reloadConfig: { [weak self] in self?.reloadConfig() }))
 
     store.startWatching { [weak self] newConfig in
       Task { @MainActor in self?.editor?.adoptExternal(newConfig) }
@@ -129,6 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   }
 
   private func refreshMenu() {
+    settingsWindow?.state.conditions.accessibility = permissions?.accessibility ?? .unknown
     statusMenu?.update(
       StatusMenu.State(
         enabled: editor?.config.app.enabled ?? applied.app.enabled, pausedUntil: engineStatus.pausedUntil,
