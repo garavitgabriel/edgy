@@ -180,6 +180,12 @@ The runtime API is in `SettingsEditor`: `effectiveBindings(forApp:)` with source
 - On an app tab it is **"On in Huddle"** (`setProfileDisabled`).
 - Global Enabled is still in the popover. Each status is said once, where it applies.
 
+**No "Split into" on app tabs.**
+- App tabs edit gestures on the **Default tab's segmentation**, so splitting an edge is a Default-tab action only.
+- The control is **hidden** on app tabs, not greyed out.
+- Reason: inheriting profiles merge by exact zone and gesture. A split on an app tab would leave Default's whole-edge binding live on the other half, with an overlap warning. That isn't a real independent split.
+- (Ruled with the build chief, 2026-11-07.)
+
 **The mirror on an app tab shows the *effective* bindings,** meaning what will actually happen in that app, drawn with the normal zone shapes. Two source marks appear on the pad:
 - **Overridden:** the zone's label tab gets a small solid `ink` dot before its text.
 - **Turned off here:** the zone is drawn as unmapped (hairline), and its tab reads "Off here" in `ink2`.
