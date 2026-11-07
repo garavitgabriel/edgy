@@ -45,12 +45,16 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
       self.window = window
     }
     model.startFeed()
+    // While Settings is open Edgy shows in the Dock and the app switcher (BRIEF § Window identity).
+    NSApp.setActivationPolicy(.regular)
     NSApp.activate()
     window?.makeKeyAndOrderFront(nil)
   }
 
   func windowWillClose(_ notification: Notification) {
-    model.stopFeed()
+    // The feed stays on: the overlay (level plate, display check, Test Mode) needs it whether or
+    // not this window is open. The engine throttles touches, so a running feed costs little.
+    NSApp.setActivationPolicy(.accessory)
   }
 }
 

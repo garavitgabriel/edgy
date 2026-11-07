@@ -25,6 +25,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var engineStatus = EngineStatus()
   private var statusMenu: StatusMenu?
   private var menuBar: MenuBarController?
+  private var overlay: OverlayController?
   private var frontmostObserver: NSObjectProtocol?
   private var pauseTimer: Timer?
   private var activationObserver: NSObjectProtocol?
@@ -108,7 +109,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         about: { [weak self] in self?.showAbout() },
         quit: { [weak self] in self?.quit() },
         openAccessibilitySettings: { [weak self] in self?.grantAccessibility() }))
-    menuBar.onOverlayVisibleChange = { [weak self] visible in self?.overlayVisibilityChanged(visible) }
+    // The overlay always runs (level plate for external displays, the display check); Test Mode
+    // adds its recognized / ignored plates.
+    let overlay = OverlayController(model: settingsModel)
+    overlay.start()
+    self.overlay = overlay
+    menuBar.onOverlayVisibleChange = { [weak self] visible in self?.overlay?.showsTestModePlates = visible }
     menuBar.state.frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
     menuBar.install()
     self.menuBar = menuBar
@@ -233,20 +239,6 @@ extension AppDelegate: StatusMenuHandler {
     }
     engine.setTestMode(on)
     refreshMenu()
-  }
-
-  /// Test Mode's overlay (batch 18 draws it). Until it lands, decisions go to the log.
-  private func overlayVisibilityChanged(_ visible: Bool) {
-    guard let engine else { return }
-    if visible, feedObserver == nil {
-      let log = SystemLogger(category: "testmode")
-      feedObserver = engine.observeFeed { update in
-        for decision in update.decisions { log.log(.info, "\(decision)") }
-      }
-    } else if !visible, let feedObserver {
-      engine.removeFeedObserver(feedObserver)
-      self.feedObserver = nil
-    }
   }
 
   func pauseForOneHour() {
