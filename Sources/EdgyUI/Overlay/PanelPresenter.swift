@@ -4,8 +4,8 @@ import SwiftUI
 /// The live overlay: one borderless, non-activating, click-through panel per screen for the
 /// plates, and one small non-activating panel that accepts clicks for the display check (the
 /// only clickable plate). Panels never take focus, join every Space and sit above full-screen
-/// apps. Drawn dark (renders D and S8): a dark plate on warm material reads over light and dark
-/// documents alike.
+/// apps. The plate itself is always dark (`PlateView`, bone 9 ruling); the panels also use the dark
+/// appearance so the HUD material under it matches.
 ///
 /// Live only: tests use a recording presenter, so no panel reaches a real screen from a test.
 @MainActor

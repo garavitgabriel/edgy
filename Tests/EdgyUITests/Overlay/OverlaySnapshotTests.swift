@@ -10,9 +10,9 @@ import Testing
 
 /// The batch-18 shots (light + dark) in `docs/design/build-shots/batch-18/`.
 ///
-/// Overlay plates are shown as the overlay's panel draws them (always dark, renders D and S8),
-/// over a white and a black document strip: bone 9's worst case. `plate-component-*` shows the
-/// component itself following the appearance (onboarding draws it on light glass).
+/// Plates are drawn with no appearance override: the one plate component is always dark (bone 9
+/// ruling), so every `-light` / `-dark` pair is identical by construction (critique 18 must-fix 2).
+/// Each plate sits over a white and a black document strip: bone 9's worst case.
 @MainActor
 @Suite struct OverlaySnapshotTests {
   static let folder = "batch-18"
@@ -24,7 +24,6 @@ import Testing
       plate.padding(24).background(Color.white)
       plate.padding(24).background(Color.black)
     }
-    .environment(\.colorScheme, .dark)
     #expect(try Snapshot.write(view, folder: Self.folder, name: name).count == 2)
   }
 
@@ -159,58 +158,132 @@ import Testing
     try shot("plate-display-check", content(.displayCheckDue(key: "4c2d-7154-9", name: "Desk 34")))
   }
 
-  // MARK: Docked on a mock screen
+  // MARK: Docked on a mock screen (re-made for batch 23: menu bar, work area, along-edge check)
 
   /// Render D: Test Mode on, a volume slide on the right edge and a palm on the bottom-left corner.
   @Test func dockedTestMode() throws {
-    try docked(
-      "overlay-docked-test-mode", testMode: true,
-      decisions: [
-        .actionRan(
-          BuiltInAction.volume, zone: .edge(.right), kind: .slide,
-          outcome: ActionOutcome(level: 0.64, systemHUDShown: true)
-        ),
-        .rejected(
-          contactID: 2, zone: .corner(.bottomLeft), reason: .palm, deviceID: 1,
-          measure: .init(measured: 21, limit: 18, unit: .mm)),
-      ])
+    try MockScreen.docked(
+      "overlay-docked-test-mode", folder: Self.folder, testMode: true, decisions: MockScreen.renderD)
   }
 
   /// Render S8: the level plate and display check on the left, a hold on the bottom edge.
   @Test func dockedLevelAndCheck() throws {
-    try docked(
-      "overlay-docked-level-check", testMode: true,
+    try MockScreen.docked(
+      "overlay-docked-level-check", folder: Self.folder, testMode: true, decisions: MockScreen.renderS8)
+  }
+}
+
+/// The batch-23 compositions (critique 18): light and dark documents, the level plate and the
+/// display check stacked along the edge with Test Mode off, and dry run with no level plate.
+@MainActor
+@Suite struct OverlayCompositionTests {
+  static let folder = "batch-23"
+
+  @Test func lightDocument() throws {
+    try MockScreen.docked(
+      "overlay-light-document", folder: Self.folder, testMode: true,
+      decisions: MockScreen.renderD + MockScreen.hold)
+  }
+
+  /// Critique 18 should-fix 3: one overlay over a dark document (the plates' light edge shows).
+  @Test func darkDocument() throws {
+    try MockScreen.docked(
+      "overlay-dark-document", folder: Self.folder, testMode: true, darkDocument: true,
+      decisions: MockScreen.renderD + MockScreen.hold)
+  }
+
+  /// Level plate + display check stacked along the left edge, Test Mode **off** (BRIEF: the level
+  /// plate "shows whether or not Test Mode is on"); the glyph has no Test Mode dot.
+  @Test func levelAndCheckStacked() throws {
+    try MockScreen.docked(
+      "overlay-level-check-stacked", folder: Self.folder, testMode: false, decisions: MockScreen.levelAndCheck)
+  }
+
+  /// The keyboard backlight's level plate with Test Mode off, over a dark document.
+  @Test func levelWithTestModeOff() throws {
+    try MockScreen.docked(
+      "overlay-level-test-mode-off", folder: Self.folder, testMode: false, darkDocument: true,
       decisions: [
         .actionRan(
-          BuiltInAction.brightness, zone: .edge(.left), kind: .slide,
-          outcome: ActionOutcome(level: 0.4, detail: "Desk 34")),
-        .displayCheckDue(key: "4c2d-7154-9", name: "Desk 34"),
-        .actionRan(
-          BuiltInAction.keyboardHold, zone: .edge(.bottom), kind: .longPress, outcome: ActionOutcome(detail: "fn")),
+          BuiltInAction.keyboardBacklight, zone: .edge(.right), kind: .slide, outcome: ActionOutcome(level: 0.6))
       ])
   }
 
-  private func docked(_ name: String, testMode: Bool, decisions: [LiveDecision]) throws {
-    let screen = OverlayScreen(
-      id: "1", name: "Desk 34", frame: CGRect(x: 0, y: 0, width: 1000, height: 650),
-      visibleFrame: CGRect(x: 0, y: 0, width: 1000, height: 626))
+  /// Critique 18 must-fix 3: dry run on a brightness slide shows only "Would set Brightness", no
+  /// level plate and no display check, even though the feed offers both.
+  @Test func dryRunBrightness() throws {
+    let engine = OverlayFakeEngine()
+    engine.isTestMode = true
+    let model = SettingsModel(editor: PreviewFixtures.model().editor, engine: engine)
+    let placements = try MockScreen.docked(
+      "overlay-dryrun-brightness", folder: Self.folder, testMode: true, model: model,
+      decisions: [
+        .wouldRun(BuiltInAction.brightness, zone: .edge(.left), kind: .slide),
+        .displayCheckDue(key: "4c2d-7154-9", name: "Desk 34"),
+      ])
+    #expect(placements.map(\.content.title) == ["Would set Brightness"])
+    #expect(!placements.contains { $0.content.kind == .level || $0.content.isDisplayCheck })
+  }
+}
+
+/// A 1280 × 800 mock screen: a menu bar with Edgy's glyph, a warm desktop and one document window
+/// whose frame and text frame are fed to the controller as the work area, so the shots show the
+/// real docking and avoidance.
+@MainActor
+enum MockScreen {
+  static let menuBarHeight: CGFloat = 24
+  static let screen = OverlayScreen(
+    id: "1", name: "Desk 34", frame: CGRect(x: 0, y: 0, width: 1280, height: 800),
+    visibleFrame: CGRect(x: 0, y: 0, width: 1280, height: 800 - menuBarHeight))
+  /// The document window and its focused text (AppKit coordinates, origin bottom-left).
+  static let window = CGRect(x: 300, y: 90, width: 680, height: 630)
+  static let text = window.insetBy(dx: 48, dy: 48)
+
+  static let renderD: [LiveDecision] = [
+    .actionRan(
+      BuiltInAction.volume, zone: .edge(.right), kind: .slide, outcome: ActionOutcome(level: 0.64, systemHUDShown: true)
+    ),
+    .rejected(
+      contactID: 2, zone: .corner(.bottomLeft), reason: .palm, deviceID: 1,
+      measure: .init(measured: 21, limit: 18, unit: .mm)),
+  ]
+  static let hold: [LiveDecision] = [
+    .actionRan(BuiltInAction.keyboardHold, zone: .edge(.bottom), kind: .longPress, outcome: ActionOutcome(detail: "fn"))
+  ]
+  static let levelAndCheck: [LiveDecision] = [
+    .actionRan(
+      BuiltInAction.brightness, zone: .edge(.left), kind: .slide, outcome: ActionOutcome(level: 0.4, detail: "Desk 34")),
+    .displayCheckDue(key: "4c2d-7154-9", name: "Desk 34"),
+  ]
+  static let renderS8: [LiveDecision] = levelAndCheck + hold
+
+  @discardableResult
+  static func docked(
+    _ name: String, folder: String, testMode: Bool, darkDocument: Bool = false,
+    model: SettingsModel = PreviewFixtures.model(), decisions: [LiveDecision]
+  ) throws -> [PlatePlacement] {
     let measurer = PanelPresenter()
     let presenter = SizingPresenter(measure: measurer.size(of:))
-    let model = PreviewFixtures.model()
-    let controller = OverlayController(
-      model: model, screens: FakeOverlayScreens([screen]), presenter: presenter, clock: ManualClock())
+    let screens = FakeOverlayScreens([screen], work: OverlayWorkArea(text: text, window: window))
+    let controller = OverlayController(model: model, screens: screens, presenter: presenter, clock: ManualClock())
     controller.start()
     controller.showsTestModePlates = testMode
     model.simulate(LiveFeedUpdate(touches: nil, decisions: decisions))
     controller.pump()
     let placements = presenter.shown
+    for placement in placements {
+      #expect(!placement.frame.intersects(text), "\(placement.content.title) covers the text")
+      #expect(screen.visibleFrame.contains(placement.frame), "\(placement.content.title) is off-screen")
+    }
     let view = ZStack(alignment: .topLeading) {
-      MockDesktop()
+      MockDesktop(
+        screen: screen.frame, window: window, text: text, dark: darkDocument,
+        glyph: testMode ? .testMode : .normal)
       OverlayCanvasSnapshot(placements: placements, screenFrame: screen.frame)
-        .environment(\.colorScheme, .dark)
     }
     .frame(width: screen.frame.width, height: screen.frame.height)
-    #expect(try Snapshot.write(view, folder: Self.folder, name: name).count == 2)
+    #expect(try Snapshot.write(view, folder: folder, name: name).count == 2)
+    return placements
   }
 }
 
@@ -245,22 +318,58 @@ struct OverlayCanvasSnapshot: View {
   }
 }
 
-/// A warm desktop with a document window, standing in for render D's screen.
+/// A warm desktop with a menu bar (Edgy's exported glyph at the right: its dot is the only Test
+/// Mode marker, bone 8) and a document window at `window`, its lines inside `text`.
 struct MockDesktop: View {
+  var screen: CGRect
+  var window: CGRect
+  var text: CGRect
+  var dark: Bool
+  var glyph: MenuGlyph.State
+
+  /// A frame in AppKit coordinates as a SwiftUI offset from the screen's top-left.
+  private func offset(_ frame: CGRect) -> CGSize {
+    CGSize(width: frame.minX - screen.minX, height: screen.maxY - frame.maxY)
+  }
+
   var body: some View {
-    ZStack {
+    ZStack(alignment: .topLeading) {
       LinearGradient(colors: [Tokens.padTop, Tokens.bar], startPoint: .top, endPoint: .bottom)
-      VStack(alignment: .leading, spacing: 14) {
+      document
+        .frame(width: window.width, height: window.height, alignment: .topLeading)
+        .offset(offset(window))
+      menuBar
+    }
+    .frame(width: screen.width, height: screen.height, alignment: .topLeading)
+  }
+
+  private var document: some View {
+    let ink = dark ? Color.white : Color.black
+    return ZStack(alignment: .topLeading) {
+      RoundedRectangle(cornerRadius: Tokens.radiusPlate).fill(dark ? Color.black : Color.white)
+      VStack(alignment: .leading, spacing: 16) {
         Text("Three days in Porto").font(Tokens.font(Tokens.typeTitle, semibold: true))
-        ForEach(0..<9, id: \.self) { line in
-          Capsule().fill(Color.black.opacity(0.12)).frame(width: line % 3 == 2 ? 300 : 520, height: 8)
+        ForEach(0..<14, id: \.self) { line in
+          Capsule().fill(ink.opacity(0.16)).frame(width: line % 4 == 3 ? 300 : text.width, height: 8)
         }
       }
-      .foregroundStyle(Color.black.opacity(0.85))
-      .padding(48)
-      .frame(width: 640, height: 470, alignment: .topLeading)
-      .background(Color.white)
-      .clipShape(RoundedRectangle(cornerRadius: Tokens.radiusPlate))
+      .foregroundStyle(ink.opacity(0.85))
+      .frame(width: text.width, height: text.height, alignment: .topLeading)
+      .offset(x: text.minX - window.minX, y: window.maxY - text.maxY)
     }
+  }
+
+  private var menuBar: some View {
+    HStack(spacing: 18) {
+      Text("Quillpad").font(Tokens.font(Tokens.typeBody, semibold: true))
+      Text("File").font(Tokens.font(Tokens.typeBody))
+      Text("Edit").font(Tokens.font(Tokens.typeBody))
+      Spacer()
+      Image(nsImage: MenuGlyph.image(for: glyph)).renderingMode(.template)
+    }
+    .foregroundStyle(Color.primary)
+    .padding(.horizontal, 16)
+    .frame(width: screen.width, height: MockScreen.menuBarHeight)
+    .background(Color(nsColor: .windowBackgroundColor).opacity(0.85))
   }
 }
