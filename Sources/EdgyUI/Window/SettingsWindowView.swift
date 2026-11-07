@@ -63,7 +63,7 @@ public struct SettingsWindowView: View {
       AdvancedSettingsView(model: model) { showingAdvanced = false }
     }
     .alert(removeTitle, isPresented: Binding(get: { removing != nil }, set: { if !$0 { removing = nil } })) {
-      Button("Remove", role: .destructive) {
+      Button("Remove") {
         if let removing { model.removeAppProfile(bundleID: removing) }
         removing = nil
       }
@@ -72,7 +72,7 @@ public struct SettingsWindowView: View {
       Text("Its gestures go back to what Default does.")
     }
     .alert("Replace the config file with the current settings?", isPresented: $confirmingReplace) {
-      Button("Replace", role: .destructive) { commands.replaceWithCurrentSettings() }
+      Button("Replace") { commands.replaceWithCurrentSettings() }
       Button("Cancel", role: .cancel) {}
     } message: {
       Text("Edgy writes the settings it is running now. The text in the file is lost.")

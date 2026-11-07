@@ -63,6 +63,7 @@ Tests cover: tab order (alphabetical, by installed name), app-name fallback, swi
 - **Huddle off:** name in `ink2` + slashed circle ✔, switch "On in Huddle" off ✔, line "Edgy is off in Huddle · Turn on" centred ✔, inspector empty ✔. The 40% fade and hairline zones are the mirror's (batch 14).
 - **Add app vs S2:** step 2 matches S2: app name header, "Start from" in `ink2`, three radio rows with the selected row filled, sub-lines word for word, Back (bordered) + Add (`ink` fill). Step 1 follows BRIEF (no render): "Add an app", search, Running, All apps, "Has a profile" rows in `ink2` (kept ≥4.5:1, not double-dimmed).
 - **System states vs S5 (popover forms):** paused line copy and Resume placement mirror S5's "Paused, 47 min left · Resume"; Accessibility strip uses S5's sentence and "Open Settings". No-trackpad and disabled shots show the stub (the mirror owns those treatments).
+- **Overlapping zones:** warning icon + `ink2` sentence ("Whole edge and upper half both use Slide.") wraps to two lines in the 340 pt column with **Show** trailing; reads cleanly above the inspector.
 - **Broken config:** strip with error icon + the BRIEF sentence + three buttons; footer and switch visibly disabled; tabs stay clickable (viewing is safe).
 - **Advanced…:** plain two-section sheet, labels `ink2`, values with units on the right in proportional figures, the out-of-range warning under its field ("The config file said 90 mm; using 20 mm.").
 
@@ -87,13 +88,15 @@ Tests cover: tab order (alphabetical, by installed name), app-name fallback, swi
 6. **Default buttons (Add, Done) are `ink`-filled**, matching S2; sliders tinted `ink`; only switches use the accent.
 7. **Read-only window:** tabs stay selectable; mirror, inspector, footer, switch, "+" and context-menu items are disabled.
 8. **Copy I wrote** where BRIEF gives none (one clause, plain): remove confirm "Remove the Huddle profile?" / "Its gestures go back to what Default does."; replace confirm "Replace the config file with the current settings?" / "Edgy writes the settings it is running now. The text in the file is lost."; Advanced labels ("Wait before a slide", "Ignore after typing", "Fingers for a slide"; haptic moments "Each step of a slide", "A level reaches its end", "A slide is caught", "An action runs"); strengths "4 of 6"; overlap part names ("Whole edge and upper half both use Slide.").
-9. **Sliders snap in the setter** (1 mm / 10–50 ms) rather than `step:`, which drew hundreds of tick marks.
+9. **No `role: .destructive` on the confirm buttons** (Remove, Replace): macOS draws a destructive alert button's title in system red, a second hue. The wording carries the weight instead.
+10. **Sliders snap in the setter** (1 mm / 10–50 ms) rather than `step:`, which drew hundreds of tick marks.
 
 ## Needs Gabriel
 
 - Window material over real wallpapers (light/dark): text contrast on the tinted glass.
 - Switches with the accent fill on a key window (headless shots show the inactive look).
 - App marks with real app icons at 16 pt, desaturated: do they read as "small monochrome marks"? (Render S1 suggests line-art marks; a desaturated full-colour icon may look heavier.)
+- Confirm alerts (Remove profile, Replace config) show no red button title on device.
 - Window size on a 13–14" display (1285 × 845 pt minimum; see Open questions).
 
 ## Open questions
