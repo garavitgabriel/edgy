@@ -121,6 +121,138 @@ swift run edgy-trace record --label long-press-top-left-corner --seconds 4 --out
   --expect "One finger holds still in the top-left corner for about 1.5 s. Expect: top-left corner long-press fires once, on the hold."
 ```
 
+## On an external trackpad (desktop Mac or a second device)
+
+Every scenario above and below can be recorded on an external trackpad too; edges and corners are
+measured in millimetres, so the same expectations apply.
+
+1. `swift run edgy-trace devices` and note the external trackpad's `id` (kind `externalTrackpad`).
+2. Add `--device <id>` to every command, and append `-external` to both the `--label` and the file
+   name, e.g. `--label long-press-top-left-corner-external --out Fixtures/traces/long-press-top-left-corner-external.json`.
+   The replay test strips `-external` / `-builtin` and applies the scenario's assertion.
+3. The external pad is larger, so a 12 mm corner is a smaller share of it — but users reported the
+   corner feeling large. Record scenario 21 there first.
+
+## v0.3 scenarios — misfire hardening and holds
+
+Same routine. These mirror the synthetic tests in `Tests/GesturesTests/AdversarialTests.swift`;
+the recordings tell us whether the thresholds hold on real hands.
+
+### 12. `thumb-rest-bottom-index-moves`
+
+Rest your thumb on the bottom edge strip (as you do while clicking), keep it there, and move the
+pointer around with the index finger for a few seconds.
+
+```bash
+swift run edgy-trace record --label thumb-rest-bottom-index-moves --seconds 6 --out Fixtures/traces/thumb-rest-bottom-index-moves.json \
+  --expect "Thumb rests on the bottom edge while the index finger moves the pointer. Expect: nothing fires, nothing claimed."
+```
+
+### 13. `thumb-rest-right-index-moves`
+
+Same, but the thumb (or a finger) rests on the right edge strip for a full second *before* the
+index finger lands and moves the pointer.
+
+```bash
+swift run edgy-trace record --label thumb-rest-right-index-moves --seconds 6 --out Fixtures/traces/thumb-rest-right-index-moves.json \
+  --expect "A finger rests on the right edge, then another finger moves the pointer. Expect: the resting finger's claim is let go as soon as the other finger moves; no volume change."
+```
+
+### 14. `two-finger-scroll-drift-into-right-edge`
+
+Two-finger scroll that starts mid-pad and drifts right until one finger is in the right edge strip.
+
+```bash
+swift run edgy-trace record --label two-finger-scroll-drift-into-right-edge --seconds 5 --out Fixtures/traces/two-finger-scroll-drift-into-right-edge.json \
+  --expect "Two-finger scroll drifts into the right edge. Expect: nothing fires; touches must start in the zone."
+```
+
+### 15. `three-finger-swipe-from-right-edge`
+
+Three fingers start at the right edge and swipe left (switch Spaces / full-screen apps).
+
+```bash
+swift run edgy-trace record --label three-finger-swipe-from-right-edge --seconds 4 --out Fixtures/traces/three-finger-swipe-from-right-edge.json \
+  --expect "Three-finger swipe starting at the right edge. Expect: nothing fires; contact-count gate rejects."
+```
+
+### 16. `four-finger-swipe-up-from-bottom`
+
+Four fingers start low on the pad (touching the bottom edge strip) and swipe up (Mission Control).
+
+```bash
+swift run edgy-trace record --label four-finger-swipe-up-from-bottom --seconds 4 --out Fixtures/traces/four-finger-swipe-up-from-bottom.json \
+  --expect "Four-finger swipe up starting at the bottom edge. Expect: nothing fires."
+```
+
+### 17. `three-finger-swipe-sideways-low`
+
+Three fingers low on the pad, swipe sideways along the bottom.
+
+```bash
+swift run edgy-trace record --label three-finger-swipe-sideways-low --seconds 4 --out Fixtures/traces/three-finger-swipe-sideways-low.json \
+  --expect "Three-finger sideways swipe along the bottom edge. Expect: no media swipe fires."
+```
+
+### 18. `palm-land-left-while-typing`
+
+Type, and mid-sentence let the left palm land on the left edge of the trackpad.
+
+```bash
+swift run edgy-trace record --label palm-land-left-while-typing --seconds 6 --out Fixtures/traces/palm-land-left-while-typing.json \
+  --expect "Left palm lands on the left edge mid-typing. Expect: nothing fires (the recording has no typing signal, so the palm gate must catch it alone)."
+```
+
+### 19. `inward-swipe-from-right-one-finger`
+
+One finger starts at the far right and moves left into the pad at a relaxed speed.
+
+```bash
+swift run edgy-trace record --label inward-swipe-from-right-one-finger --seconds 4 --out Fixtures/traces/inward-swipe-from-right-one-finger.json \
+  --expect "One finger moves inward from the right edge. Expect: nothing fires; handed off to the system."
+```
+
+### 20. `long-press-drift-top-left`
+
+Put a finger in the top-left corner and let it creep slowly (2–3 mm over a second) instead of
+holding still. Hard to do on purpose: think "resting, not pressing".
+
+```bash
+swift run edgy-trace record --label long-press-drift-top-left --seconds 4 --out Fixtures/traces/long-press-drift-top-left.json \
+  --expect "A finger creeps slowly in the top-left corner. Expect: no long-press."
+```
+
+### 21. `tap-corner-edge-boundary-top-right`
+
+Tap a few times right where the top-right corner meets the right edge (about 12 mm down from the
+top), a second apart. No assertion yet — it shows where real taps land relative to the line.
+
+```bash
+swift run edgy-trace record --label tap-corner-edge-boundary-top-right --seconds 6 --out Fixtures/traces/tap-corner-edge-boundary-top-right.json \
+  --expect "Taps on the line between the top-right corner and the right edge. Expect: each tap goes to exactly one zone (corner inside its 12 mm square)."
+```
+
+### 22. `push-to-talk-hold-bottom-left`
+
+Press and hold the bottom-left corner for ~2 s as if talking, letting the finger shift a little,
+then lift.
+
+```bash
+swift run edgy-trace record --label push-to-talk-hold-bottom-left --seconds 5 --out Fixtures/traces/push-to-talk-hold-bottom-left.json \
+  --expect "Hold the bottom-left corner about 2 s. Expect: one hold, began then ended at lift."
+```
+
+### 23. `click-drag-right-edge`
+
+Click the trackpad down inside the right edge strip and drag up along it (as when resizing a
+window from its right side). Kept for the click blocker: no assertion until the frame carries the
+button state.
+
+```bash
+swift run edgy-trace record --label click-drag-right-edge --seconds 4 --out Fixtures/traces/click-drag-right-edge.json \
+  --expect "Physical click-and-drag up the right edge. Expect (once frames carry the button): nothing fires."
+```
+
 ## After the session
 
 ```bash
