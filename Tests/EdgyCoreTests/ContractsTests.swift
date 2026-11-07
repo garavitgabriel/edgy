@@ -49,3 +49,13 @@ import Testing
   #expect(d.category == .system)
   #expect(d.parameters.isEmpty)
 }
+
+@Test func availabilityDefaultsToAvailable() {
+  final class Bare: ActionPerforming {
+    var available: [ActionDescriptor] { [] }
+    func perform(_ id: ActionID, input: ActionInput, context: ActionContext) throws {}
+  }
+  #expect(Bare().availability(of: "x.y") == .available)
+  #expect(ActionAvailability.limited(reason: "r").isUsable)
+  #expect(!ActionAvailability.unavailable(reason: "r").isUsable)
+}

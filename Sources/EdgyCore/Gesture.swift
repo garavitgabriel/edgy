@@ -41,6 +41,10 @@ public enum GestureKind: Codable, Hashable, Sendable {
 }
 
 /// A recognized gesture, emitted by the Gestures module.
+///
+/// Phases per kind: `.slide` → began / changed… / ended (or cancelled). `.longPress` → `.began`
+/// the moment the hold is recognized, then `.ended` when the finger lifts (`.cancelled` if the
+/// touch is taken away, e.g. by a palm or extra fingers). Tap, double-tap and swipe → one `.ended`.
 public struct GestureEvent: Codable, Hashable, Sendable {
   public enum Phase: String, Codable, Sendable { case began, changed, ended, cancelled }
 

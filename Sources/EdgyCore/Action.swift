@@ -14,6 +14,25 @@ public enum ActionInput: Sendable, Equatable {
   case delta(Double, phase: GestureEvent.Phase)
   /// One-shot trigger.
   case trigger
+  /// Press-and-hold: `down: true` when a long-press is recognized, `down: false` when the finger
+  /// lifts (or the gesture is cancelled). Every `down: true` is followed by exactly one `down: false`.
+  case press(down: Bool)
+}
+
+/// Whether an action can work on this Mac right now. The settings UI greys out unavailable
+/// actions and shows `reason`; first-run defaults skip them.
+public enum ActionAvailability: Sendable, Hashable {
+  case available
+  /// Works, with a caveat worth showing (e.g. "needs the system Mission Control shortcut").
+  case limited(reason: String)
+  /// Can't work on this hardware/setup (e.g. "No built-in display, and this monitor doesn't
+  /// accept brightness control").
+  case unavailable(reason: String)
+
+  public var isUsable: Bool {
+    if case .unavailable = self { return false }
+    return true
+  }
 }
 
 /// Where and why the action fires.
@@ -73,7 +92,8 @@ public struct ActionParameter: Sendable, Hashable {
 }
 
 public struct ActionDescriptor: Sendable, Hashable {
-  public enum Shape: String, Sendable { case continuous, trigger }
+  /// `continuous` ↔ `.slide`; `hold` ↔ `.longPress` only; `trigger` ↔ every non-slide gesture.
+  public enum Shape: String, Sendable { case continuous, trigger, hold }
   public var id: ActionID
   public var shape: Shape
   /// Human-readable name for the settings UI.
@@ -104,11 +124,15 @@ public protocol ActionPerforming: AnyObject {
   /// Haptic feedback for a gesture moment (not tied to an action's own output). Implementations
   /// decide with `AppSettings.allowsHaptic(_:parameters:)` using `context.parameters`.
   func feedback(_ event: HapticEvent, context: ActionContext)
+  /// Whether `id` can work on this Mac (hardware, attached displays, keyboard). Cheap enough to
+  /// call when building settings UI or first-run defaults; implementations may cache.
+  func availability(of id: ActionID) -> ActionAvailability
 }
 
 extension ActionPerforming {
   public func apply(settings: AppSettings) {}
   public func feedback(_ event: HapticEvent, context: ActionContext) {}
+  public func availability(of id: ActionID) -> ActionAvailability { .available }
 }
 
 public enum ActionError: Error, Equatable {
