@@ -170,6 +170,6 @@ git grep -niE -f ~/.config/edgy-names-denylist         → nothing (exit 1)
 
 ## Open questions
 
-1. **Picker height:** min(420, mirror − 16) still covers the pad's opposite bar when the picker opens across the pad. With 8 mm strips the interior is about mirror − 2×(8 mm + gap). Should the cap be the pad's interior height instead? The placement already avoids neighbouring zones whenever it fits.
+1. ~~**Picker height:**~~ **Resolved after merge.** The chief decided to cap the picker at the pad's interior. The follow-up commit makes `PickerPlacement.place` shorten the picker until it clears its zone and every other zone, with min(420, mirror − 16) as the upper bound and 200 pt as the floor. Tested on a to-scale 3.7 pt/mm pad (`onAShortPadThePickerShrinksBetweenTheBars`).
 2. **Should `SettingsModel` own drafts / focus / open-menu state?** See the blocker.
 3. **Hosting:** `.actionPickerHost(model:)` still needs to be put on the window. See the blocker.
