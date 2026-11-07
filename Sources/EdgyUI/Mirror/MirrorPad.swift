@@ -84,6 +84,42 @@ struct MirrorPad: View {
   /// Publish zone and mirror bounds for the action picker (batch 15's `PickerAnchorKey`). The
   /// settings mirror only.
   var publishesPickerAnchors = false
+  /// The Split control's hover preview (§ Split control): this edge's dividers for `parts`, drawn
+  /// as `ink` hairlines at 50% until the click or the pointer leaves.
+  var splitPreview: SplitPreview.Hover?
+
+  /// Between the inner edges of the top and bottom bars, and of the side strips.
+  var interiorRect: CGRect {
+    let top = geometry.shapeFrame(for: .edge(.top)).maxY
+    let bottom = geometry.shapeFrame(for: .edge(.bottom)).minY
+    let left = geometry.shapeFrame(for: .edge(.left)).maxX
+    let right = geometry.shapeFrame(for: .edge(.right)).minX
+    return CGRect(x: left, y: top, width: max(right - left, 0), height: max(bottom - top, 0))
+  }
+
+  /// Hairline dividers across the hovered edge where its `parts` would meet.
+  @ViewBuilder func splitDividers(_ preview: SplitPreview.Hover) -> some View {
+    let whole = geometry.shapeFrame(for: .edge(preview.edge))
+    let vertical = preview.edge == .left || preview.edge == .right
+    Path { path in
+      guard preview.parts > 1 else { return }
+      for index in 1..<preview.parts {
+        // Where segment `index` meets segment `index - 1`, from the runtime's own segment frames.
+        let next = geometry.shapeFrame(for: .edge(preview.edge, segment: index, segments: preview.parts))
+        let previous = geometry.shapeFrame(for: .edge(preview.edge, segment: index - 1, segments: preview.parts))
+        if vertical {
+          let y = (min(next.maxY, previous.maxY) + max(next.minY, previous.minY)) / 2
+          path.move(to: CGPoint(x: whole.minX - 3, y: y))
+          path.addLine(to: CGPoint(x: whole.maxX + 3, y: y))
+        } else {
+          let x = (min(next.maxX, previous.maxX) + max(next.minX, previous.minX)) / 2
+          path.move(to: CGPoint(x: x, y: whole.minY - 3))
+          path.addLine(to: CGPoint(x: x, y: whole.maxY + 3))
+        }
+      }
+    }
+    .stroke(Tokens.ink.opacity(0.5), lineWidth: 1)
+  }
 
   /// Fully faded per BRIEF: "The mirror fades to 40%".
   static let fadedOpacity = 0.4
@@ -107,6 +143,11 @@ struct MirrorPad: View {
     ZStack(alignment: .topLeading) {
       ZStack(alignment: .topLeading) {
         slab(size)
+        if publishesPickerAnchors {
+          let interior = interiorRect
+          Color.clear.frame(width: interior.width, height: interior.height).pickerInterior()
+            .offset(x: interior.minX, y: interior.minY).allowsHitTesting(false)
+        }
         if !(dashedOutline && !showsLabels) {
           ForEach(zones.filter { !$0.isCorner }) { shape($0, live: live.contains($0.zone)) }
           ForEach(zones.filter(\.isCorner)) { shape($0, live: live.contains($0.zone)) }
@@ -116,6 +157,7 @@ struct MirrorPad: View {
             ForEach(zones.filter(\.isCorner)) { hitArea($0) }
           }
           if showsLabels { ForEach(zones) { label($0, live: live.contains($0.zone)) } }
+          if let preview = splitPreview { splitDividers(preview).allowsHitTesting(false) }
         }
       }
       // One fade for the whole pad, not per layer (overlaps would show through).
@@ -247,11 +289,8 @@ struct MirrorPad: View {
   }
 
   @ViewBuilder private func cornerIcon(_ zone: MirrorZone) -> some View {
-    if showsIcons, let symbol = zone.symbol {
-      Image(systemName: symbol)
-        .font(Tokens.font(full ? Tokens.typeValue : Tokens.typeBody, semibold: true))
-        .imageScale(full ? .medium : .small)
-        .foregroundStyle(Tokens.ink)
+    if showsIcons, let action = zone.symbol {
+      ActionIcon(id: action, size: full ? 16 : 12).foregroundStyle(Tokens.ink)
     }
   }
 
@@ -304,6 +343,7 @@ struct MirrorPad: View {
         }
       }
       .fixedSize()
+      .modifier(PickerTabAnchor(zone: zone.zone, enabled: publishesPickerAnchors && !placement.inBar))
       .alignmentGuide(HorizontalAlignment.leading) { d in d.width * placement.anchor.x - placement.point.x }
       .alignmentGuide(VerticalAlignment.top) { d in d.height * placement.anchor.y - placement.point.y }
       .onTapGesture { onSelect?(zone.zone) }
@@ -419,7 +459,7 @@ struct MirrorPad: View {
     // rounded corner), clear of the side bar.
     let tileReach = bar.minX < size.width / 2 ? bar.maxX : size.width - bar.minX
     let inset = min(stripDepth, tileReach - tileRadius(bar) - 2)
-    let overlap: CGFloat = 2
+    let overlap: CGFloat = join  // the tab tucks under the tile (render A; critique 14 M2)
     switch zone.zone {
     case .edge(.left, _, _):
       return LabelPlacement(point: CGPoint(x: bar.maxX - join, y: bar.midY), anchor: .leading, inBar: false)
@@ -506,6 +546,15 @@ struct PickerZoneAnchor: ViewModifier {
 
   func body(content: Content) -> some View {
     if enabled { content.pickerAnchor(for: zone) } else { content }
+  }
+}
+
+/// `.pickerTab(for:)` on a zone's label tab, so the picker clears corner tabs as well as tiles.
+struct PickerTabAnchor: ViewModifier {
+  var zone: Zone
+  var enabled: Bool
+  func body(content: Content) -> some View {
+    if enabled { content.pickerTab(for: zone) } else { content }
   }
 }
 

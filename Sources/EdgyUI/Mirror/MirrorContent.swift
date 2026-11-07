@@ -20,8 +20,8 @@ struct MirrorZone: Hashable, Identifiable {
   var label: String?
   /// An app tab overrides at least one of this zone's default bindings (ink dot on the tab).
   var overridden: Bool
-  /// The SF Symbol drawn inside a mapped corner tile.
-  var symbol: String?
+  /// The action whose icon is drawn inside a mapped corner tile (the transcribed action family).
+  var symbol: ActionID?
   /// Shorter forms of `label`, longest first (bone 3: parameter short value, then action short
   /// name). The pad draws the first form that fits, else the last one clipped with a fade.
   var shorter: [String] = []
@@ -85,7 +85,7 @@ enum MirrorContent {
       return MirrorZone(
         zone: zone, style: .mapped, label: ZoneLabel.text(for: bindings, catalog: catalog),
         overridden: running.contains { $0.source == .overridden },
-        symbol: first.map { ZoneLabel.symbol(for: $0.action) },
+        symbol: first?.action,
         shorter: ZoneLabel.shorterForms(for: bindings, catalog: catalog),
         unavailable: bindings.contains { !availability($0.action).isUsable })
     }
@@ -220,47 +220,6 @@ enum ZoneLabel {
     default: return names.dropLast().joined(separator: ", ") + " and " + names[names.count - 1]
     }
   }
-
-  /// The icon inside a mapped corner tile (SF Symbols only; one family, one weight).
-  static func symbol(for action: ActionID) -> String {
-    symbols[action] ?? "circle.dotted"
-  }
-
-  private static let symbols: [ActionID: String] = [
-    BuiltInAction.micMute: "mic.slash",
-    BuiltInAction.mute: "speaker.slash",
-    BuiltInAction.volume: "speaker.wave.2",
-    BuiltInAction.brightness: "sun.max",
-    BuiltInAction.playPause: "playpause",
-    BuiltInAction.next: "forward",
-    BuiltInAction.previous: "backward",
-    BuiltInAction.runShortcut: "square.stack.3d.up",
-    BuiltInAction.keyboardShortcut: "command",
-    BuiltInAction.keyboardHold: "keyboard",
-    BuiltInAction.keyboardSlideSteps: "keyboard",
-    BuiltInAction.keyboardBacklight: "light.max",
-    BuiltInAction.keyboardBacklightToggle: "light.max",
-    BuiltInAction.openApp: "app",
-    BuiltInAction.openURL: "link",
-    BuiltInAction.openFile: "folder",
-    BuiltInAction.appSwitcher: "square.on.square",
-    BuiltInAction.missionControl: "rectangle.3.group",
-    BuiltInAction.appWindows: "macwindow.on.rectangle",
-    BuiltInAction.showDesktop: "menubar.dock.rectangle",
-    BuiltInAction.spaceLeft: "rectangle.lefthalf.inset.filled",
-    BuiltInAction.spaceRight: "rectangle.righthalf.inset.filled",
-    BuiltInAction.lockScreen: "lock",
-    BuiltInAction.sleepDisplay: "moon",
-    BuiltInAction.dictation: "mic",
-    BuiltInAction.windowLeftHalf: "rectangle.lefthalf.filled",
-    BuiltInAction.windowRightHalf: "rectangle.righthalf.filled",
-    BuiltInAction.windowTopHalf: "rectangle.tophalf.filled",
-    BuiltInAction.windowBottomHalf: "rectangle.bottomhalf.filled",
-    BuiltInAction.windowMaximize: "rectangle.inset.filled",
-    BuiltInAction.windowCenter: "rectangle.center.inset.filled",
-    BuiltInAction.windowMinimize: "minus.rectangle",
-    BuiltInAction.windowRestore: "rectangle",
-  ]
 
   private static func padOrder(_ gesture: GestureKind) -> Int {
     switch gesture {

@@ -49,18 +49,15 @@ private struct ZoneInspector: View {
   var zone: Zone
 
   var body: some View {
-    let rows = model.inspectorRows(for: zone)
-    let drafts = model.inspectorDrafts
     VStack(alignment: .leading, spacing: 0) {
-      Text(ZoneNaming.title(zone))
+      Text(Self.title(zone))
         .font(Tokens.font(Tokens.typeTitle, semibold: true))
         .foregroundStyle(Tokens.ink)
         .accessibilityAddTraits(.isHeader)
-      if let count = model.splitCount(for: zone) {
-        // No "Split into" on app tabs: hidden, not greyed out (§ App profiles, chief ruling).
+      if case .edge(let edge, _, let count) = zone {
+        // No Split on app tabs: hidden, not greyed out (§ App profiles, chief ruling).
         if model.selectedProfile == .default {
-          SplitControl(count: count, enabled: model.canSplit) { model.split(zone, into: $0) }
-            .padding(.top, 12)
+          SplitControl(model: model, zone: zone, enabled: model.canSplit).padding(.top, 12)
         }
         ForEach(Array(model.overlaps(onEdgeOf: zone).enumerated()), id: \.offset) { _, overlap in
           IssueLine(style: .warning, text: IssueCopy.overlap(overlap.0, overlap.1, gesture: overlap.2)) {
@@ -68,10 +65,52 @@ private struct ZoneInspector: View {
           }
           .padding(.top, 8)
         }
+        InspectorRule().padding(.top, 14).padding(.bottom, 10)
+        if count > 1 {
+          // A split edge's bindings group by segment (§ Split control), in reading order.
+          VStack(alignment: .leading, spacing: 14) {
+            ForEach(SplitNaming.readingOrder(edge: edge, segments: count), id: \.self) { segment in
+              if case .edge(_, let index, _) = segment {
+                VStack(alignment: .leading, spacing: 6) {
+                  Text(SplitNaming.heading(edge: edge, segment: index, segments: count))
+                    .font(Tokens.font(Tokens.typeBody, semibold: true)).foregroundStyle(Tokens.ink2)
+                    .accessibilityAddTraits(.isHeader)
+                  SegmentBindings(model: model, zone: segment, rules: false)
+                }
+              }
+            }
+          }
+        } else {
+          SegmentBindings(model: model, zone: zone, rules: true)
+        }
+      } else {
+        InspectorRule().padding(.top, 14).padding(.bottom, 10)
+        SegmentBindings(model: model, zone: zone, rules: true)
       }
-      InspectorRule().padding(.top, 14).padding(.bottom, 10)
-      let open = model.openBinding(in: zone, rows: rows)
-      let pending = pendingGesture(rows: rows)
+    }
+  }
+
+  /// The 26 pt title. A split edge is named as the edge ("Right edge"); its parts are the headings.
+  static func title(_ zone: Zone) -> String {
+    if case .edge(let edge, _, let count) = zone, count > 1 { return ZoneNaming.title(.edge(edge)) }
+    return ZoneNaming.title(zone)
+  }
+}
+
+/// One zone's (or one segment's) mapped gestures, the pending row while picking, "Add gesture…" and
+/// its interaction notes.
+private struct SegmentBindings: View {
+  @Bindable var model: SettingsModel
+  var zone: Zone
+  /// Hairlines around the rows (a whole zone); a segment group is spaced, not ruled.
+  var rules: Bool
+
+  var body: some View {
+    let rows = model.inspectorRows(for: zone)
+    let drafts = model.inspectorDrafts
+    let open = model.openBinding(in: zone, rows: rows)
+    let pending = pendingGesture(rows: rows)
+    VStack(alignment: .leading, spacing: 0) {
       VStack(alignment: .leading, spacing: 12) {
         ForEach(rows) { row in
           let key = InspectorDrafts.Key(profile: model.selectedProfile, binding: row.id)
@@ -83,7 +122,7 @@ private struct ZoneInspector: View {
         }
         if let pending { PendingRowView(gesture: pending) }
       }
-      if !rows.isEmpty || pending != nil { InspectorRule().padding(.vertical, 10) }
+      if rules, !rows.isEmpty || pending != nil { InspectorRule().padding(.vertical, 10) }
       if !model.unmappedGestures(for: zone).isEmpty {
         Button {
           drafts.open = nil
@@ -97,8 +136,9 @@ private struct ZoneInspector: View {
           .frame(minHeight: 28).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .padding(.top, rules || (rows.isEmpty && pending == nil) ? 0 : 4)
       }
-      TapNotes(model: model, zone: zone, rows: rows).padding(.top, 14)
+      TapNotes(model: model, zone: zone, rows: rows).padding(.top, rules ? 14 : 4)
     }
     .onChange(of: drafts.focus) { _, focus in
       // The focused field has drawn; one handoff per choice.
@@ -131,26 +171,6 @@ struct PendingRowView: View {
     .padding(.horizontal, 6)
     .background(RoundedRectangle(cornerRadius: Tokens.radiusControl).fill(Tokens.bar.opacity(0.35)))
     .padding(.horizontal, -6)
-  }
-}
-
-/// "Split into 1 2 3 4" (bone 6).
-struct SplitControl: View {
-  var count: Int
-  var enabled: Bool
-  var set: (Int) -> Void
-
-  var body: some View {
-    HStack(spacing: 12) {
-      Text("Split into").font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
-      Picker("Split into", selection: SwiftUI.Binding(get: { count }, set: set)) {
-        ForEach(1...4, id: \.self) { Text("\($0)").tag($0) }
-      }
-      .pickerStyle(.segmented)
-      .labelsHidden()
-      .fixedSize()
-      .disabled(!enabled)
-    }
   }
 }
 

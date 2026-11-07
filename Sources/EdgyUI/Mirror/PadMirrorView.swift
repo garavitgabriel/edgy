@@ -37,7 +37,7 @@ public struct PadMirrorView: View {
         touches: device == nil ? [] : model.liveTouches, faded: state.faded, dashedOutline: state == .noTrackpad,
         message: Self.message(for: state),
         onSelect: { model.selectZone($0) },
-        publishesPickerAnchors: true
+        publishesPickerAnchors: true, splitPreview: model.splitPreview.hover
       )
       .id(device?.id)
       .transition(.opacity)
