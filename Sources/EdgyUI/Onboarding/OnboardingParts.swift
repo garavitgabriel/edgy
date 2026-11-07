@@ -34,7 +34,7 @@ enum OnboardingMetrics {
   static let rowEdgeOpacity = 0.35
 }
 
-/// "1 Accessibility ✓  2 Try it  3 Pick a preset  4 Launch at login": done steps take a ✓, the
+/// "1 Accessibility (check)  2 Try it  3 Pick a preset  4 Launch at login": done steps take a check mark, the
 /// current one is semibold.
 struct OnboardingStepRow: View {
   let state: OnboardingState
@@ -179,7 +179,7 @@ struct PresetRow: View {
             .foregroundStyle(Tokens.ink2)
             .fixedSize(horizontal: false, vertical: true)
         }
-        Spacer(minLength: 0)
+        .frame(maxWidth: .infinity, alignment: .leading)
       }
       .padding(.horizontal, 14)
       .padding(.vertical, OnboardingMetrics.presetRowPadding)

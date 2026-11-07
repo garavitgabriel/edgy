@@ -90,7 +90,7 @@ public final class OnboardingState {
   public var isAccessibilityGranted: Bool { accessibility == .granted }
 
   /// A step is done once passed. Step 1 counts only when access is granted (skipping isn't done),
-  /// and shows its ✓ the moment access is granted, even while it is the current step.
+  /// and shows its check mark the moment access is granted, even while it is the current step.
   public func isDone(_ step: Step) -> Bool {
     if step == .accessibility { return isAccessibilityGranted }
     return step < self.step
