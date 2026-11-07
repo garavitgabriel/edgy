@@ -47,7 +47,7 @@ verification: green — swift build, swift test (all suites, Actions 214), swift
 `InstalledApp`, `InstalledAppsProviding`, `makeLiveInstalledAppsProvider()`; `ShortcutsList`, `ShortcutsListing`, `makeLiveShortcutsListing()`; `KeyRecorderInput`, `KeyRecorderState`, `KeyComboRecorderModel`, `KeyComboRecording`, `makeLiveKeyComboRecorder()`; `BuiltInAction.doNothing`; `ActionParameterKey.maxSeconds`.
 
 ## Decisions I made (and why)
-- **Flags-changed route, with device bits.** The probe showed macOS already types modifier-key events as flags-changed. Setting the type explicitly guards against that inference changing. Keeping the left-hand device bits matters to apps that tell left from right modifiers. `post()` (shortcuts) is unchanged apart from going through the same helpers.
+- **Flags-changed route, with device bits.** The probe showed macOS already types modifier-key events as flags-changed. Setting the type explicitly guards against that inference changing. Keeping the left-hand device bits matters to apps that tell left from right modifiers. `post()` (shortcuts) is unchanged. `key()` (switcher tabs, held keys) now uses `heldFlags`, so those events also carry the device bits.
 - **Watchdogs are timers, not polling,** with a generation token rather than relying on cancel alone. Cancelling a dispatch item can race a fire that already started.
 - **The switcher watchdog cancels (escape) rather than selects,** the same rule as v0.3's stray `.began`: after a lost end, selecting an app the user never chose would be a misfire.
 - **"Do nothing" placement:** in the system group after Dictation, so the v0.1 prefix and every existing group order stay put. The UI can surface it first if the design wants.
@@ -65,7 +65,8 @@ Run `scripts/smoke-actions.sh` (Accessibility for the terminal; Input Monitoring
 3. **Step 25, hold watchdog:** with `maxSeconds` 5 the dictation app stops by itself after about 5 s, and the log line appears.
 4. **Step 26, recorder:** try `cmd+shift+4`, a bare `f5`, fn alone, `ctrl+opt` released in either order, and escape (cancels). Without Input Monitoring it should say "Edgy needs Input Monitoring permission to record keys."
 5. **Steps 27–28:** installed-apps count and timing look sane, with no duplicates and running apps flagged. The Shortcuts names match the Shortcuts app, including emoji or non-Latin names.
-6. **Switcher watchdog:** hard to trigger by hand. It fires only if a switcher slide's end is lost for 10 s. Covered by tests.
+6. **Regression: steps 12, 16, 19, 20.** Key events sent while modifiers are held (switcher cmd+tab, held keys) now carry left-hand device bits, as real keyboards do. Re-run these v0.3 steps to confirm nothing changed.
+7. **Switcher watchdog:** hard to trigger by hand. It fires only if a switcher slide's end is lost for 10 s. Covered by tests.
 
 ## Open questions
 - **Validation (batch 12):** `keyboard.shortcut` / `slideSteps` with a modifier-only combo should be flagged at save time. The registry already rejects them at perform time with "needs a key".
