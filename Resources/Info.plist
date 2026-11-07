@@ -8,6 +8,8 @@
 	<string>Edgy</string>
 	<key>CFBundleExecutable</key>
 	<string>Edgy</string>
+	<key>CFBundleIconFile</key>
+	<string>AppIcon</string>
 	<key>CFBundleIdentifier</key>
 	<string>com.garavit.edgy</string>
 	<key>CFBundleInfoDictionaryVersion</key>

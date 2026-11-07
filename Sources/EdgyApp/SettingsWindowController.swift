@@ -1,31 +1,46 @@
 import AppKit
+import EdgyRuntime
 import EdgyUI
+import Observation
 import SwiftUI
 
-/// Hosts the designed settings window (`SettingsWindowView`, EdgyUI) in an AppKit window.
-/// Edgy is a menu-bar app, so showing the window also brings the app forward; closing it leaves
-/// Edgy running in the menu bar.
+/// Live window-level conditions the app knows and the model doesn't (Accessibility, a broken
+/// config file), pushed into the window through `\.windowConditions`.
+@MainActor
+@Observable
+final class SettingsWindowState {
+  var conditions = WindowConditions.normal
+}
+
+/// Hosts the designed settings window (`SettingsWindowView`, EdgyUI) in an AppKit window with a
+/// transparent full-size title bar, so the profile tabs share the title bar. Edgy is a menu-bar
+/// app: showing the window brings Edgy forward; closing it leaves Edgy running.
 @MainActor
 final class SettingsWindowController: NSObject, NSWindowDelegate {
   private let model: SettingsModel
+  let state = SettingsWindowState()
+  private let commands: WindowCommands
   private var window: NSWindow?
 
-  init(model: SettingsModel) {
+  init(model: SettingsModel, commands: WindowCommands) {
     self.model = model
+    self.commands = commands
   }
 
   func show() {
     if window == nil {
-      let host = NSHostingController(rootView: SettingsWindowView(model: model))
+      let root = SettingsWindowRoot(model: model, state: state, commands: commands)
+      let host = NSHostingController(rootView: root)
       let window = NSWindow(contentViewController: host)
       window.title = "Edgy"
-      window.styleMask = [.titled, .closable, .miniaturizable, .fullSizeContentView]
+      window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
       window.titlebarAppearsTransparent = true
       window.titleVisibility = .hidden
       window.isMovableByWindowBackground = true
       window.isReleasedWhenClosed = false
+      window.contentMinSize = SettingsWindowView.minimumSize
+      window.setContentSize(SettingsWindowView.minimumSize)
       window.delegate = self
-      window.setContentSize(host.view.fittingSize)
       window.center()
       self.window = window
     }
@@ -36,5 +51,17 @@ final class SettingsWindowController: NSObject, NSWindowDelegate {
 
   func windowWillClose(_ notification: Notification) {
     model.stopFeed()
+  }
+}
+
+private struct SettingsWindowRoot: View {
+  let model: SettingsModel
+  let state: SettingsWindowState
+  let commands: WindowCommands
+
+  var body: some View {
+    SettingsWindowView(model: model)
+      .environment(\.windowConditions, state.conditions)
+      .environment(\.windowCommands, commands)
   }
 }
