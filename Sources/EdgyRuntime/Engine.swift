@@ -192,7 +192,8 @@ public final class Engine: @unchecked Sendable {
       enabledZones: profile.disabled ? [] : Set(profile.bindings.map(\.zone)),
       secondsSinceLastKeyPress: typing.secondsSinceLastKeyPress,
       slideZones: zones(bound: .slide, in: profile),
-      longPressZones: zones(bound: .longPress, in: profile))
+      longPressZones: zones(bound: .longPress, in: profile),
+      doubleTapZones: zones(bound: .doubleTap, in: profile))
     let output = recognizer.process(frame, device: device, context: context)
     updatePointerGuard(claimed: !output.claimedContactIDs.isEmpty, at: frame.timestamp)
     for (contactID, reason) in output.rejections where reason != .startedOutsideZone {

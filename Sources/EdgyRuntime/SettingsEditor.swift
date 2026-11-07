@@ -31,6 +31,10 @@ public struct SettingsChange: Sendable {
     case redo
     /// Adopted from outside the editor (hand-edited file, Reload Config).
     case external
+    /// `refreshAvailability()` found an action whose availability changed (a display or keyboard
+    /// came or went). `config == previous`; `issues` (and what `availability(of:)` answers) may
+    /// differ, so a window redraws its greyed-out actions and warnings. Not an undo step.
+    case availability
   }
 
   public var cause: Cause
@@ -163,12 +167,16 @@ public final class SettingsEditor {
   }
 
   /// Re-reads availability for the whole catalog (after a display or keyboard is attached or
-  /// removed) so `issues` and later validation see it. Changes no config; no observer call.
-  public func refreshAvailability() {
-    validator = ConfigValidator(
-      catalog: validator.catalog,
-      availability: Self.snapshot(catalog: validator.catalog, from: availabilitySource))
+  /// removed) so `issues` and later validation see it. Changes no config. When any action's
+  /// availability changed, observers get a `.availability` change and this returns `true`.
+  @discardableResult
+  public func refreshAvailability() -> Bool {
+    let snapshot = Self.snapshot(catalog: validator.catalog, from: availabilitySource)
+    guard snapshot != validator.availability else { return false }
+    validator = ConfigValidator(catalog: validator.catalog, availability: snapshot)
     issues = validator.validate(config)
+    notify(.availability, previous: config)
+    return true
   }
 
   /// `base` (the built-in preset by default) adjusted to this Mac: bindings whose action is
