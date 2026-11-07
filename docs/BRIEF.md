@@ -295,10 +295,10 @@ The same 640 × 520 glass window, with a step row at the top ("1 Accessibility �
 | Preset | Line | Bindings (zone, gesture → action id) |
 |---|---|---|
 | **Media** (preselected; = `EdgyConfig.defaults`) | "Volume, brightness and music on the edges." | right slide → `audio.volume` · left slide → `display.brightness` · bottom swipe left → `media.previous` · bottom swipe right → `media.next` · bottom double-tap → `media.playPause` · top-right double-tap → `audio.mute` · top-left double-tap → `mic.mute` |
-| **Windows** | "Volume and brightness, plus window moves on the bottom edge." | right slide → `audio.volume` · left slide → `display.brightness` · bottom swipe left → `window.leftHalf` · bottom swipe right → `window.rightHalf` · bottom swipe up → `window.maximize` · bottom double-tap → `window.center` · top swipe down → `system.missionControl` · top-left double-tap → `system.showDesktop` · top-right double-tap → `audio.mute` |
+| **Windows** | "Volume and brightness, plus window moves on the bottom edge." | right slide → `audio.volume` · left slide → `display.brightness` · bottom swipe left → `window.leftHalf` · bottom swipe right → `window.rightHalf` · bottom long-press → `window.maximize` · bottom double-tap → `window.center` · top double-tap → `system.missionControl` · top-left double-tap → `system.showDesktop` · top-right double-tap → `audio.mute` |
 | **Minimal** | "Just volume and brightness." | right slide → `audio.volume` · left slide → `display.brightness` |
 
-Primary: **Continue**. One line in `ink2` under the rows: "You can change any of it in Settings." *(MachineDefaults substitutes unavailable actions on this Mac, per the build chief. **Build chief: run every preset binding through `validate`; if a gesture isn't supported on that zone, e.g. a vertical swipe on the bottom or top edge, swap it for a supported one and tell design.**)*
+Primary: **Continue**. One line in `ink2` under the rows: "You can change any of it in Settings." *(MachineDefaults substitutes unavailable actions on this Mac, per the build chief. **Build chief: run every preset binding through `validate`; if a gesture isn't supported on that zone, swap it for a supported one and tell design.** Top and bottom edges take only left/right swipes; fixed 2026-11-07.)*
 
 **Step 4: Launch at login.**
 - Headline: "Keep Edgy running".
