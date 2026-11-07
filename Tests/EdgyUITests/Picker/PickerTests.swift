@@ -75,13 +75,34 @@ import Testing
     #expect(PickerPlacement.width <= PickerPlacement.maxWidth)
   }
 
-  @Test func aBottomBarOpensUpwardWithoutCoveringItOrItsNeighbours() {
-    let size = CGSize(width: 320, height: 420)
+  var top: CGRect { CGRect(x: pad.minX + 54, y: pad.minY, width: pad.width - 108, height: 43) }
+
+  @Test func aBottomBarOpensUpwardWithoutCoveringAnyOtherBar() {
+    let size = CGSize(width: 320, height: PickerPlacement.height(mirrorHeight: pad.height))
     let result = PickerPlacement.place(
-      anchor: bottom, zone: .edge(.bottom), avoiding: [left, right], size: size, in: window)
+      anchor: bottom, zone: .edge(.bottom), avoiding: [left, right, top], size: size, in: window)
     #expect(result.side == .above)
     #expect(!result.frame.intersects(bottom))
     #expect(!result.frame.intersects(left) && !result.frame.intersects(right))
+    #expect(!result.frame.intersects(top))  // shrinks below the cap rather than cover the opposite bar
+    #expect(result.frame.height <= size.height && result.frame.height >= PickerPlacement.minHeight)
+  }
+
+  /// A to-scale external pad at 3.7 pt/mm (592 × 425, 30 pt strips): mirror − 16 is taller than the
+  /// interior, so the picker shortens to sit between the bars.
+  @Test func onAShortPadThePickerShrinksBetweenTheBars() {
+    let pad = CGRect(x: 60, y: 60, width: 592, height: 425)
+    let bar: CGFloat = 30
+    let bottom = CGRect(x: pad.minX + 37, y: pad.maxY - bar, width: pad.width - 74, height: bar)
+    let top = CGRect(x: pad.minX + 37, y: pad.minY, width: pad.width - 74, height: bar)
+    let left = CGRect(x: pad.minX, y: pad.minY + 37, width: bar, height: pad.height - 74)
+    let right = CGRect(x: pad.maxX - bar, y: pad.minY + 37, width: bar, height: pad.height - 74)
+    let size = CGSize(width: 320, height: PickerPlacement.height(mirrorHeight: pad.height))
+    let result = PickerPlacement.place(
+      anchor: bottom, zone: .edge(.bottom), avoiding: [top, left, right], size: size, in: window)
+    #expect(result.side == .above)
+    #expect(result.frame.height < size.height)
+    for zone in [bottom, top, left, right] { #expect(!result.frame.intersects(zone)) }
     #expect(window.contains(result.frame))
     #expect(abs(result.frame.minX + result.arrowOffset - bottom.midX) < 1)
   }
@@ -89,9 +110,10 @@ import Testing
   @Test func aRightStripOpensToItsLeft() {
     let size = CGSize(width: 320, height: 420)
     let result = PickerPlacement.place(
-      anchor: right, zone: .edge(.right), avoiding: [bottom, left], size: size, in: window)
+      anchor: right, zone: .edge(.right), avoiding: [bottom, left, top], size: size, in: window)
     #expect(result.side == .left)
     #expect(!result.frame.intersects(right))
+    #expect(!result.frame.intersects(top) && !result.frame.intersects(bottom))
     #expect(window.contains(result.frame))
   }
 

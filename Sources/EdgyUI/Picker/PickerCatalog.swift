@@ -100,6 +100,8 @@ enum PickerPlacement {
   /// Tallest: 420, and never taller than the mirror − 16 pt (so it never covers the pad's other bars).
   static let maxHeight: CGFloat = 420
   static let mirrorInset: CGFloat = 16
+  /// The shortest the picker gets when it shrinks to clear other zones (header, search, ~4 rows).
+  static let minHeight: CGFloat = 200
   /// Gap between the arrow tip and the zone, and from the window edge.
   static let gap: CGFloat = 6
   static let margin: CGFloat = 8
@@ -140,14 +142,26 @@ enum PickerPlacement {
     anchor: CGRect, zone: Zone, avoiding others: [CGRect], size: CGSize, in container: CGRect
   ) -> Result {
     let bounds = container.insetBy(dx: margin, dy: margin)
+    func overlap(_ result: Result) -> CGFloat {
+      var total = area(result.frame.intersection(anchor)) * 4
+      for other in others { total += area(result.frame.intersection(other)) }
+      if !bounds.contains(result.frame.integral.insetBy(dx: 1, dy: 1)) { total += area(result.frame.size) }
+      return total
+    }
     var best: (Result, CGFloat)?
+    // Inner side first; on each side the picker gets shorter (never below `minHeight`, the list
+    // scrolls) until it clears its zone and every other zone (BRIEF: it never covers the pad's
+    // other bars). Only when no side fits does the least-covering full-size spot win.
     for side in preferredSides(for: zone) {
-      let result = frame(for: side, anchor: anchor, size: size, bounds: bounds)
-      var overlap = area(result.frame.intersection(anchor)) * 4
-      for other in others { overlap += area(result.frame.intersection(other)) }
-      if !bounds.contains(result.frame.integral.insetBy(dx: 1, dy: 1)) { overlap += area(size) }
-      if overlap == 0 { return result }
-      if best == nil || overlap < best!.1 { best = (result, overlap) }
+      var height = size.height
+      while true {
+        let result = frame(for: side, anchor: anchor, size: CGSize(width: size.width, height: height), bounds: bounds)
+        let covered = overlap(result)
+        if covered == 0 { return result }
+        if height == size.height, best == nil || covered < best!.1 { best = (result, covered) }
+        guard height > minHeight else { break }
+        height = max(height - 8, minHeight)
+      }
     }
     return best!.0
   }
