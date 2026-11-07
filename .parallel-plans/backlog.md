@@ -26,3 +26,7 @@ Items found in testing or left open by builders, to fold into a future round.
 - Slide feel (batch 20 defaults): "feels good overall" — keep 8 mm per app, 0.4 s keep-open, speed-up curves; speed-up now off by default for stepped slides (design ruling).
 - Menu-bar glyph: reads as "CI" some of the time → design session runs a glyph pass (variants at true 16 pt); swap the exported PDFs when picked.
 - Touch traces: deferred to the pre-launch pass (v1). Record the 10 priority scenarios in scripts/record-traces.md, then tune hold stillness, swipe thresholds and the end band.
+
+## Overlay follow-ups (critique 23 should-fix, chief to do after 22/24)
+- Parameterised run plates: past-tense verb + object ("Opened Quillpad", "Pressed ⇧⌘ 4", "Ran <name>"); plain triggers stay bare.
+- plate-component shot gets the black-document half.
