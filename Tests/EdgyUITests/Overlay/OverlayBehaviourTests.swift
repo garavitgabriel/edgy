@@ -439,12 +439,14 @@ final class OverlayFakeEngine: LiveEngine, @unchecked Sendable {
 // MARK: Contrast (bone 9: ≥4.5:1 over light and dark documents)
 
 @MainActor @Suite struct PlateContrastTests {
-  /// sRGB components of a token under an appearance.
-  func rgb(_ color: Color, dark: Bool) -> (Double, Double, Double) {
-    var result = (0.0, 0.0, 0.0)
+  /// sRGB components and alpha of a token under an appearance.
+  func rgba(_ color: Color, dark: Bool) -> (Double, Double, Double, Double) {
+    var result = (0.0, 0.0, 0.0, 1.0)
     NSAppearance(named: dark ? .darkAqua : .aqua)!.performAsCurrentDrawingAppearance {
       let ns = NSColor(color).usingColorSpace(.sRGB)!
-      result = (Double(ns.redComponent), Double(ns.greenComponent), Double(ns.blueComponent))
+      result = (
+        Double(ns.redComponent), Double(ns.greenComponent), Double(ns.blueComponent), Double(ns.alphaComponent)
+      )
     }
     return result
   }
@@ -454,20 +456,56 @@ final class OverlayFakeEngine: LiveEngine, @unchecked Sendable {
     return 0.2126 * lin(c.0) + 0.7152 * lin(c.1) + 0.0722 * lin(c.2)
   }
 
-  func contrast(_ text: Color, overDocument doc: Double, dark: Bool) -> Double {
-    let tint = rgb(Tokens.windowTint, dark: dark)
-    let a = PlateMetrics.tintOpacity
-    let plate = (tint.0 * a + doc * (1 - a), tint.1 * a + doc * (1 - a), tint.2 * a + doc * (1 - a))
-    let l1 = luminance(rgb(text, dark: dark))
-    let l2 = luminance(plate)
+  /// `color` (with its own alpha) composited over an opaque background.
+  func over(_ color: Color, _ background: (Double, Double, Double), dark: Bool) -> (Double, Double, Double) {
+    let c = rgba(color, dark: dark)
+    let a = c.3
+    return (c.0 * a + background.0 * (1 - a), c.1 * a + background.1 * (1 - a), c.2 * a + background.2 * (1 - a))
+  }
+
+  func ratio(_ a: (Double, Double, Double), _ b: (Double, Double, Double)) -> Double {
+    let l1 = luminance(a)
+    let l2 = luminance(b)
     return (max(l1, l2) + 0.05) / (min(l1, l2) + 0.05)
+  }
+
+  /// The plate (`plateFill`, with its own opacity) over a white (1) or black (0) document.
+  func plate(overDocument doc: Double, dark: Bool) -> (Double, Double, Double) {
+    over(Tokens.plateFill, (doc, doc, doc), dark: dark)
   }
 
   @Test(arguments: [true, false]) func plateTextReadsOverWhiteAndBlackDocuments(dark: Bool) {
     for document in [0.0, 1.0] {
-      #expect(contrast(Tokens.ink, overDocument: document, dark: dark) >= 4.5)
-      #expect(contrast(Tokens.ink2, overDocument: document, dark: dark) >= 4.5)
+      let plate = plate(overDocument: document, dark: dark)
+      #expect(ratio(over(Tokens.plateInk, plate, dark: dark), plate) >= 4.5)
+      #expect(ratio(over(Tokens.plateInk2, plate, dark: dark), plate) >= 4.5)
     }
+  }
+
+  /// Bone 9 ruling: the plate is the same dark plate in both system appearances.
+  @Test func plateIsTheSameInLightAndDark() {
+    for token in [Tokens.plateFill, Tokens.plateInk, Tokens.plateInk2, Tokens.plateEdge, Tokens.contactRim] {
+      let light = rgba(token, dark: false)
+      let dark = rgba(token, dark: true)
+      #expect(light == dark)
+    }
+    #expect(luminance(plate(overDocument: 1, dark: false)) < 0.05)
+  }
+
+  /// Bone 9 ruling: the accent contact's 1 pt cream rim reaches ≥3:1 on the plate (the accent fill
+  /// alone was about 2.6:1).
+  @Test(arguments: [0.0, 1.0]) func contactRimReachesThreeToOneOnThePlate(document: Double) {
+    let plate = plate(overDocument: document, dark: true)
+    #expect(ratio(over(Tokens.contactRim, plate, dark: true), plate) >= 3)
+  }
+
+  /// Bone 9 ruling: over a black document the plate's light edge separates it from the page.
+  @Test func plateEdgeShowsOverADarkDocument() {
+    let black = (0.0, 0.0, 0.0)
+    let plate = plate(overDocument: 0, dark: true)
+    let edge = over(Tokens.plateEdge, plate, dark: true)
+    #expect(luminance(edge) > luminance(plate))
+    #expect(ratio(edge, black) > ratio(plate, black))
   }
 }
 

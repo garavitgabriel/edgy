@@ -4,9 +4,12 @@ import SwiftUI
 /// The ONE plate component (bone 9): Test Mode overlay plates, the level plate, the display check
 /// and onboarding feedback all use it — same radius, same 17/13 type pair, same inset.
 ///
-/// It follows the environment's appearance and reads only `Tokens`. The overlay's panels draw it
-/// dark (renders D and S8: a dark plate reads over light and dark documents alike); onboarding
-/// draws it on its own light glass.
+/// It is **always the dark espresso plate** (bone 9 ruling, renders D and S8), in both system
+/// appearances and on every surface: it reads only the `Tokens.plate*` and `contactRim` tokens,
+/// never the appearance-following `ink`/`ink2`, so a light and a dark system draw it identically.
+/// Its 0.5 pt light edge is always drawn: over a light document it disappears into the page, and
+/// over a dark one it is what separates the plate (BRIEF: "Over dark documents it gets a 0.5 pt
+/// light edge").
 public struct PlateView: View {
   public enum Mark: Hashable, Sendable {
     /// Filled accent contact: recognized.
@@ -59,7 +62,7 @@ public struct PlateView: View {
       VStack(alignment: .leading, spacing: PlateMetrics.lineGap) {
         titleText
         if let detail {
-          Text(detail).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
+          Text(detail).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.plateInk2)
         }
         if case .level(let level) = mark { LevelBar(level: level) }
         if !buttons.isEmpty {
@@ -77,13 +80,13 @@ public struct PlateView: View {
     .padding(.vertical, PlateMetrics.insetV)
     .frame(minWidth: isLevel ? PlateMetrics.levelWidth : nil, alignment: .leading)
     .background(
-      RoundedRectangle(cornerRadius: Tokens.radiusPlate, style: .continuous)
-        .fill(Tokens.windowTint.opacity(PlateMetrics.tintOpacity))
+      RoundedRectangle(cornerRadius: Tokens.radiusPlate, style: .continuous).fill(Tokens.plateFill)
     )
     .overlay(
       RoundedRectangle(cornerRadius: Tokens.radiusPlate, style: .continuous)
-        .strokeBorder(Tokens.line.opacity(PlateMetrics.edgeOpacity), lineWidth: PlateMetrics.hairline)
+        .strokeBorder(Tokens.plateEdge, lineWidth: Tokens.plateEdgeWidth)
     )
+    .environment(\.colorScheme, .dark)
     .accessibilityElement(children: buttons.isEmpty ? .combine : .contain)
     .accessibilityLabel([title, detail].compactMap(\.self).joined(separator: ", "))
   }
@@ -95,23 +98,28 @@ public struct PlateView: View {
 
   @ViewBuilder private var titleText: some View {
     if !buttons.isEmpty {
-      Text(title).font(Tokens.font(Tokens.typeBody, semibold: true)).foregroundStyle(Tokens.ink)
+      Text(title).font(Tokens.font(Tokens.typeBody, semibold: true)).foregroundStyle(Tokens.plateInk)
     } else if detail == nil && !isLevel {
-      Text(title).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink)
+      Text(title).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.plateInk)
     } else {
-      Text(title).font(Tokens.font(Tokens.typeValue, semibold: true)).foregroundStyle(Tokens.ink)
+      Text(title).font(Tokens.font(Tokens.typeValue, semibold: true)).foregroundStyle(Tokens.plateInk)
     }
   }
 
   private var markShape: AnyView? {
     switch mark {
     case .recognized:
-      return AnyView(Circle().fill(Tokens.accent))
-    case .wouldRun:
+      // The filled accent contact inside a 1 pt cream rim (≥3:1 on the plate): a stroke, not a halo.
       return AnyView(
-        Circle().strokeBorder(Tokens.accent, lineWidth: PlateMetrics.wouldRunStroke))
+        Circle().fill(Tokens.accent).padding(Tokens.contactRimWidth)
+          .overlay(Circle().strokeBorder(Tokens.contactRim, lineWidth: Tokens.contactRimWidth)))
+    case .wouldRun:
+      // The dry-run 2 pt accent ring with the same rim outside it; no fill.
+      return AnyView(
+        Circle().strokeBorder(Tokens.accent, lineWidth: PlateMetrics.wouldRunStroke).padding(Tokens.contactRimWidth)
+          .overlay(Circle().strokeBorder(Tokens.contactRim, lineWidth: Tokens.contactRimWidth)))
     case .rejected:
-      return AnyView(StruckCircle().stroke(Tokens.ink2, lineWidth: PlateMetrics.rejectedStroke))
+      return AnyView(StruckCircle().stroke(Tokens.plateInk2, lineWidth: PlateMetrics.rejectedStroke))
     case .level, .none:
       return nil
     }
@@ -120,9 +128,6 @@ public struct PlateView: View {
 
 /// Plate layout numbers (not type, colour or radius: those live in `Tokens`).
 enum PlateMetrics {
-  /// Plates sit over any document, so they take more tint than the window (0.82): at 0.82 a
-  /// light plate over a black page puts `ink2` near 4.1:1. BRIEF: "add opacity, not a second colour".
-  static let tintOpacity = 0.92
   static let insetH: CGFloat = 18
   static let insetV: CGFloat = 14
   static let mark: CGFloat = 26
@@ -131,8 +136,6 @@ enum PlateMetrics {
   static let buttonGap: CGFloat = 8
   static let wouldRunStroke: CGFloat = 2
   static let rejectedStroke: CGFloat = 1.5
-  static let hairline: CGFloat = 1
-  static let edgeOpacity = 0.35
   static let levelWidth: CGFloat = 220
   static let levelBarHeight: CGFloat = 4
   static let levelBarTop: CGFloat = 8
@@ -140,7 +143,8 @@ enum PlateMetrics {
   static let buttonPadV: CGFloat = 5
   static let buttonWash = 0.12
   static let buttonWashPressed = 0.22
-  static let trackOpacity = 0.45
+  /// The level bar's neutral track: `plateInk2` thinned (the plate owns no `line` colour).
+  static let trackOpacity = 0.3
 }
 
 /// The hollow circle with a strike (rejected): the strike runs bottom-left to top-right, inside.
@@ -163,7 +167,7 @@ struct LevelBar: View {
   var body: some View {
     GeometryReader { proxy in
       ZStack(alignment: .leading) {
-        Capsule().fill(Tokens.line.opacity(PlateMetrics.trackOpacity))
+        Capsule().fill(Tokens.plateInk2.opacity(PlateMetrics.trackOpacity))
         Capsule().fill(Tokens.accent).frame(width: proxy.size.width * min(max(level, 0), 1))
       }
     }
@@ -173,17 +177,18 @@ struct LevelBar: View {
   }
 }
 
-/// The display check's text buttons: `ink` text on a 12% `ink` wash, control radius.
+/// The display check's text buttons: `plateInk` text on a 12% `plateInk` wash, control radius.
 struct PlateButtonStyle: ButtonStyle {
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
       .font(Tokens.font(Tokens.typeBody))
-      .foregroundStyle(Tokens.ink)
+      .foregroundStyle(Tokens.plateInk)
       .padding(.horizontal, PlateMetrics.buttonPadH)
       .padding(.vertical, PlateMetrics.buttonPadV)
       .background(
         RoundedRectangle(cornerRadius: Tokens.radiusControl, style: .continuous)
-          .fill(Tokens.ink.opacity(configuration.isPressed ? PlateMetrics.buttonWashPressed : PlateMetrics.buttonWash))
+          .fill(
+            Tokens.plateInk.opacity(configuration.isPressed ? PlateMetrics.buttonWashPressed : PlateMetrics.buttonWash))
       )
       .contentShape(Rectangle())
   }
