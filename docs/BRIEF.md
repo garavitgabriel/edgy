@@ -306,7 +306,7 @@ The same 640 × 520 glass window, with a step row at the top ("1 Accessibility �
 
 **Step 1: Accessibility.**
 - Headline: "Let Edgy run your actions".
-- Body: "Volume and media work without it. Shortcuts, windows and keys need Accessibility access."
+- Body (one sentence): "Window moves, shortcuts and keys need it; volume and media work without it."
 - Primary: **Open Settings**, which opens the system privacy pane.
 - The window watches the permission live. When it turns granted, the step row shows ✓, the body becomes "Access granted.", and the primary becomes **Continue**.
 - A quiet text button, **Skip for now**, continues without access; the No Accessibility state above then applies.
@@ -349,7 +349,7 @@ Primary: **Continue**. One line in `ink2` under the rows: "You can change any of
 ### Picker at catalog scale (spec, 2026-11-07)
 
 - **Layout:**
-  - Single column, at most 420 pt tall, with the header ("Tap, bottom edge") and the search field pinned and the list scrolling.
+  - Single column, at most 420 pt wide, and **at most the mirror's height − 16 pt tall** (it never covers the pad's other bars). The header ("Tap, bottom edge") and the search field stay pinned, and the list scrolls.
   - The search field is focused on open. Arrows and Return work; typing filters.
 - **Groups, in catalog order:** Sound, Display, Media, System, Windows, Apps, Keyboard, Shortcuts. The group headers are the only 11 pt type.
 - **Actions that don't fit the gesture's shape are not listed in their groups.** They collapse into one disclosure row at the end in `ink2`, "6 more need a slide", which expands in place. The search covers them too.
