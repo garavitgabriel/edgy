@@ -41,6 +41,11 @@ public enum BuiltInAction {
   public static let dictation: ActionID = "system.dictation"
   public static let keyboardBacklight: ActionID = "keyboard.backlight"
   public static let keyboardBacklightToggle: ActionID = "keyboard.backlightToggle"
+
+  // v0.4
+  /// "Do nothing" (`ActionID.doNothing`): turns a default gesture off in an inheriting app
+  /// profile. Normally dropped before it reaches the registry; performing it is a no-op.
+  public static let doNothing: ActionID = ActionID.doNothing
 }
 
 /// Parameter keys and values the built-in actions read from `Binding.parameters`.
@@ -168,6 +173,9 @@ enum ActionCatalog {
       id: BuiltInAction.sleepDisplay, shape: .trigger, displayName: "Sleep Display", category: .system),
     // Starts / stops macOS Dictation. See `LiveDictationOutput` for what it depends on.
     ActionDescriptor(id: BuiltInAction.dictation, shape: .trigger, displayName: "Dictation", category: .system),
+    // v0.4: offered by the picker so an app profile can turn a default gesture off. Always
+    // available; compatible with every gesture (the settings layer special-cases it).
+    ActionDescriptor(id: BuiltInAction.doNothing, shape: .trigger, displayName: "Do nothing", category: .system),
 
     // Windows (the frontmost app's focused window).
     ActionDescriptor(

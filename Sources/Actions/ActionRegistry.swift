@@ -416,6 +416,9 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
       try unavailable(id) { try dictation.toggle() }
     case BuiltInAction.keyboardBacklightToggle:
       try unavailable(id) { try toggleBacklight() }
+    case BuiltInAction.doNothing:
+      // Resolution drops these bindings; one that slips through does nothing, on purpose.
+      return
     default:
       throw ActionError.unknownAction(id)
     }
