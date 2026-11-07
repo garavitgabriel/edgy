@@ -15,7 +15,7 @@ Gabriel, MacBook Pro, 2026-11-07: Switch Apps on the top edge "opens a lot of th
 4. The keep-open path is unchanged: a `.began` while a session lingers continues it with no tab.
 5. The outcome report, the `actionFired` haptic and the watchdog arm fire when the switcher **actually opens**, not on `.began`. End stepping (`atEnd`) on an unopened session does not open it; only real travel does.
 6. Command is still never left down: every existing release path holds.
-7. `docs/settings-reference.md` and the `stepMM` help line (if the catalog's helper text mentions opening) say the switcher opens after one step of travel. Don't change BRIEF copy; if the catalog copy must change, list it in the done report for design.
+7. **Copy (design ruling, BRIEF updated):** the Switch Apps `stepMM` helper in `ActionCatalog` changes from "Slide this far to move one app." to exactly **"Slide this far to open the switcher and move one app."** (switcher only; Slide to Repeat Keys keeps its own line). `docs/settings-reference.md` says the switcher opens after one step of travel.
 8. `scripts/smoke-actions.sh`: add a step to rest a finger on the switcher edge (nothing opens), tap it (nothing), slide less than one step (nothing), then slide one step (opens on the next app).
 
 ## Acceptance (mock keyboard only, hard rule 1)

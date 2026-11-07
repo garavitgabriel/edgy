@@ -289,7 +289,7 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
 
 | Parameter | Applies to | Label | Control | Helper line |
 |---|---|---|---|---|
-| `stepMM` | Switch Apps | Distance per app | slider 4–20 mm, value "8 mm" | "Slide this far to move one app." |
+| `stepMM` | Switch Apps | Distance per app | slider 4–20 mm, value "8 mm" | "Slide this far to open the switcher and move one app." |
 | `stepMM` | Slide to Repeat Keys | Distance per press | slider 4–20 mm | "Slide this far for one key press." |
 | `speedUp` | Switch Apps | Faster when you flick | checkbox | "A quick flick skips several apps." |
 | `speedUp` | Slide to Repeat Keys | Faster when you flick | checkbox | "A quick flick sends several presses." |
