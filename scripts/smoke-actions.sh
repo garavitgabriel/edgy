@@ -3,8 +3,10 @@
 #
 # It changes real volume, mute, brightness, media playback, the HUD and haptics, then drives the
 # v0.2 catalog: opens a TextEdit document, sends it shortcuts, snaps its window, opens a URL,
-# shows Mission Control and switches Spaces. It asks before each step and restores prior values
-# at the end (levels also on Ctrl-C); it closes the document it opened.
+# shows Mission Control and switches Spaces. v0.3 steps (17+): measures the fine level-key step,
+# checks the native volume HUD with headphones, drives the app switcher, holds a key, toggles
+# Dictation, the keyboard backlight, and snaps a full-screen window. It asks before each step and
+# restores prior values at the end (levels also on Ctrl-C); it closes the document it opened.
 #
 # Media keys, key shortcuts and window snapping need Accessibility for your terminal app (System Settings → Privacy & Security →
 # Accessibility). Haptics need a Force Touch trackpad; keep a finger resting on it to feel them.
@@ -19,16 +21,20 @@ echo "This will change real system state (and put it back). Build in $WORK."
 read -r -p "Continue? [y/N] " answer
 [[ "$answer" == [yY]* ]] || exit 0
 
-# The package exposes no library product, so compile the two modules straight from source.
+# The package exposes no library product, so compile the modules straight from source.
 swiftc -swift-version 6 -parse-as-library -emit-library -static -module-name EdgyCore \
   -emit-module -emit-module-path "$WORK/EdgyCore.swiftmodule" \
   -o "$WORK/libEdgyCore.a" "$ROOT"/Sources/EdgyCore/*.swift
+swiftc -swift-version 6 -parse-as-library -emit-library -static -module-name Displays \
+  -emit-module -emit-module-path "$WORK/Displays.swiftmodule" \
+  -o "$WORK/libDisplays.a" "$ROOT"/Sources/Displays/*.swift
 swiftc -swift-version 6 -parse-as-library -emit-library -static -module-name Actions -enable-testing \
   -I "$WORK" -emit-module -emit-module-path "$WORK/Actions.swiftmodule" \
   -o "$WORK/libActions.a" "$ROOT"/Sources/Actions/*.swift
 
 cat >"$WORK/main.swift" <<'SWIFT'
 import AppKit
+import Displays
 import EdgyCore
 import Foundation
 
@@ -58,10 +64,15 @@ let haptics = LiveHapticOutput()
 let keyboard = LiveKeyboardOutput()
 let workspace = LiveWorkspaceOutput()
 let windows = LiveWindowOutput()
+let levelKeys = LiveLevelKeyOutput()
+let backlight = LiveKeyboardBacklightOutput()
 let registry = ActionRegistry(
   settings: .defaults, audio: audio, display: display, media: LiveMediaKeyOutput(), hud: hud,
   haptics: haptics, shortcuts: LiveShortcutRunner(), keyboard: keyboard, workspace: workspace,
-  windows: windows, system: LiveSystemOutput(keyboard: keyboard))
+  windows: windows, system: LiveSystemOutput(keyboard: keyboard), levelKeys: levelKeys,
+  displays: makeLiveDisplayBrightness(), backlight: backlight, dictation: LiveDictationOutput(),
+  waiter: LiveTransitionWaiter())
+let priorBacklight = backlight.isAvailable ? try? backlight.level() : nil
 
 // Snapshot everything we might touch.
 let priorVolume = try? audio.outputVolume()
@@ -77,6 +88,7 @@ print("Before: volume \(priorVolume.map { String($0) } ?? "n/a"), muted \(priorM
   if let priorMuted { try? audio.setOutputMuted(priorMuted) }
   if let priorMicMuted { try? audio.setInputMuted(priorMicMuted) }
   if let priorBrightness { try? display.setBrightness(priorBrightness) }
+  if let priorBacklight { try? backlight.setLevel(priorBacklight) }
   print("\nRestored prior values.")
 }
 
@@ -224,11 +236,89 @@ if ask("16. Spaces: move one Space left, then back right (needs at least two Spa
   settle(1.5)
   print("  If nothing moved, check Keyboard Shortcuts → Mission Control → Move left/right a space.")
 }
+
+// v0.3. Steps 1, 2 and 4 above already went through the native level keys (current system HUD);
+// the steps below check the parts tests can't.
+print("\n--- v0.3 ---")
+if ask("17. Level keys: measure one fine volume step (4 fine presses up, read CoreAudio, 4 back down)?") {
+  let before = (try? audio.outputVolume()) ?? -1
+  check("4 fine volume-up presses") { try levelKeys.press(.volumeUp, count: 4, fine: true) }
+  settle(0.8)
+  let after = (try? audio.outputVolume()) ?? -1
+  check("4 fine volume-down presses") { try levelKeys.press(.volumeDown, count: 4, fine: true) }
+  settle(0.8)
+  print(String(format: "  volume %.4f → %.4f: %.4f per fine press (expect ≈ 0.0156 = 1/64)", before, after, (after - before) / 4))
+  print("  If it moved 0.0625 per press, the fine-step modifiers (shift+option) were ignored: note it in the done report.")
+}
+if ask("18. Volume HUD: slide volume up 3/16 and back with headphones or earbuds connected (expect the device's own HUD)?") {
+  check("volume slide") { try slide("audio.volume", up + down) }
+  settle()
+  print("  Was it the current system HUD (device icon, smooth bar), not the old square overlay?")
+}
+if ask("19. App switcher: open it, move 2 apps right, 1 back, then select (cmd stays down until the end)?") {
+  let switcher: ActionID = "apps.switcher"
+  check("switcher") {
+    for (delta, phase) in [(0.0, GestureEvent.Phase.began), (0.1, .changed), (0.1, .changed), (-0.1, .changed)] {
+      try registry.perform(switcher, input: .delta(delta, phase: phase), context: ctx)
+      settle(0.5)
+    }
+    try registry.perform(switcher, input: .delta(0, phase: .ended), context: ctx)
+  }
+  settle()
+  print("  Did the switcher open on the next app, step right twice, back once, and select on release?")
+  print("  Then press any modifier key: nothing should feel stuck (command must be up).")
+  if ask("   Now try a cancelled switch (opens, then escapes back without switching)?") {
+    check("switcher cancel") {
+      try registry.perform(switcher, input: .delta(0, phase: .began), context: ctx)
+      settle(0.8)
+      try registry.perform(switcher, input: .delta(0, phase: .cancelled), context: ctx)
+    }
+    settle()
+  }
+}
+if ask("20. Hold a key for 3 s (push-to-talk). Set your dictation app's hold key first; enter it here:") {
+  print("  Keys to hold (e.g. f13, ctrl+opt+space) [f13]: ", terminator: "")
+  let typed = (readLine() ?? "").trimmingCharacters(in: .whitespaces)
+  let keys = ["keys": typed.isEmpty ? "f13" : typed]
+  let holdContext = ActionContext(frontmostBundleID: nil, parameters: keys)
+  check("hold down") { try registry.perform("keyboard.hold", input: .press(down: true), context: holdContext) }
+  settle(3.0)
+  check("hold up") { try registry.perform("keyboard.hold", input: .press(down: false), context: holdContext) }
+  settle()
+  print("  Did the dictation app listen for 3 s and stop on release? Nothing should feel stuck afterwards.")
+}
+if ask("21. macOS Dictation: start, wait 4 s, stop (needs Dictation on, shortcut = microphone key)?") {
+  fire("system.dictation")
+  settle(4.0)
+  fire("system.dictation")
+  settle()
+  print("  Did the Dictation microphone appear and then go away? If not, note the Dictation shortcut setting.")
+}
+if backlight.isAvailable, ask("22. Keyboard backlight: slide down to off and back up, then toggle off and on?") {
+  print("  backlight now: \((try? backlight.level()).map { String(format: "%.2f", $0) } ?? "n/a")")
+  check("backlight slide") { try slide("keyboard.backlight", [Double](repeating: -0.25, count: 4) + up) }
+  settle()
+  fire("keyboard.backlightToggle")
+  settle(1.2)
+  fire("keyboard.backlightToggle")
+  settle()
+  print("  Did it dim to off, come back up, go off, then return to the same level?")
+} else if !backlight.isAvailable {
+  print("\n22. Skipped: no backlit keyboard found (expected on a desktop Mac).")
+}
+if ask("23. Full-screen snap: put a window in full screen within 6 s; it should leave full screen, snap left, then restore?") {
+  settle(6.0)
+  fire("window.leftHalf")
+  settle(3.0)
+  fire("window.restore")
+  settle()
+  print("  Did it leave full screen, land on the left half, then go back to its normal (not full-screen) frame?")
+}
 print("\nNot run here: system.lockScreen and system.sleepDisplay (they end the session). Bind them and try by hand.")
 
 restore()
 SWIFT
 
-swiftc -swift-version 6 -I "$WORK" -L "$WORK" -lActions -lEdgyCore \
+swiftc -swift-version 6 -I "$WORK" -L "$WORK" -lActions -lDisplays -lEdgyCore \
   -o "$WORK/smoke-actions" "$WORK/main.swift"
 "$WORK/smoke-actions"

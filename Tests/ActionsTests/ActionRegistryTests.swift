@@ -302,8 +302,8 @@ import Testing
 
 @Suite struct RegistryShapeTests {
   /// v0.1's eight actions keep their ids and shapes (and must stay in the catalog).
-  /// v0.1's eight actions lead the catalog, exactly as before. (v0.2 appends 20 more after them;
-  /// `availablePinsTheFullIdList` pins the whole list and `available.count == 28`.)
+  /// v0.1's eight actions lead the catalog, exactly as before. (v0.2 appends 20 more after them,
+  /// v0.3 five more; `availablePinsTheFullIdList` pins the whole list and `available.count == 33`.)
   @Test func availableListsExactlyTheEightActions() {
     let h = Harness()
     let v01 = Array(h.registry.available.prefix(8))
@@ -321,7 +321,7 @@ import Testing
         "shortcut.run": .trigger,
       ])
     #expect(h.registry.available.allSatisfy { !$0.displayName.isEmpty })
-    #expect(h.registry.available.count == 28)
+    #expect(h.registry.available.count == 33)
   }
 }
 
@@ -339,6 +339,11 @@ import Testing
     #expect(r.workspace is MockWorkspaceOutput)
     #expect(r.windows is MockWindowOutput)
     #expect(r.system is MockSystemOutput)
+    #expect(r.levelKeys is MockLevelKeyOutput)
+    #expect(r.displays is MockDisplayBrightness)
+    #expect(r.backlight is MockKeyboardBacklightOutput)
+    #expect(r.dictation is MockDictationOutput)
+    #expect(r.waiter is MockTransitionWaiter)
   }
 
   @Test func noTestSourceCallsTheLiveFactory() throws {
@@ -350,6 +355,8 @@ import Testing
       "makeLive" + "ActionRegistry", "Live" + "AudioOutput", "Live" + "HUDOutput", "Live" + "KeyboardOutput",
       "Live" + "WorkspaceOutput", "Live" + "WindowOutput", "Live" + "SystemOutput", "Live" + "MediaKeyOutput",
       "Live" + "BrightnessOutput", "Live" + "HapticOutput", "Live" + "ShortcutRunner",
+      "Live" + "LevelKeyOutput", "Live" + "KeyboardBacklightOutput", "Live" + "DictationOutput",
+      "Live" + "TransitionWaiter", "makeLive" + "DisplayBrightness",
     ]
     for file in files {
       let text = try String(contentsOf: file, encoding: .utf8)
