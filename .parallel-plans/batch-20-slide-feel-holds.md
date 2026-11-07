@@ -33,6 +33,7 @@ Hardware use (Gabriel, 2026-11-07): the app switcher runs out of edge with many 
 5. **Tune against real traces:** replay every `Fixtures/traces/*.json`; set `longPressMaxTravelMM`, the end band and the speed curve from them; each change with before/after in the done report. If no traces exist yet, keep current values and list the scenarios needed.
 6. **Copy and presentation** come from `docs/BRIEF.md` § Binding parameters → "Slide feel and hold timing (batch 20)": every new parameter's `displayName`, `helpText` and `unit` exactly as the table there, `zeroLabel: "Off"` on `keepOpenMS`, and `holdMS` with `fallback: .longPressMS` on long-press bindings other than `keyboard.hold` (which defaults to 300). Add a validation **info** note `slideAndSwipes` (stable code, documented) when an edge has both a slide and a swipe, with BRIEF's copy, and make the swipe threshold stricter on such edges.
    Also relabel `keyboard.hold`'s existing `maxSeconds` per BRIEF: "Let go after", unit "s", BRIEF's helper line, ordered last before the haptics row.
+   Normalise catalog `displayName` spellings so the UI never re-spells them (e.g. pick one of "Play / Pause" / "Play/Pause" and use it consistently; document the rule).
 7. `scripts/smoke-actions.sh`: steps for short-stroke switching with many apps open, flick speed, end stepping, push-to-talk while pointing, and confirming `fn` reaches a dictation app (if not, the done report recommends a non-fn push-to-talk key).
 
 ## Acceptance
