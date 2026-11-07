@@ -108,9 +108,6 @@ extension PlateContent {
       return PlateContent(
         kind: .failed, mark: .none, title: "\(PlateNaming.name(id, catalog: catalog)) can't run here",
         detail: reason, zone: zone)
-
-    default:
-      return nil
     }
   }
 

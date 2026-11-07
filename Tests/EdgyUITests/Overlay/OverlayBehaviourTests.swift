@@ -15,10 +15,19 @@ import Testing
 final class FakeOverlayScreens: OverlayScreenProviding {
   var screens: [OverlayScreen]
   var mainScreenID: String?
+  /// The focused text and window the fake reports (nothing by default).
+  var work = OverlayWorkArea()
+  private(set) var workAreaReads = 0
 
-  init(_ screens: [OverlayScreen], main: String? = nil) {
+  init(_ screens: [OverlayScreen], main: String? = nil, work: OverlayWorkArea = OverlayWorkArea()) {
     self.screens = screens
     mainScreenID = main ?? screens.first?.id
+    self.work = work
+  }
+
+  func workArea() -> OverlayWorkArea {
+    workAreaReads += 1
+    return work
   }
 }
 
@@ -135,15 +144,78 @@ let volumeRan = LiveDecision.actionRan(
     #expect(visible.insetBy(dx: m, dy: m).contains(frame))
   }
 
-  @Test func displayCheckSitsBesideTheLevelPlateTowardTheMiddle() {
+  /// Critique 18 must-fix 1: the check stacks beside its level plate **along the docked edge**
+  /// (below it on a side edge, outward on a top or bottom edge), never inward toward the document.
+  @Test func displayCheckStacksAlongTheDockedEdge() {
     let check = CGSize(width: 320, height: 110)
+    let inner = visible.insetBy(dx: m, dy: m)
     let leftLevel = PlateDocking.frame(zone: .edge(.left), size: size, in: visible)
     let besideLeft = PlateDocking.beside(leftLevel, size: check, zone: .edge(.left), in: visible)
-    #expect(besideLeft.minX == leftLevel.maxX + m)
-    #expect(besideLeft.maxY == leftLevel.maxY)
+    #expect(besideLeft.minX == leftLevel.minX)
+    #expect(besideLeft.maxY == leftLevel.minY - m)
     let rightLevel = PlateDocking.frame(zone: .edge(.right), size: size, in: visible)
     let besideRight = PlateDocking.beside(rightLevel, size: check, zone: .edge(.right), in: visible)
-    #expect(besideRight.maxX == rightLevel.minX - m)
+    #expect(besideRight.maxX == rightLevel.maxX)
+    #expect(besideRight.maxY == rightLevel.minY - m)
+    // A level plate low on its edge: the check goes above it, still on the edge.
+    let low = PlateDocking.frame(zone: .edge(.left, segment: 0, segments: 4), size: size, in: visible)
+    let aboveLow = PlateDocking.beside(low, size: check, zone: .edge(.left, segment: 0, segments: 4), in: visible)
+    #expect(aboveLow.minX == low.minX)
+    #expect(aboveLow.minY == low.maxY + m)
+    // Bottom edge, left part: outward (toward the left end), on the same line.
+    let bottomLeft = PlateDocking.frame(zone: .edge(.bottom, segment: 1, segments: 4), size: size, in: visible)
+    let besideBottom = PlateDocking.beside(
+      bottomLeft, size: check, zone: .edge(.bottom, segment: 1, segments: 4), in: visible)
+    #expect(besideBottom.minY == inner.minY)
+    #expect(besideBottom.maxX <= bottomLeft.minX - m || besideBottom.minX >= bottomLeft.maxX + m)
+    for frame in [besideLeft, besideRight, aboveLow, besideBottom] { #expect(inner.contains(frame)) }
+  }
+
+  // MARK: Keeping clear of the text being worked on (bone 9)
+
+  /// A document window in the middle of the screen with its focused text inside.
+  let window = CGRect(x: 150, y: 100, width: 700, height: 600)
+  let text = CGRect(x: 190, y: 140, width: 620, height: 520)
+
+  @Test func aPlateNeverCoversTheFocusedText() {
+    // A wide plate on the bottom edge would reach up into the text.
+    let tall = CGSize(width: 300, height: 160)
+    let column = CGRect(x: 340, y: 60, width: 320, height: 600)
+    let docked = PlateDocking.frame(zone: .edge(.bottom), size: tall, in: visible)
+    #expect(docked.intersects(column))
+    let work = OverlayWorkArea(text: column, window: window)
+    let settled = PlateDocking.settle(docked, zone: .edge(.bottom), in: visible, work: work)
+    #expect(!settled.intersects(column.insetBy(dx: -PlateDocking.workGap, dy: -PlateDocking.workGap)))
+    #expect(settled.minY == docked.minY)  // it slid along the edge, not inward
+    #expect(visible.insetBy(dx: m, dy: m).contains(settled))
+  }
+
+  @Test func aPlateKeepsAGapFromTheWindowWhenThereIsRoom() {
+    // The window reaches under the right edge's plate; there's open space above it on that edge.
+    let docked = PlateDocking.frame(zone: .edge(.right), size: size, in: visible)
+    let crowding = CGRect(x: 150, y: 100, width: 800, height: 500)
+    let work = OverlayWorkArea(text: crowding.insetBy(dx: 60, dy: 60), window: crowding)
+    let settled = PlateDocking.settle(docked, zone: .edge(.right), in: visible, work: work)
+    #expect(!settled.intersects(crowding.insetBy(dx: -PlateDocking.workGap, dy: -PlateDocking.workGap)))
+    #expect(settled.maxX == docked.maxX)
+  }
+
+  @Test func whenTheWindowFillsTheEdgeThePlateStillClearsTheText() {
+    let fullWindow = CGRect(x: 0, y: 0, width: 1000, height: 800)
+    let narrowText = CGRect(x: 250, y: 60, width: 500, height: 680)
+    let docked = PlateDocking.frame(zone: .edge(.right), size: size, in: visible)
+    let settled = PlateDocking.settle(
+      docked, zone: .edge(.right), in: visible, work: OverlayWorkArea(text: narrowText, window: fullWindow))
+    #expect(settled == docked)
+    #expect(!settled.intersects(narrowText))
+  }
+
+  @Test func settledPlatesNeverOverlapEachOther() {
+    let first = PlateDocking.frame(zone: .edge(.right), size: size, in: visible)
+    let clash = first.offsetBy(dx: 0, dy: 20)
+    let settled = PlateDocking.settle(clash, zone: .edge(.right), in: visible, work: OverlayWorkArea(), plates: [first])
+    #expect(!settled.intersects(first))
+    #expect(settled.maxX == first.maxX)
   }
 }
 
@@ -315,6 +387,37 @@ let volumeRan = LiveDecision.actionRan(
     #expect(presenter.shown.first?.frame.minX == deskScreen.visibleFrame.minX + PlateDocking.margin)
   }
 
+  /// Critique 18 must-fix 1, through the controller: the level plate and the display check both
+  /// stay clear of the focused text, the check stacked along the level plate's edge. The work area
+  /// is read once per batch of new plates, never on the 30 Hz tick.
+  @Test func levelPlateAndCheckStayClearOfTheText() {
+    let presenter = RecordingPresenter()
+    presenter.plateSize = CGSize(width: 230, height: 90)
+    let model = PreviewFixtures.model()
+    let text = CGRect(x: 200, y: 120, width: 1000, height: 700)
+    let screens = FakeOverlayScreens(
+      [laptopScreen], work: OverlayWorkArea(text: text, window: text.insetBy(dx: -40, dy: -40)))
+    let controller = OverlayController(model: model, screens: screens, presenter: presenter, clock: ManualClock())
+    controller.start()
+    feed(
+      model,
+      .actionRan(
+        BuiltInAction.brightness, zone: .edge(.left), kind: .slide,
+        outcome: ActionOutcome(level: 0.4, detail: "Built-in Display")),
+      .displayCheckDue(key: "k", name: "Built-in Display"))
+    controller.pump()
+    #expect(screens.workAreaReads == 1)
+    let level = try? #require(presenter.shown.first { $0.content.kind == .level }?.frame)
+    let check = try? #require(presenter.shown.first { $0.content.isDisplayCheck }?.frame)
+    for frame in [level, check].compactMap(\.self) {
+      #expect(!frame.intersects(text))
+      #expect(frame.minX == laptopScreen.visibleFrame.minX + PlateDocking.margin)
+    }
+    #expect(check.map { c in level.map { c.maxY <= $0.minY - PlateDocking.margin } ?? false } == true)
+    for _ in 0..<5 { controller.pump() }
+    #expect(screens.workAreaReads == 1)
+  }
+
   @Test func noLevelPlateInDryRun() {
     let engine = OverlayFakeEngine()
     engine.isTestMode = true
@@ -357,7 +460,7 @@ final class OverlayFakeEngine: LiveEngine, @unchecked Sendable {
   let key = "4c2d-7154-9"
   var due: LiveDecision { .displayCheckDue(key: key, name: "Desk 34") }
 
-  @Test func showsBesideTheLevelPlateAndCountsTheAsk() {
+  @Test func showsBesideTheLevelPlateAlongItsEdgeAndCountsTheAsk() {
     let (controller, presenter, _, model) = overlayRig(screens: [laptopScreen, deskScreen], testMode: false)
     feed(
       model,
@@ -370,7 +473,9 @@ final class OverlayFakeEngine: LiveEngine, @unchecked Sendable {
     let level = presenter.shown[0].frame
     let check = presenter.shown[1].frame
     #expect(presenter.shown[1].screenID == "2")
-    #expect(check.minX == level.maxX + PlateDocking.margin)
+    // Along the docked edge, under the level plate (critique 18 must-fix 1), not inward.
+    #expect(check.minX == level.minX)
+    #expect(check.maxY == level.minY - PlateDocking.margin)
     #expect(model.editor.config.app.displayCheckAsks[key] == 1)
   }
 
