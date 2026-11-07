@@ -220,6 +220,8 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
 
 ### Binding parameters (spec, 2026-11-07; renders to follow)
 
+**Only one binding is open at a time.** Collapsed rows show the gesture and action only. The parameter rows, including "Haptics for this gesture", appear only under the **open** binding: the row the user clicked, or the one just set from the picker. Opening another row closes the first. A binding with an empty required parameter opens automatically.
+
 **One rule.**
 - The parameters sit directly under their binding row in the inspector, indented 24 pt.
 - Each takes one 28 pt row: the label on the left (13, `ink2`), the control on the right.
@@ -384,7 +386,7 @@ Primary: **Continue**. One line in `ink2` under the rows: "You can change any of
 ### Picker at catalog scale (spec, 2026-11-07)
 
 - **Layout:**
-  - Single column, at most 420 pt wide, and **at most the mirror's height − 16 pt tall** (it never covers the pad's other bars). The header ("Tap, bottom edge") and the search field stay pinned, and the list scrolls.
+  - Single column, at most 420 pt wide, and **at most the height of the pad's interior**, the space between the inner edges of the top and bottom bars, so it never covers any bar. (Ruled 2026-11-07, replacing "mirror − 16 pt".) The header ("Tap, bottom edge") and the search field stay pinned, and the list scrolls.
   - The search field is focused on open. Arrows and Return work; typing filters.
 - **Groups, in catalog order:** Sound, Display, Media, System, Windows, Apps, Keyboard, Shortcuts. The group headers are the only 11 pt type.
 - **Actions that don't fit the gesture's shape are not listed in their groups.** They collapse into one disclosure row at the end in `ink2`, "6 more need a slide", which expands in place. The search covers them too.

@@ -37,6 +37,7 @@ public struct PadMirrorView: View {
         message: Self.message(for: state),
         onSelect: { model.selectZone($0) }
       )
+      .pickerMirrorBounds()
       .id(device?.id)
       .transition(.opacity)
     }

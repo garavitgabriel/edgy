@@ -34,7 +34,7 @@ Start here before you make anything that looks or sounds like Edgy: app UI, an i
 
 ### Tokens
 
-Copied from `docs/BRIEF.md` § Tokens. **BRIEF is canonical; if a value here ever differs, BRIEF wins.** In code, use `Tokens.swift` (transcribed from BRIEF), never literals.
+Copied from `docs/BRIEF.md` § Tokens. **BRIEF is canonical; if a value here ever differs, BRIEF wins.** In code, use `Sources/EdgyUI/Shared/Tokens.swift` (transcribed from BRIEF), never literals.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|
@@ -235,7 +235,7 @@ The website, the landing page, social posts, launch video frames and README scre
   - `26F-SUPP-S7.png`: onboarding step 3, presets
   - `26F-SUPP-S8.png`: plates and issues (level plate, display check, hold plate)
 - **Production assets:** `docs/design/assets/` and its `README.md`.
-- **Build snapshot critiques:** `docs/design/critiques/batch-N.md` (one per merged UI batch, checked against the final renders), with the snapshots in `docs/design/build-shots/`.
+- **Build snapshot critiques:** `docs/design/critiques/batch-N.md` (created per merged UI batch, checked against the final renders), with the snapshots in `docs/design/build-shots/`.
 - Renders show the feel; when a render and BRIEF disagree, BRIEF wins.
 
 ## Provenance

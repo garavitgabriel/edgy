@@ -154,6 +154,7 @@ struct MirrorPad: View {
     }
     .frame(width: rect.width, height: rect.height)
     .anchorPreference(key: ZoneAnchorKey.self, value: .bounds) { [zone.zone: $0] }
+    .pickerAnchor(for: zone.zone)
     .offset(x: rect.minX, y: rect.minY)
     .allowsHitTesting(false)
   }
