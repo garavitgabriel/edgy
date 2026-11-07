@@ -189,8 +189,13 @@ public final class SettingsEditor {
   /// profile's other bindings (the binding in its own slot is replaced, so it is not a duplicate).
   public func validate(_ binding: Binding, in ref: ProfileRef) -> [ValidationIssue] {
     var issues = validator.validate(binding, in: ref)
-    for other in profile(ref)?.bindings ?? [] where other.key != binding.key {
-      if ConfigValidator.overlaps(other, binding) {
+    var others = profile(ref)?.bindings ?? []
+    if case .app = ref, profile(ref)?.inheritsDefault == true {
+      let own = Set(others.map(\.key))
+      others += config.defaultProfile.bindings.filter { !own.contains($0.key) }
+    }
+    for other in others where other.key != binding.key && other.action != .doNothing {
+      if binding.action != .doNothing, ConfigValidator.overlaps(other, binding) {
         issues.append(
           ValidationIssue(.warning, .overlappingZones, profile: ref, binding: binding.key, action: binding.action))
       }
@@ -221,13 +226,117 @@ public final class SettingsEditor {
     try mutateProfile(ref) { $0.bindings.removeAll { $0.key == key } }
   }
 
-  /// Adds a profile for `bundleID`: empty, or a copy of the default profile's bindings.
-  public func addAppProfile(bundleID: String, copyingDefault: Bool = false) throws {
+  /// What a new app profile starts as.
+  public enum NewAppProfile: Sendable {
+    /// No bindings of its own, inheriting the default: the app behaves exactly like the default
+    /// until a gesture is overridden or turned off. The v0.4 default.
+    case inheriting
+    /// The pre-v0.4 full-replace profile holding a copy of the default's bindings; later default
+    /// edits don't reach the app.
+    case copyOfDefault
+    /// A full-replace profile with no bindings: every gesture is off while the app is frontmost.
+    case empty
+  }
+
+  /// Adds a profile for `bundleID`; by default one that inherits the default profile.
+  public func addAppProfile(bundleID: String, startingAs start: NewAppProfile = .inheriting) throws {
     guard ConfigValidator.isBundleID(bundleID) else { throw SettingsEditorError.invalidBundleID(bundleID) }
     guard config.appProfiles[bundleID] == nil else { throw SettingsEditorError.profileExists(bundleID) }
     var next = config
-    next.appProfiles[bundleID] = Profile(bindings: copyingDefault ? config.defaultProfile.bindings : [])
+    switch start {
+    case .inheriting: next.appProfiles[bundleID] = Profile(bindings: [], inheritsDefault: true)
+    case .copyOfDefault: next.appProfiles[bundleID] = Profile(bindings: config.defaultProfile.bindings)
+    case .empty: next.appProfiles[bundleID] = Profile(bindings: [])
+    }
     try commit(next)
+  }
+
+  /// The pre-v0.4 call: a full-replace profile, empty or a copy of the default's bindings. Kept so
+  /// old call sites behave as before; `addAppProfile(bundleID:startingAs:)` is the v0.4 API.
+  public func addAppProfile(bundleID: String, copyingDefault: Bool) throws {
+    try addAppProfile(bundleID: bundleID, startingAs: copyingDefault ? .copyOfDefault : .empty)
+  }
+
+  // MARK: Per-app overrides
+
+  /// Puts `binding` in the app's profile, overriding the default's binding on the same zone +
+  /// gesture for that app only. Creates an inheriting profile when the app has none (one undo step).
+  public func overrideBinding(_ binding: Binding, forApp bundleID: String) throws {
+    try mutateAppProfile(bundleID, creating: true) { profile in
+      if let index = profile.bindings.firstIndex(where: { $0.key == binding.key }) {
+        profile.bindings[index] = binding
+      } else {
+        profile.bindings.append(binding)
+      }
+    }
+  }
+
+  /// Turns the gesture at `key` off while the app is frontmost (a `doNothing` binding), whatever
+  /// the default binds there. Creates an inheriting profile when the app has none.
+  public func turnOff(_ key: BindingKey, forApp bundleID: String) throws {
+    try overrideBinding(Binding(zone: key.zone, gesture: key.gesture, action: .doNothing), forApp: bundleID)
+  }
+
+  /// Drops the app's own binding at `key` so the default's shows through again (an override or a
+  /// turned-off gesture goes back to inherited). In a full-replace profile this just removes the
+  /// binding. Nothing to revert is a no-op.
+  public func revertToDefault(_ key: BindingKey, forApp bundleID: String) throws {
+    try mutateAppProfile(bundleID, creating: false) { $0.bindings.removeAll { $0.key == key } }
+  }
+
+  /// Turns a full-replace profile into an inheriting one that behaves exactly the same: bindings
+  /// equal to the default's are dropped (inherited), default slots the app didn't bind become
+  /// `doNothing`, everything else stays as an override. Already inheriting -> no-op.
+  public func convertToInheriting(bundleID: String) throws {
+    let base = config.defaultProfile.bindings.filter { $0.action != .doNothing }
+    try mutateAppProfile(bundleID, creating: false) { profile in
+      guard !profile.inheritsDefault else { return }
+      let own = Dictionary(profile.bindings.map { ($0.key, $0) }, uniquingKeysWith: { first, _ in first })
+      var overrides: [Binding] = []
+      for binding in base {
+        if let mine = own[binding.key] {
+          if mine != binding { overrides.append(mine) }
+        } else {
+          overrides.append(Binding(zone: binding.zone, gesture: binding.gesture, action: .doNothing))
+        }
+      }
+      let baseKeys = Set(base.map(\.key))
+      overrides += profile.bindings.filter { !baseKeys.contains($0.key) }
+      profile = Profile(bindings: overrides, disabled: profile.disabled, inheritsDefault: true)
+    }
+  }
+
+  /// What runs while `bundleID` is frontmost, one row per slot, with where each row comes from.
+  /// Order matches `EdgyConfig.profile(for:)`: default order, then the app's own extra slots.
+  /// Unlike the resolved profile, turned-off slots are listed (as `.turnedOff`). An app without a
+  /// profile (or `nil`) gets the default's bindings, all `.inherited`; a full-replace profile's rows
+  /// are all `.appOnly` (or `.turnedOff` for `doNothing`).
+  public func effectiveBindings(forApp bundleID: String?) -> [EffectiveBinding] {
+    let base = config.defaultProfile.bindings.filter { $0.action != .doNothing }
+    guard let bundleID, let app = config.appProfiles[bundleID] else {
+      return base.map { EffectiveBinding(binding: $0, source: .inherited, defaultBinding: $0) }
+    }
+    guard app.inheritsDefault else {
+      return app.bindings.map {
+        EffectiveBinding(binding: $0, source: $0.action == .doNothing ? .turnedOff : .appOnly, defaultBinding: nil)
+      }
+    }
+    var rows: [EffectiveBinding] = []
+    var used = Set<BindingKey>()
+    for binding in base {
+      guard let mine = app.bindings.first(where: { $0.key == binding.key }) else {
+        rows.append(EffectiveBinding(binding: binding, source: .inherited, defaultBinding: binding))
+        continue
+      }
+      used.insert(binding.key)
+      let source: EffectiveBinding.Source = mine.action == .doNothing ? .turnedOff : .overridden
+      rows.append(EffectiveBinding(binding: mine, source: source, defaultBinding: binding))
+    }
+    for binding in app.bindings where used.insert(binding.key).inserted {
+      let source: EffectiveBinding.Source = binding.action == .doNothing ? .turnedOff : .appOnly
+      rows.append(EffectiveBinding(binding: binding, source: source, defaultBinding: nil))
+    }
+    return rows
   }
 
   public func removeAppProfile(bundleID: String) throws {
@@ -258,12 +367,15 @@ public final class SettingsEditor {
     try commit(next)
   }
 
-  /// Default profile → the built-in preset. App profile → a copy of the current default profile's
+  /// Default profile → the built-in preset. Inheriting app profile → no overrides, enabled
+  /// (everything inherited). Full-replace app profile → a copy of the current default profile's
   /// bindings, enabled (the same thing "add profile, copying default" gives).
   public func resetProfile(_ ref: ProfileRef) throws {
     let preset = EdgyConfig.defaults.defaultProfile
     let copy = Profile(bindings: config.defaultProfile.bindings)
-    try mutateProfile(ref) { $0 = ref == .default ? preset : copy }
+    try mutateProfile(ref) {
+      $0 = ref == .default ? preset : $0.inheritsDefault ? Profile(bindings: [], inheritsDefault: true) : copy
+    }
   }
 
   /// Everything back to `EdgyConfig.defaults`, app profiles and app settings included.
@@ -365,6 +477,18 @@ public final class SettingsEditor {
       body(&profile)
       next.appProfiles[id] = profile
     }
+    try commit(next)
+  }
+
+  private func mutateAppProfile(_ bundleID: String, creating: Bool, _ body: (inout Profile) -> Void) throws {
+    guard config.appProfiles[bundleID] != nil || creating else {
+      throw SettingsEditorError.profileNotFound(.app(bundleID))
+    }
+    guard ConfigValidator.isBundleID(bundleID) else { throw SettingsEditorError.invalidBundleID(bundleID) }
+    var next = config
+    var profile = next.appProfiles[bundleID] ?? Profile(bindings: [], inheritsDefault: true)
+    body(&profile)
+    next.appProfiles[bundleID] = profile
     try commit(next)
   }
 

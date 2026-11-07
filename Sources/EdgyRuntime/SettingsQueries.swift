@@ -6,6 +6,32 @@ public struct ZoneBindings: Hashable, Sendable {
   public var bindings: [Binding]
 }
 
+/// One row of `SettingsEditor.effectiveBindings(forApp:)`: a slot as the app sees it.
+public struct EffectiveBinding: Hashable, Sendable {
+  public enum Source: String, Hashable, Sendable {
+    /// The default's binding, unchanged for this app.
+    case inherited
+    /// The app replaces the default's binding on this slot.
+    case overridden
+    /// The app turns this slot off (`binding.action == .doNothing`).
+    case turnedOff
+    /// A slot only the app binds (or any binding of a full-replace profile).
+    case appOnly
+  }
+
+  /// What the slot does for the app (a `doNothing` binding when turned off).
+  public var binding: Binding
+  public var source: Source
+  /// The default's binding on this slot, when the app inherits, overrides or turns it off.
+  public var defaultBinding: Binding?
+
+  public init(binding: Binding, source: Source, defaultBinding: Binding?) {
+    self.binding = binding
+    self.source = source
+    self.defaultBinding = defaultBinding
+  }
+}
+
 /// Actions in one category, for the action picker.
 public struct ActionGroup: Hashable, Sendable {
   public var category: ActionCategory

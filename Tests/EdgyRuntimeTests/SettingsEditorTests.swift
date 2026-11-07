@@ -96,7 +96,8 @@ import Testing
 
   @Test func appProfilesAddRemoveAndDisable() throws {
     let h = try EditorHarness()
-    try h.editor.addAppProfile(bundleID: Self.app)
+    // The pre-v0.4 full-replace path (v0.4's bare call makes an inheriting profile).
+    try h.editor.addAppProfile(bundleID: Self.app, copyingDefault: false)
     #expect(h.editor.config.appProfiles[Self.app] == Profile(bindings: []))
     try h.editor.addAppProfile(bundleID: "com.example.copy", copyingDefault: true)
     #expect(h.editor.config.appProfiles["com.example.copy"]?.bindings == EdgyConfig.defaults.defaultProfile.bindings)
@@ -153,7 +154,7 @@ import Testing
   @Test func resetProfileAndResetAll() throws {
     let h = try EditorHarness()
     try h.editor.removeBinding(BindingKey(zone: .edge(.left), gesture: .slide), from: .default)
-    try h.editor.addAppProfile(bundleID: Self.app)
+    try h.editor.addAppProfile(bundleID: Self.app, copyingDefault: false)
     try h.editor.setBinding(Self.topTap, in: .app(Self.app))
     try h.editor.setProfileDisabled(true, for: .app(Self.app))
 
