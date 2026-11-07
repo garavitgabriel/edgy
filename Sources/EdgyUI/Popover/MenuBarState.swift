@@ -63,7 +63,8 @@ public final class MenuBarState {
 
   /// From the app's `PermissionMonitor`. Only `.denied` shows the No Accessibility block.
   public var accessibility: PermissionState = .unknown
-  /// The broken config file on reload, if any (the same value the settings window reads).
+  /// The broken config file on reload, as the app maps it for the settings window (with the real
+  /// file name). When nil, `editor.configProblem` is used (see `configProblem(model:)`).
   public var configProblem: ConfigProblem?
   /// The frontmost app, so its profile's chip comes first and the live chip is right.
   public var frontmostBundleID: String?
@@ -94,6 +95,13 @@ public final class MenuBarState {
     guard testMode else { return }
     dontRunActions = on
     model.setTestMode(on)
+  }
+
+  /// The broken config file, if any: the app's value, else the editor's own (as "config.json").
+  public func configProblem(model: SettingsModel) -> ConfigProblem? {
+    _ = model.revision
+    if let configProblem { return configProblem }
+    return model.editor.configProblem.map { ConfigProblem(line: $0.line, message: $0.message) }
   }
 
   /// The glyph for the current facts (see `MenuGlyph.state(engine:editor:testMode:accessibility:configProblem:)`).

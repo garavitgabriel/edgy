@@ -104,15 +104,15 @@ public enum MenuGlyph {
   ///   ("Don't run actions"). The dot means Test Mode is on either way (§ Test Mode: glyph unchanged).
   /// - `accessibility`: only `.denied` counts; `.unknown` (before the first check) shows nothing,
   ///   like the window's strip, so the glyph never flashes the exclamation at launch.
-  /// - `configProblem`: the broken config file on reload. `SettingsEditor` has no `configProblem`
-  ///   on this branch (batch 13), so the app passes it in, the same value the window reads.
+  /// - `configProblem`: the broken config file on reload, as the app maps it for the window
+  ///   (with the real file name). When nil, `editor.configProblem` still counts.
   @MainActor
   public static func state(
     engine: EngineStatus, editor: SettingsEditor, testMode: Bool, accessibility: PermissionState,
     configProblem: ConfigProblem? = nil
   ) -> State {
     state(
-      brokenConfig: configProblem != nil, needsAccessibility: accessibility == .denied,
+      brokenConfig: configProblem != nil || editor.configProblem != nil, needsAccessibility: accessibility == .denied,
       hasTrackpad: engine.hasTrackpad, paused: engine.paused, enabled: editor.config.app.enabled,
       testMode: testMode)
   }

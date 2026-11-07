@@ -106,7 +106,7 @@ public enum PopoverTop: Equatable, Sendable {
 
   @MainActor
   public static func resolve(state: MenuBarState, model: SettingsModel) -> PopoverTop {
-    if let problem = state.configProblem { return .brokenConfig(problem) }
+    if let problem = state.configProblem(model: model) { return .brokenConfig(problem) }
     if state.accessibility == .denied { return .needsAccessibility }
     return .normal(PopoverMirror.resolve(state: state, model: model))
   }
