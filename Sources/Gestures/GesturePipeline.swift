@@ -8,7 +8,12 @@ import EdgyCore
 /// Event conventions:
 /// - Slides emit `.began` (delta 0), any number of `.changed`, then `.ended` (delta 0) on lift or
 ///   `.cancelled` when misfire defense revokes the claim.
-/// - Discrete gestures (tap, double-tap, long-press, swipe) emit exactly one event, phase `.ended`.
+/// - Tap, double-tap and swipe emit exactly one event, phase `.ended`.
+/// - Long-press emits `.began` the moment the hold is recognized (while the finger is down), then
+///   exactly one of `.ended` (a member lifts) or `.cancelled` (misfire defense takes the touch away:
+///   palm, extra fingers). The fingers stay claimed from `.began` until then. Once a hold has
+///   begun the touch is frozen: no swipe, no slide output, no off-axis rejection. `reset()` emits
+///   nothing; whoever resets (the engine) owns closing any hold it was told about.
 /// - The first tap emits `.tap`; a second tap in the same zone within the double-tap window emits
 ///   `.doubleTap` instead of a second `.tap`. (There are no timers, so a tap cannot be delayed.)
 final class GesturePipeline: GestureRecognizing {
@@ -295,6 +300,9 @@ struct FrameStep {
   }
 
   mutating func advanceEdge(_ candidate: Candidate, edge: Zone.Edge, travel: Double) {
+    // A hold that has begun owns the touch until lift: motion no longer becomes a swipe, slide
+    // output or an off-axis rejection (each would strand or contradict the hold).
+    guard !candidate.longPressFired else { return }
     let elapsed = now - candidate.birthTime
     switch candidate.phase {
     case .sliding:
@@ -396,7 +404,7 @@ struct FrameStep {
       context.longPressZones?.contains(state.candidates[index].zone) ?? true
     else { return }
     state.candidates[index].longPressFired = true
-    emit(state.candidates[index], .longPress, phase: .ended, deltaMM: 0)
+    emit(state.candidates[index], .longPress, phase: .began, deltaMM: 0)
   }
 
   mutating func setPhase(_ key: Int, _ phase: Candidate.Phase) {
@@ -408,9 +416,14 @@ struct FrameStep {
   mutating func finish(_ candidate: Candidate) {
     let elapsed = now - candidate.birthTime
     let tapLike = elapsed <= tuning.tapMaxDurationS && candidate.maxTravel <= tuning.tapMaxTravelMM
+    if candidate.longPressFired {
+      if candidate.phase == .sliding { emit(candidate, .slide, phase: .ended, deltaMM: 0) }
+      emit(candidate, .longPress, phase: .ended, deltaMM: 0)
+      return
+    }
     switch candidate.phase {
     case .sliding:
-      if !candidate.slide.emittedMotion && !candidate.longPressFired && tapLike {
+      if !candidate.slide.emittedMotion && tapLike {
         // A dwell claim that never moved and lifted quickly was really a tap.
         emit(candidate, .slide, phase: .cancelled, deltaMM: 0)
         tap(candidate)
@@ -425,7 +438,6 @@ struct FrameStep {
         for member in candidate.members { rejectLifted(member, reason) }
       }
     case .pending:
-      guard !candidate.longPressFired else { return }
       if let direction = swipeDirection(candidate, elapsed: elapsed),
         isFlick(candidate, elapsed: elapsed) || !slideAllowed(candidate)
       {
@@ -482,6 +494,9 @@ struct FrameStep {
     let candidate = state.candidates.remove(at: index)
     if candidate.phase == .sliding {
       emit(candidate, .slide, phase: .cancelled, deltaMM: 0)
+    }
+    if candidate.longPressFired {
+      emit(candidate, .longPress, phase: .cancelled, deltaMM: 0)
     }
     for member in candidate.members {
       rejectTrack(member, reason)
