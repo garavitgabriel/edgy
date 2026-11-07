@@ -19,10 +19,12 @@ import Testing
   @Test func unitFollowsTheValue() {
     let stepMM = ActionParameter(
       key: "stepMM", kind: .number(4...20), required: false, defaultValue: "8", displayName: "Distance per app",
-      helpText: "Slide this far to move one app.", unit: "mm")
+      // Batch 26 ruling (Switch Apps opens on travel): was "Slide this far to move one app."
+      helpText: "Slide this far to open the switcher and move one app.", unit: "mm")
     #expect(NumberParameterField.label(8, format: .plain, parameter: stepMM) == "8 mm")
     #expect(NumberParameterField.label(12.5, format: .plain, parameter: stepMM) == "12.5 mm")
-    #expect(stepMM.helpText == "Slide this far to move one app.")
+    // Batch 26 ruling: #expect(stepMM.helpText == "Slide this far to move one app.")
+    #expect(stepMM.helpText == "Slide this far to open the switcher and move one app.")
   }
 
   @Test func zeroReadsAsItsLabel() {

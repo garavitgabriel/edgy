@@ -110,6 +110,19 @@ struct ParameterRowsView: View {
   }
 }
 
+/// Owner's ruling (batch 27): while Hold Keys has no keys, one line under the recorder says what
+/// to press (13, `ink2`, the helper line's style). It goes once keys are set. No suggestion chips.
+enum HoldKeysHint {
+  static let empty =
+    "Press the shortcut your app uses while held. For a key like fn alone, hold it a second, then let go."
+
+  static func text(_ parameter: ActionParameter, in binding: EdgyCore.Binding) -> String? {
+    guard binding.action == "keyboard.hold", parameter.kind == .keyCombo else { return nil }
+    let keys = binding.parameters[parameter.key]?.trimmingCharacters(in: .whitespaces) ?? ""
+    return keys.isEmpty ? empty : nil
+  }
+}
+
 private struct ParameterRow: View {
   @Bindable var model: SettingsModel
   var row: InspectorRow
@@ -163,7 +176,7 @@ private struct ParameterRow: View {
     case .action(let parameter):
       LabeledParameter(
         label: ActionNaming.parameterLabel(parameter, action: row.binding.action), labelWidth: labelWidth,
-        help: ActionNaming.parameterHelp(parameter)
+        help: ActionNaming.parameterHelp(parameter) ?? HoldKeysHint.text(parameter, in: row.binding)
       ) {
         control(for: parameter)
       }

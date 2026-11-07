@@ -13,10 +13,41 @@ import Testing
 /// outside the temp folder is touched, and no real product's icon is shown.
 @MainActor
 enum IconApps {
-  static let root = FileManager.default.temporaryDirectory.appendingPathComponent("edgy-batch21-apps")
+  /// A fresh folder name per icon drawing, so the system's icon cache never serves an old one.
+  static let root = FileManager.default.temporaryDirectory.appendingPathComponent("edgy-batch27-icon-apps")
 
-  /// `icon`: the bundle ships its own `.icns` (Edgy's exported icon stands in for a real app's).
-  /// Without it the bundle is iconless and must draw the Open App tile (critique 22 must-fix).
+  /// A stand-in real app icon: a mid-tone slate tile with a light diamond mark, invented here
+  /// (critique 25 should-fix 1: Edgy's own cream icon read as a pale square at 14 pt). Its tone
+  /// sits mid-way, clear of the window's cream and of `ink`.
+  static func midToneIcon(to url: URL) {
+    let side = 512
+    guard
+      let context = CGContext(
+        data: nil, width: side, height: side, bitsPerComponent: 8, bytesPerRow: 0,
+        space: CGColorSpace(name: CGColorSpace.sRGB)!, bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)
+    else { return }
+    let s = CGFloat(side)
+    let tile = CGRect(x: s * 0.1, y: s * 0.1, width: s * 0.8, height: s * 0.8)
+    context.addPath(CGPath(roundedRect: tile, cornerWidth: s * 0.18, cornerHeight: s * 0.18, transform: nil))
+    context.setFillColor(CGColor(srgbRed: 0.27, green: 0.42, blue: 0.55, alpha: 1))
+    context.fillPath()
+    context.setFillColor(CGColor(srgbRed: 0.93, green: 0.95, blue: 0.97, alpha: 1))
+    context.move(to: CGPoint(x: s * 0.5, y: s * 0.78))
+    context.addLine(to: CGPoint(x: s * 0.62, y: s * 0.5))
+    context.addLine(to: CGPoint(x: s * 0.5, y: s * 0.22))
+    context.addLine(to: CGPoint(x: s * 0.38, y: s * 0.5))
+    context.closePath()
+    context.fillPath()
+    guard let image = context.makeImage(),
+      let destination = CGImageDestinationCreateWithURL(url as CFURL, "com.apple.icns" as CFString, 1, nil)
+    else { return }
+    CGImageDestinationAddImage(destination, image, nil)
+    CGImageDestinationFinalize(destination)
+  }
+
+  /// `icon`: the bundle ships its own `.icns` (the invented mid-tone icon above stands in for a
+  /// real app's). Without it the bundle is iconless and must draw the Open App tile (critique 22
+  /// must-fix).
   static func app(_ name: String, _ bundleID: String, running: Bool, icon: Bool = false) -> InstalledApp {
     let url = root.appendingPathComponent("\(name).app")
     let contents = url.appendingPathComponent("Contents")
@@ -29,8 +60,16 @@ enum IconApps {
     try? FileManager.default.removeItem(at: icns)
     if icon {
       plist["CFBundleIconFile"] = "AppIcon"
-      try? FileManager.default.copyItem(
-        at: Snapshot.repoRoot.appendingPathComponent("docs/design/assets/AppIcon.icns"), to: icns)
+      // Was Edgy's own exported `AppIcon.icns` (critique 25 should-fix 1).
+      midToneIcon(to: icns)
+      // A runnable bundle: without an executable the system stamps its "can't open" badge over
+      // the icon. A two-line shell script that only exits; it is never run.
+      let macOS = contents.appendingPathComponent("MacOS")
+      try? FileManager.default.createDirectory(at: macOS, withIntermediateDirectories: true)
+      let executable = macOS.appendingPathComponent(name)
+      try? Data("#!/bin/sh\nexit 0\n".utf8).write(to: executable)
+      try? FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: executable.path)
+      plist["CFBundleExecutable"] = name
     }
     (plist as NSDictionary).write(to: contents.appendingPathComponent("Info.plist"), atomically: true)
     return InstalledApp(name: name, bundleID: bundleID, path: url.path, isRunning: running)

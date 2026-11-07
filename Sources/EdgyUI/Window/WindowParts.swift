@@ -207,45 +207,36 @@ struct AppMark: View {
   }
 }
 
-/// The app icon the title bar shows: the running app's own (the bundled `AppIcon.icns`, whose
-/// small sizes are the dotless drawing). Snapshots inject the exported `icon_16x16@2x.png`.
-private struct AppIconImageKey: EnvironmentKey {
-  static var defaultValue: NSImage? { nil }
-}
-
-extension EnvironmentValues {
-  var edgyAppIcon: NSImage? {
-    get { self[AppIconImageKey.self] }
-    set { self[AppIconImageKey.self] = newValue }
-  }
-}
-
-/// § Window identity and Advanced (a), the owner's ruling on device: the app icon only, no
-/// wordmark. 26 pt (the tab pill's height, so it renders from the small drawing), 12 pt after the
-/// last traffic light, centred on the tab pill's centre (the shared title-bar row centres both).
-/// A 0.5 pt `titleIconOutline` around the tile in light mode only (the token is clear in dark).
+/// § Window identity and Advanced (a), the owner's ruling on device (2026-11-07, supersedes the
+/// 26 pt app icon): the Edgy mark alone, the V3 pad plus its lit strip with no tile, filled in
+/// `ink` (the strip too, never accent: bone 8). `titleMarkWidth` × `titleMarkHeight` (26 × 18),
+/// `titleIconLeading` (12) after the last traffic light, centred on the tab pill's centre (the
+/// shared title-bar row centres both). The exported `mark-edgy.pdf` is a non-template image used
+/// only as the shape's mask, so the system never tints it. No outline, no shadow, no states.
 /// Tooltip and accessibility label "Edgy"; not clickable, no hover wash.
 struct WindowIdentity: View {
-  @Environment(\.edgyAppIcon) private var injected
-
-  static let iconSize = Tokens.titleIconSize
+  static let width = Tokens.titleMarkWidth
+  static let height = Tokens.titleMarkHeight
   static let label = "Edgy"
-  /// The tile inside the icon canvas on the system's app-icon grid: inset 100/1024 per side,
-  /// corner 185.4/824 of the tile (a continuous rounded rectangle). The outline follows it.
-  static let tileInset: CGFloat = 100.0 / 1024.0
-  static let tileCorner: CGFloat = 185.4 / 824.0
 
-  static var tileSide: CGFloat { iconSize * (1 - 2 * tileInset) }
+  /// The exported mark (`Glyph/Assets/mark-edgy.pdf`), `nil` (logged) if the resource is missing.
+  @MainActor static let mark: NSImage? = {
+    guard let url = Bundle.module.url(forResource: "mark-edgy", withExtension: "pdf", subdirectory: "Assets"),
+      let image = NSImage(contentsOf: url)
+    else {
+      SettingsModel.windowLog.log(.error, "Edgy mark missing: mark-edgy.pdf is not in the EdgyUI bundle")
+      return nil
+    }
+    image.isTemplate = false
+    return image
+  }()
 
   var body: some View {
-    Image(nsImage: injected ?? NSApplication.shared.applicationIconImage)
-      .resizable().interpolation(.high).aspectRatio(contentMode: .fit)
-      .frame(width: Self.iconSize, height: Self.iconSize)
-      .overlay {
-        RoundedRectangle(cornerRadius: Self.tileSide * Self.tileCorner, style: .continuous)
-          .strokeBorder(Tokens.titleIconOutline, lineWidth: Tokens.titleIconOutlineWidth)
-          .frame(width: Self.tileSide, height: Self.tileSide)
+    Tokens.ink
+      .mask {
+        if let mark = Self.mark { Image(nsImage: mark).resizable().interpolation(.high) }
       }
+      .frame(width: Self.width, height: Self.height)
       .help(Self.label)
       .accessibilityElement()
       .accessibilityLabel(Self.label)

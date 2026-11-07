@@ -12,10 +12,12 @@ struct PickerCatalog: Equatable {
     var id: ActionID { descriptor.id }
     /// "Open App…" for actions with parameters.
     var title: String { ActionNaming.pickerName(descriptor) }
-    /// The 13 pt second line: the unavailable reason, or a limited action's note.
+    /// The 13 pt second line: the unavailable reason, or a limited action's note. An available
+    /// action has none, except Hold Keys, which says what it's for (owner's ruling, batch 27);
+    /// an unavailable or limited reason still wins over it.
     var subtitle: String? {
       switch availability {
-      case .available: return nil
+      case .available: return PickerCatalog.useLine[descriptor.id]
       case .limited(let reason), .unavailable(let reason): return reason
       }
     }
@@ -69,7 +71,8 @@ struct PickerCatalog: Equatable {
     let needle = query.trimmingCharacters(in: .whitespaces).lowercased()
     func matches(_ descriptor: ActionDescriptor) -> Bool {
       guard !needle.isEmpty else { return true }
-      return descriptor.displayName.lowercased().contains(needle)
+      if descriptor.displayName.lowercased().contains(needle) { return true }
+      return Self.searchAliases[descriptor.id, default: []].contains { $0.contains(needle) }
     }
     var sections: [Section] = []
     var others: [Item] = []
@@ -86,6 +89,18 @@ struct PickerCatalog: Equatable {
     self.othersTitle = others.isEmpty ? nil : "\(others.count) more \(Self.need(others.map(\.descriptor.shape)))"
     self.offersDoNothing = isAppTab && (needle.isEmpty || "do nothing here".contains(needle))
   }
+
+  /// The one sub-line an available action carries: it describes use, so Hold Keys is findable
+  /// for any app's hold shortcut (owner's ruling, batch 27, copy verbatim).
+  static let useLine: [ActionID: String] = [
+    "keyboard.hold": "Hold any app's shortcut while your finger rests"
+  ]
+
+  /// Extra words search matches, beside the display name (owner's ruling, batch 27): typing what
+  /// a hold shortcut is for finds Hold Keys.
+  static let searchAliases: [ActionID: [String]] = [
+    "keyboard.hold": ["hold", "push to talk", "talk", "dictation", "voice"]
+  ]
 
   /// BRIEF § Picker clarity: within a group, the icon table's order (most-used first), never
   /// alphabetical; search keeps it (critique 22, design answer 2). Keyed by action ID so the

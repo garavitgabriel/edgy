@@ -249,7 +249,10 @@ struct Batch25SnapshotTests {
   /// BRIEF § Window identity (a), the owner's ruling on device: the icon only, 26 pt, 12 pt after
   /// the last traffic light, centred on the tab pill.
   @Test func titleBarIsTheAppIconOnly() throws {
-    #expect(WindowIdentity.iconSize == Tokens.titleIconSize && Tokens.titleIconSize == 26)
+    // Superseded by the owner's ink-mark ruling (BRIEF § Window identity (a), batch 27): the mark
+    // is 26 × 18 pt, not a 26 pt icon. Old assertion:
+    // #expect(WindowIdentity.iconSize == Tokens.titleIconSize && Tokens.titleIconSize == 26)
+    #expect(WindowIdentity.width == Tokens.titleMarkWidth && WindowIdentity.height == Tokens.titleMarkHeight)
     #expect(WindowMetrics.titleBarLeading == WindowMetrics.trafficLightsTrailing + Tokens.titleIconLeading)
     #expect(WindowIdentity.label == "Edgy")
     let model = PreviewFixtures.model()

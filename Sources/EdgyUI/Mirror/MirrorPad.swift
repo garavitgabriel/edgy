@@ -378,20 +378,23 @@ struct MirrorPad: View {
     if zone.label != nil {
       let placement = labelPlacement(zone)
       let fit = fittedLabel(zone, placement: placement)
+      // While the Split control previews this edge, only its label TEXT fades, so the dividers
+      // never cut through a name (critique 22 should-fix 2). The tab keeps its shape, and the bar,
+      // selection ring and silhouette stay drawn: a side tab carries the bar's shape, so fading
+      // the whole label erased the edge (critique 25 regression 1, design answer 1).
+      let text = labelText(zone, fit: fit)
+        .opacity(splitPreviewHides(zone.zone) ? 0 : 1)
+        .animation(.easeOut(duration: 0.12), value: splitPreview)
       Group {
         if placement.inBar {
-          labelText(zone, fit: fit).padding(.horizontal, 8).padding(.vertical, 4)
+          text.padding(.horizontal, 8).padding(.vertical, 4)
         } else {
-          labelText(zone, fit: fit)
+          text
             .padding(.horizontal, 9).padding(.vertical, 4)
             .background { tabBackground(zone, live: live) }
         }
       }
       .fixedSize()
-      // While the Split control previews this edge, its labels fade so the dividers never cut
-      // through a name (critique 22 should-fix 2).
-      .opacity(splitPreviewHides(zone.zone) ? 0 : 1)
-      .animation(.easeOut(duration: 0.12), value: splitPreview)
       .modifier(PickerTabAnchor(zone: zone.zone, enabled: publishesPickerAnchors && !placement.inBar))
       .alignmentGuide(HorizontalAlignment.leading) { d in d.width * placement.anchor.x - placement.point.x }
       .alignmentGuide(VerticalAlignment.top) { d in d.height * placement.anchor.y - placement.point.y }

@@ -8,13 +8,11 @@ import Testing
 @testable import EdgyUI
 
 extension View {
-  /// Window shots show the exported V3 app icon at the title bar's 26 pt (the 32 pt @2x drawing,
-  /// under 128 px: the small drawing). The app gets it from its bundled `.icns`; the test host's
-  /// own icon is a generic one.
-  func withExportedAppIcon() -> some View {
-    let url = Snapshot.repoRoot.appendingPathComponent("docs/design/assets/AppIcon.iconset/icon_32x32@2x.png")
-    return environment(\.edgyAppIcon, NSImage(contentsOf: url))
-  }
+  /// Batch 25 injected the exported app icon for the title bar. Since batch 27 the title bar
+  /// draws the bundled `mark-edgy.pdf` (BRIEF § Window identity (a), the owner's ink-mark ruling),
+  /// which the test host has too, so there is nothing left to inject; kept so window shots read
+  /// the same.
+  func withExportedAppIcon() -> some View { self }
 }
 
 /// Batch 22 phase B shots in `docs/design/build-shots/batch-22/`, light and dark: picker clarity,

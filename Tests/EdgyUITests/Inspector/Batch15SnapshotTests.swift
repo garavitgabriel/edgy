@@ -261,7 +261,8 @@ import Testing
     let model = InspectorFixtures.model(config: config)
     let stepMM = ActionParameter(
       key: "stepMM", kind: .number(4...20), required: false, defaultValue: "8", displayName: "Distance per app",
-      helpText: "Slide this far to move one app.", unit: "mm")
+      // Batch 26 ruling (Switch Apps opens on travel): was "Slide this far to move one app."
+      helpText: "Slide this far to open the switcher and move one app.", unit: "mm")
     let keepOpen = ActionParameter(
       key: "keepOpenMS", kind: .number(0...1000), required: false, defaultValue: "400",
       displayName: "Keep open between strokes", unit: "ms", zeroLabel: "Off")
