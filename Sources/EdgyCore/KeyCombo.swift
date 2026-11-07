@@ -1,7 +1,8 @@
 import Foundation
 
-/// A keyboard shortcut as stored in `Binding.parameters`: lowercase modifiers then one key,
-/// joined by `+`, e.g. `"cmd+shift+4"`, `"ctrl+opt+left"`, `"f5"`.
+/// A keyboard shortcut as stored in `Binding.parameters`: lowercase modifiers then at most one key,
+/// joined by `+`, e.g. `"cmd+shift+4"`, `"ctrl+opt+left"`, `"f5"`, or modifiers alone (`"fn"`,
+/// `"ctrl+opt"`) — the shape dictation apps use for push-to-talk.
 ///
 /// Parsing is forgiving (any order, any case, a few aliases); `description` is the canonical
 /// form (modifiers in `Modifier.allCases` order). Mapping keys to hardware key codes is the
@@ -12,8 +13,8 @@ public struct KeyCombo: Hashable, Sendable, CustomStringConvertible {
   }
 
   public var modifiers: Set<Modifier>
-  /// A name from `KeyCombo.keyNames`.
-  public var key: String
+  /// A name from `KeyCombo.keyNames`, or `nil` for a modifier-only combo (at least one modifier).
+  public var key: String?
 
   /// Every key a combo may end in.
   public static let keyNames: [String] = {
@@ -50,7 +51,18 @@ public struct KeyCombo: Hashable, Sendable, CustomStringConvertible {
     self.key = key
   }
 
-  /// Parses `"cmd+shift+4"`-style text. Returns `nil` unless there is exactly one known key.
+  /// A modifier-only combo. `nil` when `modifiers` is empty.
+  public init?(modifiers: Set<Modifier>) {
+    guard !modifiers.isEmpty else { return nil }
+    self.modifiers = modifiers
+    self.key = nil
+  }
+
+  /// True when the combo is modifiers alone (no key).
+  public var isModifierOnly: Bool { key == nil }
+
+  /// Parses `"cmd+shift+4"`-style text. Returns `nil` unless there is at most one known key and
+  /// something to press (a key, or at least one modifier).
   public init?(_ text: String) {
     let parts = text.lowercased().split(separator: "+", omittingEmptySubsequences: false).map {
       $0.trimmingCharacters(in: .whitespaces)
@@ -68,11 +80,14 @@ public struct KeyCombo: Hashable, Sendable, CustomStringConvertible {
         key = name
       }
     }
-    guard let key else { return nil }
+    guard let key else {
+      self.init(modifiers: modifiers)
+      return
+    }
     self.init(modifiers: modifiers, key: key)
   }
 
   public var description: String {
-    (Modifier.allCases.filter(modifiers.contains).map(\.rawValue) + [key]).joined(separator: "+")
+    (Modifier.allCases.filter(modifiers.contains).map(\.rawValue) + (key.map { [$0] } ?? [])).joined(separator: "+")
   }
 }

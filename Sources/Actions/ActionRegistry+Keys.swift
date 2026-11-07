@@ -114,7 +114,7 @@ extension ActionRegistry {
     do {
       try unavailable(id) {
         try keyboard.setModifiers(Self.ordered(combo.modifiers), down: true)
-        try keyboard.key(combo.key, down: true, modifiers: combo.modifiers)
+        if let key = combo.key { try keyboard.key(key, down: true, modifiers: combo.modifiers) }
       }
     } catch {
       releaseHeld()
@@ -127,7 +127,7 @@ extension ActionRegistry {
     guard let combo = heldCombo else { return }
     heldCombo = nil
     do {
-      try keyboard.key(combo.key, down: false, modifiers: combo.modifiers)
+      if let key = combo.key { try keyboard.key(key, down: false, modifiers: combo.modifiers) }
     } catch {
       actionsLog.error("hold: key up failed: \(String(describing: error), privacy: .public)")
     }

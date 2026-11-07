@@ -12,8 +12,11 @@ import Foundation
 /// match. Needs Accessibility.
 final class LiveKeyboardOutput: KeyboardOutput {
   func post(_ combo: KeyCombo) throws {
-    guard let code = KeyCodes.byName[combo.key] else {
-      throw OutputError("no key code for \"\(combo.key)\"")
+    guard let name = combo.key else {
+      throw OutputError("\"\(combo)\" is modifiers only; it can be held but not sent as a shortcut")
+    }
+    guard let code = KeyCodes.byName[name] else {
+      throw OutputError("no key code for \"\(name)\"")
     }
     guard let source = CGEventSource(stateID: .hidSystemState) else {
       throw OutputError("cannot create a keyboard event source")

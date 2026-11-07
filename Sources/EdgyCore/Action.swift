@@ -6,6 +6,11 @@ public struct ActionID: RawRepresentable, Codable, Hashable, Sendable, Expressib
   public var rawValue: String
   public init(rawValue: String) { self.rawValue = rawValue }
   public init(stringLiteral value: String) { self.rawValue = value }
+
+  /// "Do nothing": in an app profile that inherits the default, binding a gesture to this turns
+  /// that default gesture off for the app. Never performed; resolution drops it (see
+  /// `EdgyConfig.profile(for:)`). Listed in the catalog so the picker can offer it.
+  public static let doNothing: ActionID = "edgy.none"
 }
 
 /// What a gesture hands to an action.

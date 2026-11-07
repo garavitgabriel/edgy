@@ -47,6 +47,6 @@ enum KeyCodes {
 
   /// The flags for a whole combo: its modifiers plus the key's implicit flags.
   static func flags(for combo: KeyCombo) -> CGEventFlags {
-    combo.modifiers.reduce(implicitFlags(for: combo.key)) { $0.union(modifiers[$1]?.flag ?? []) }
+    combo.modifiers.reduce(implicitFlags(for: combo.key ?? "")) { $0.union(modifiers[$1]?.flag ?? []) }
   }
 }

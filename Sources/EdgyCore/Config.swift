@@ -57,10 +57,25 @@ public struct Profile: Codable, Hashable, Sendable {
   public var bindings: [Binding]
   /// When true, Edgy ignores all gestures while this profile's app is frontmost.
   public var disabled: Bool
+  /// App profiles only. `true`: this profile is a set of overrides on top of the default profile —
+  /// a binding here replaces the default binding on the same zone + gesture, and a binding to
+  /// `ActionID.doNothing` turns that default gesture off for this app. `false` (older configs): the
+  /// profile replaces the default profile entirely. Ignored on the default profile.
+  public var inheritsDefault: Bool
 
-  public init(bindings: [Binding], disabled: Bool = false) {
+  public init(bindings: [Binding], disabled: Bool = false, inheritsDefault: Bool = false) {
     self.bindings = bindings
     self.disabled = disabled
+    self.inheritsDefault = inheritsDefault
+  }
+
+  private enum CodingKeys: String, CodingKey { case bindings, disabled, inheritsDefault }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    bindings = try c.decode([Binding].self, forKey: .bindings)
+    disabled = try c.decode(Bool.self, forKey: .disabled)
+    inheritsDefault = try c.decodeIfPresent(Bool.self, forKey: .inheritsDefault) ?? false
   }
 }
 
@@ -176,9 +191,27 @@ public struct EdgyConfig: Codable, Hashable, Sendable {
     ]),
     appProfiles: [:])
 
-  /// The profile in effect for a frontmost app.
+  /// The profile in effect for a frontmost app, resolved: an inheriting app profile is merged over
+  /// the default profile (same zone + gesture → the app's binding wins, default order kept, the
+  /// app's extra bindings appended), and `ActionID.doNothing` bindings are dropped so the zone stays
+  /// free. The result never inherits.
   public func profile(for bundleID: String?) -> Profile {
-    if let bundleID, let p = appProfiles[bundleID] { return p }
-    return defaultProfile
+    guard let bundleID, let app = appProfiles[bundleID] else { return Self.resolved(defaultProfile) }
+    guard app.inheritsDefault else { return Self.resolved(app) }
+    var merged: [Binding] = []
+    var used = Set<Int>()
+    for base in defaultProfile.bindings {
+      if let index = app.bindings.firstIndex(where: { $0.zone == base.zone && $0.gesture == base.gesture }) {
+        if used.insert(index).inserted { merged.append(app.bindings[index]) }
+      } else {
+        merged.append(base)
+      }
+    }
+    merged += app.bindings.indices.filter { !used.contains($0) }.map { app.bindings[$0] }
+    return Self.resolved(Profile(bindings: merged, disabled: app.disabled))
+  }
+
+  private static func resolved(_ profile: Profile) -> Profile {
+    Profile(bindings: profile.bindings.filter { $0.action != .doNothing }, disabled: profile.disabled)
   }
 }

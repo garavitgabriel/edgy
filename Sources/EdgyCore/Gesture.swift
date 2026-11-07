@@ -78,6 +78,8 @@ public struct GestureEvent: Codable, Hashable, Sendable {
 /// Why a touch was not turned into a gesture. Surfaced in test mode / diagnostics.
 public enum RejectionReason: String, Codable, Sendable {
   case startedOutsideZone, palm, tooManyContacts, typing, offAxisMotion, tooFast, systemGestureHandoff, disabledZone
+  /// The physical button went down while the touch was a candidate or a claim (click, drag, select).
+  case physicalClick
 }
 
 /// Output of one pipeline step.
@@ -116,15 +118,20 @@ public struct GestureContext: Sendable {
   /// Zones with a long-press bound. Elsewhere a resting finger never fires (or claims as) a
   /// long-press. `nil` = every enabled zone may long-press.
   public var longPressZones: Set<Zone>?
+  /// Zones with a double-tap bound. In a zone that also has a tap bound, a single tap is held
+  /// until the double-tap window passes, so the first tap of a double-tap never fires the tap
+  /// action. Elsewhere a tap fires at once. `nil` = no zone waits.
+  public var doubleTapZones: Set<Zone>?
 
   public init(
     settings: GestureSettings, enabledZones: Set<Zone>, secondsSinceLastKeyPress: TimeInterval?,
-    slideZones: Set<Zone>? = nil, longPressZones: Set<Zone>? = nil
+    slideZones: Set<Zone>? = nil, longPressZones: Set<Zone>? = nil, doubleTapZones: Set<Zone>? = nil
   ) {
     self.settings = settings
     self.enabledZones = enabledZones
     self.secondsSinceLastKeyPress = secondsSinceLastKeyPress
     self.slideZones = slideZones
     self.longPressZones = longPressZones
+    self.doubleTapZones = doubleTapZones
   }
 }

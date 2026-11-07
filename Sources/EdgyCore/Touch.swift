@@ -64,12 +64,31 @@ public struct TouchFrame: Codable, Hashable, Sendable {
   public var timestamp: TimeInterval
   public var frameNumber: Int32
   public var contacts: [TouchContact]
+  /// The device's physical button (or force click) is down during this frame. A touch that clicks
+  /// is the user pressing, dragging or selecting, never an edge gesture. Absent in older traces →
+  /// `false`.
+  public var buttonDown: Bool
 
-  public init(deviceID: UInt64, timestamp: TimeInterval, frameNumber: Int32, contacts: [TouchContact]) {
+  public init(
+    deviceID: UInt64, timestamp: TimeInterval, frameNumber: Int32, contacts: [TouchContact],
+    buttonDown: Bool = false
+  ) {
     self.deviceID = deviceID
     self.timestamp = timestamp
     self.frameNumber = frameNumber
     self.contacts = contacts
+    self.buttonDown = buttonDown
+  }
+
+  private enum CodingKeys: String, CodingKey { case deviceID, timestamp, frameNumber, contacts, buttonDown }
+
+  public init(from decoder: Decoder) throws {
+    let c = try decoder.container(keyedBy: CodingKeys.self)
+    deviceID = try c.decode(UInt64.self, forKey: .deviceID)
+    timestamp = try c.decode(TimeInterval.self, forKey: .timestamp)
+    frameNumber = try c.decode(Int32.self, forKey: .frameNumber)
+    contacts = try c.decode([TouchContact].self, forKey: .contacts)
+    buttonDown = try c.decodeIfPresent(Bool.self, forKey: .buttonDown) ?? false
   }
 }
 
