@@ -27,9 +27,11 @@ public struct MenuPopoverView: View {
         .padding(.horizontal, PopoverMetrics.inset)
         .padding(.top, PopoverMetrics.inset)
       PopoverSeparator()
-      MenuListView(model: model, rows: MenuRow.visible(paused: model.engineStatus.paused), actions: actions, now: state.now)
-        .padding(.horizontal, PopoverMetrics.listInset)
-        .padding(.bottom, PopoverMetrics.listInset)
+      MenuListView(
+        model: model, rows: MenuRow.visible(paused: model.engineStatus.paused), actions: actions, now: state.now
+      )
+      .padding(.horizontal, PopoverMetrics.listInset)
+      .padding(.bottom, PopoverMetrics.listInset)
     }
     .frame(width: PopoverMetrics.width)
     .font(Tokens.font(Tokens.typeBody))
@@ -99,9 +101,14 @@ public struct MenuPopoverView: View {
     VStack(alignment: .leading, spacing: PopoverMetrics.rowGap) {
       SwitchRow(
         title: "Enabled",
-        isOn: SwiftUI.Binding(get: { _ = model.revision; return model.editor.config.app.enabled }, set: model.setEnabled))
+        isOn: SwiftUI.Binding(
+          get: {
+            _ = model.revision
+            return model.editor.config.app.enabled
+          }, set: model.setEnabled))
       SwitchRow(
-        title: "Test Mode", isOn: SwiftUI.Binding(get: { state.testMode }, set: { state.setTestMode($0, model: model) }))
+        title: "Test Mode", isOn: SwiftUI.Binding(get: { state.testMode }, set: { state.setTestMode($0, model: model) })
+      )
       if state.showsDontRunActions {
         Toggle(
           PopoverCopy.dontRunActions,
@@ -196,11 +203,11 @@ struct SwitchRow: View {
   @SwiftUI.Binding var isOn: Bool
 
   var body: some View {
-    Toggle(isOn: $isOn) {
+    HStack {
       Text(title).font(Tokens.font(Tokens.typeBody, semibold: true))
+      Spacer(minLength: 12)
+      Toggle(title, isOn: $isOn).toggleStyle(.switch).labelsHidden().tint(Tokens.accent)
     }
-    .toggleStyle(.switch)
-    .tint(Tokens.accent)
   }
 }
 
@@ -223,13 +230,9 @@ struct ChipView: View {
       }
       .padding(.horizontal, 12)
       .padding(.vertical, 5)
-      .background {
-        if chip.isLive {
-          Capsule().fill(Tokens.ink)
-        } else {
-          Capsule().strokeBorder(Tokens.line.opacity(0.6), lineWidth: 1)
-        }
-      }
+      .background(Capsule().fill(chip.isLive ? Tokens.ink : Color.clear))
+      .overlay(Capsule().strokeBorder(chip.isLive ? Color.clear : Tokens.line.opacity(0.6), lineWidth: 1))
+      .clipShape(Capsule())
       .contentShape(Capsule())
     }
     .buttonStyle(.plain)

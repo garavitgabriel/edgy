@@ -36,7 +36,12 @@ public struct MenuBarActions: Sendable {
 
   /// The same commands, each running `first` before it (the controller closes the popover).
   func preceded(by first: @escaping Command) -> MenuBarActions {
-    func wrap(_ command: @escaping Command) -> Command { { first(); command() } }
+    func wrap(_ command: @escaping Command) -> Command {
+      {
+        first()
+        command()
+      }
+    }
     return MenuBarActions(
       openSettings: wrap(openSettings), openConfigFile: wrap(openConfigFile), reloadConfig: wrap(reloadConfig),
       about: wrap(about), quit: wrap(quit), openAccessibilitySettings: wrap(openAccessibilitySettings))
