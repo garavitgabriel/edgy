@@ -120,17 +120,19 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
   let dictation: DictationOutput
   let waiter: TransitionWaiter
   let scheduler: ActionScheduler
+  let switcherInput: SwitcherInputMonitor
 
   /// The level slide in progress, per action. Keeps its own level rather than re-reading (and
   /// re-quantizing) the system value on every frame.
   struct LevelSession {
     var target: LevelTarget
     var level: Double
+    var feel = LevelFeel()
   }
   private var levelSessions: [ActionID: LevelSession] = [:]
 
-  /// Travel toward the next key press of the `keyboard.slideSteps` slide in progress.
-  private var keyStepCarry: Double = 0
+  /// The `keyboard.slideSteps` slide in progress: its stepper (carry, speed, end stepping).
+  private var keySteps: SlideStepper?
 
   /// Last non-zero keyboard backlight level, for `keyboard.backlightToggle`.
   var backlightMemory: Double?
@@ -150,6 +152,8 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
   var keySessionGeneration = 0
   var holdWatchdog: ScheduledWork?
   var switcherWatchdog: ScheduledWork?
+  /// The app switcher's keep-open timer while a session lingers between strokes.
+  var switcherLinger: ScheduledWork?
 
   // Window memory (see `ActionRegistry+Windows.swift`). Guarded by `windowLock`.
   let windowLock = NSRecursiveLock()
@@ -174,8 +178,10 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     hud: HUDOutput, haptics: HapticOutput, shortcuts: ShortcutRunner, keyboard: KeyboardOutput,
     workspace: WorkspaceOutput, windows: WindowOutput, system: SystemOutput, levelKeys: LevelKeyOutput,
     displays: DisplayBrightnessControlling, backlight: KeyboardBacklightOutput, dictation: DictationOutput,
-    waiter: TransitionWaiter, scheduler: ActionScheduler
+    waiter: TransitionWaiter, scheduler: ActionScheduler,
+    switcherInput: SwitcherInputMonitor = NoSwitcherInputMonitor()
   ) {
+    self.switcherInput = switcherInput
     self.settings = settings
     self.audio = audio
     self.display = display
@@ -250,10 +256,12 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     if phase == .began { levelSessions[id] = nil }
     defer { if phase == .ended || phase == .cancelled { levelSessions[id] = nil } }
 
-    let session = try levelSessions[id] ?? startLevelSession(id)
+    var session = try levelSessions[id] ?? startLevelSession(id)
     let old = session.level
-    let step = LevelStep.apply(delta: delta, sensitivity: Self.sensitivity(context), to: old)
-    levelSessions[id] = LevelSession(target: session.target, level: step.level)
+    let felt = session.feel.scaled(delta, motion: context.motion, speedUp: try speedUp(id, in: context))
+    let step = LevelStep.apply(delta: felt, sensitivity: Self.sensitivity(context), to: old)
+    session.level = step.level
+    levelSessions[id] = session
     let outcome = levelOutcome(session.target, level: step.level)
     guard step.level != old else { return outcome }
 
@@ -405,30 +413,91 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     }
   }
 
-  /// `keyboard.slideSteps`: one press of `upKeys` / `downKeys` per `step` of travel. The
-  /// binding's sensitivity scales travel, as it does for levels. Parameters are checked on every
-  /// update (including `.began`) so a bad binding fails as soon as the slide starts.
+  /// `keyboard.slideSteps`: one press of `upKeys` / `downKeys` per `stepMM` of travel, with the
+  /// shared slide feel (speed-up, end stepping; `SlideFeel`). The binding's sensitivity scales
+  /// travel, as it does for levels. Parameters are checked on every update (including `.began`) so
+  /// a bad binding fails as soon as the slide starts. Haptics: a tick per press, and a stronger
+  /// click when end stepping starts.
   private func performKeySteps(
     _ id: ActionID, delta: Double, phase: GestureEvent.Phase, context: ActionContext
   ) throws {
-    if phase == .began { keyStepCarry = 0 }
-    defer { if phase == .ended || phase == .cancelled { keyStepCarry = 0 } }
+    if phase == .began { keySteps = nil }
+    defer { if phase == .ended || phase == .cancelled { keySteps = nil } }
 
     let up = try keyedCombo(ActionParameterKey.upKeys, for: id, in: context)
     let down = try keyedCombo(ActionParameterKey.downKeys, for: id, in: context)
-    let step = try number(
-      ActionParameterKey.step, for: id, in: context, range: ActionCatalog.stepRange,
-      default: ActionCatalog.defaultStep)
-
-    let result = KeySteps.apply(travel: delta * Self.sensitivity(context), step: step, carry: keyStepCarry)
-    keyStepCarry = result.carry
-    guard result.presses != 0 else { return }
-    let keys = result.presses > 0 ? up : down
+    let unit = try stepUnit(
+      id, in: context, legacyRange: ActionCatalog.stepRange, legacyDefault: ActionCatalog.defaultStep,
+      zoneLengthMM: Self.zoneLength(delta: delta, motion: context.motion))
+    let speedUp = try speedUp(id, in: context)
+    var stepper = keySteps ?? SlideStepper(step: unit.step, speedUp: speedUp)
+    stepper.step = unit.step
+    stepper.speedUp = speedUp
+    let result = stepper.advance(travel: unit.travel(delta) * Self.sensitivity(context), motion: unit.motion)
+    keySteps = stepper
+    guard result.steps != 0 else { return }
+    let keys = result.steps > 0 ? up : down
     let tick = settings.allowsHaptic(.slideSteps, parameters: context.parameters)
-    for _ in 0..<abs(result.presses) {
+    if result.endStarted && settings.allowsHaptic(.slideLimits, parameters: context.parameters) {
+      haptics.strongTick(strength: settings.hapticClickStrength)
+    }
+    for _ in 0..<abs(result.steps) {
       try unavailable(id) { try keyboard.post(keys) }
       if tick { haptics.tick(strength: settings.hapticTickStrength) }
     }
+  }
+
+  /// How a stepped slide measures travel for this update.
+  struct StepUnit {
+    /// Per step, in the units `travel` returns (millimetres with a motion, else normalized).
+    var step: Double
+    var motion: SlideMotion?
+
+    func travel(_ delta: Double) -> Double { motion?.deltaMM ?? delta }
+  }
+
+  /// The step for a stepped slide (`apps.switcher`, `keyboard.slideSteps`):
+  /// - With a motion (the recognizer measured millimetres): `stepMM`; else the legacy fraction
+  ///   `step` converted with the zone's length (`stepMigrationLengthMM`); else `defaultStepMM`.
+  /// - Without one (an old caller): the legacy fraction `step` (or its default) on the normalized
+  ///   delta, exactly as before batch 20. A `stepMM` there is converted with a 100 mm zone.
+  func stepUnit(
+    _ id: ActionID, in context: ActionContext, legacyRange: ClosedRange<Double>, legacyDefault: Double,
+    zoneLengthMM: Double? = nil
+  ) throws -> StepUnit {
+    let stepMM =
+      context.parameters[ActionParameterKey.stepMM] == nil
+      ? nil
+      : try number(
+        ActionParameterKey.stepMM, for: id, in: context, range: ActionCatalog.stepMMRange,
+        default: ActionCatalog.defaultStepMM)
+    let legacy =
+      context.parameters[ActionParameterKey.step] == nil
+      ? nil
+      : try number(ActionParameterKey.step, for: id, in: context, range: legacyRange, default: legacyDefault)
+    guard let motion = context.motion else {
+      return StepUnit(step: legacy ?? stepMM.map { $0 / Self.legacyZoneLengthMM } ?? legacyDefault, motion: nil)
+    }
+    if let stepMM { return StepUnit(step: stepMM, motion: motion) }
+    if let legacy { return StepUnit(step: legacy * (zoneLengthMM ?? Self.legacyZoneLengthMM), motion: motion) }
+    return StepUnit(step: ActionCatalog.defaultStepMM, motion: motion)
+  }
+
+  /// A `stepMM` read without a motion (or a legacy `step` on an update that carries no travel, so
+  /// its zone's length is unknown) is converted as if the zone were this long.
+  static let legacyZoneLengthMM = 100.0
+
+  /// The zone's length in millimetres, from an update that moved (`deltaMM / delta`).
+  static func zoneLength(delta: Double, motion: SlideMotion?) -> Double? {
+    guard let motion, delta != 0, motion.deltaMM != 0 else { return nil }
+    return abs(motion.deltaMM / delta)
+  }
+
+  /// Whether `speedUp` is on (default on); anything but "on"/"off" is a bad parameter.
+  func speedUp(_ id: ActionID, in context: ActionContext) throws -> Bool {
+    try choice(
+      ActionParameterKey.speedUp, for: id, in: context, allowed: [ActionParameterKey.on, ActionParameterKey.off],
+      default: ActionParameterKey.on) == ActionParameterKey.on
   }
 
   // MARK: - Triggers
@@ -574,7 +643,7 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
   }
 
   /// An optional choice. Absent → `defaultValue`; not one of `allowed` → `missingParameter`.
-  private func choice(
+  func choice(
     _ key: String, for id: ActionID, in context: ActionContext, allowed: [String], default defaultValue: String
   ) throws -> String {
     guard let raw = context.parameters[key]?.trimmingCharacters(in: .whitespaces), !raw.isEmpty else {

@@ -19,6 +19,12 @@ struct Tuning: Hashable, Sendable {
   var flickSpeedMMPerS = 180.0
   /// Minimum along-axis travel for a swipe.
   var swipeMinTravelMM = 6.0
+  /// On a zone with a slide bound (explicit `GestureContext.slideZones`), a swipe needs a clearer
+  /// flick: quick slides there must stay slides (they speed up, batch 20), so the swipe candidate
+  /// speed and travel are raised to these.
+  var slideZoneFlickSpeedMMPerS = 260.0
+  /// See `slideZoneFlickSpeedMMPerS`.
+  var slideZoneSwipeMinTravelMM = 9.0
   /// A swipe candidate must lift within this time of landing.
   var swipeMaxDurationS = 0.35
   /// Swipe time limit on zones with no slide bound (no slide to confuse it with, so be generous).
@@ -38,9 +44,19 @@ struct Tuning: Hashable, Sendable {
   var restEpsilonMM = 0.6
   /// See `restEpsilonMM`.
   var restDurationS = 0.1
-  /// A claim (slide or hold) is revoked when another, non-palm contact travels this far from
-  /// where it landed: a second finger moving the pointer means the hand isn't on the edge for us,
-  /// and the claim would freeze the pointer under it. A late finger that only rests is left alone.
+  /// The end band of a slide zone: a slide that has moved and then comes to rest (see
+  /// `restEpsilonMM` / `restDurationS`) within this distance of either end of its zone reports
+  /// `GestureEvent.atEnd`, once per frame, so stepped actions keep stepping. Past the zone's end
+  /// (the finger slid on into the next segment or off the strip's axis end) counts as the end too.
+  var endBandMM = 6.0
+  /// On a short zone the band is at most this fraction of the zone's length per end, so the
+  /// middle of a quarter-edge segment never counts as an end.
+  var endBandMaxFraction = 0.2
+  /// A claim is revoked when another, non-palm contact travels this far from where it landed: a
+  /// second finger moving the pointer means the hand isn't on the edge for us, and the claim would
+  /// freeze the pointer under it. A late finger that only rests is left alone. Applies to slides,
+  /// swipes and holds that haven't begun; a hold that has begun survives it (batch 20: pointing
+  /// while push-to-talk is held), and the runtime releases the pointer guard for it.
   var foreignMotionMM = 3.0
   /// Contacts landing within this window of each other belong to one multi-finger touch.
   var multiFingerWindowS = 0.12

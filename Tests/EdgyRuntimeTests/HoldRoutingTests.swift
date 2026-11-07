@@ -160,7 +160,9 @@ enum HoldSample {
     h.step(GestureOutput(claimedContactIDs: [1]))
     h.step(GestureOutput(events: [HoldSample.event(.ended)]))
     #expect(h.actions.performed == [HoldSample.down, HoldSample.up])
-    #expect(h.guardCalls == ["engage", "release"])
+    // Batch 20: a begun hold never holds the pointer guard (was ["engage", "release"]): its claim
+    // starts with the hold, and the guard stays released while it lasts so another finger can point.
+    #expect(h.guardCalls == [])
   }
 
   @Test func cancelled() throws {
@@ -213,7 +215,8 @@ enum HoldSample {
     began(h)
     h.engine.stop()
     #expect(h.actions.performed == [HoldSample.down, HoldSample.up])
-    #expect(h.guardCalls == ["engage", "release"])
+    // Batch 20: the guard was never engaged for the begun hold (was ["engage", "release"]).
+    #expect(h.guardCalls == [])
   }
 
   @Test func replacingActionsReleasesOnTheOldRegistry() throws {

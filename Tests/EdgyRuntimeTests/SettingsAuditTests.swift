@@ -145,6 +145,7 @@ import Testing
       Self.labels(AppSettings.defaults).union(Self.labels(GestureSettings.defaults))
       .union(ConfigValidator.crossCuttingParameters)
       .union(["inheritsDefault", "disabled", "edgy.none"])
+      .union(["stepMM", "speedUp", "keepOpenMS", "holdMS", "legacyParameters", "pressTimeParameter"])
       .union(ValidationIssue.Code.allCases.map(\.rawValue))
     for name in names.sorted() {
       #expect(Self.reference.contains("`\(name)`"), "settings-reference.md doesn't mention `\(name)`")

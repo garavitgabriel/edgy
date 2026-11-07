@@ -91,6 +91,10 @@ public struct ValidationIssue: Hashable, Sendable, CustomStringConvertible {
     /// Info: the zone has both a tap and a double-tap, so a single tap waits the double-tap window
     /// before it runs (`detail` = the wait in milliseconds, e.g. `"300"`). Attached to the tap.
     case tapWaitsForDoubleTap
+    /// Info: the edge has both a slide and a swipe (on the same zone or overlapping segments of one
+    /// edge), so swipes there need a clearer flick (the recognizer raises its swipe speed and
+    /// travel on a zone with a slide bound). Attached to each such swipe. Not a warning.
+    case slideAndSwipes
   }
 
   public var severity: Severity
@@ -195,6 +199,19 @@ public enum GestureSettingsLimits {
 public struct ConfigValidator: Sendable {
   /// Parameters every binding may carry regardless of action.
   public static let crossCuttingParameters: Set<String> = [AppSettings.hapticsParameter, "sensitivity"]
+  /// Parameters an older Edgy wrote that an action still reads but no longer lists: never flagged
+  /// as unknown. `step` (a fraction of the zone's length) on the stepped slides, which now list
+  /// `stepMM` and convert `step` when `stepMM` is absent (batch 20).
+  public static let legacyParameters: [ActionID: Set<String>] = [
+    "keyboard.slideSteps": ["step"], "apps.switcher": ["step"],
+  ]
+  /// `holdMS` on a long-press binding of an action that doesn't list it: "Press time", 100…1500 ms,
+  /// falling back to the global long-press time (mirrors `GestureParameters.pressTime` in Actions,
+  /// which this module can't import). The settings layer offers it on every long-press binding
+  /// whose action has no `holdMS` of its own; the engine hands it to the recognizer per zone.
+  public static let pressTimeParameter = ActionParameter(
+    key: "holdMS", kind: .number(100...1500), required: false, displayName: "Press time",
+    helpText: "How long to press before it runs.", unit: "ms", fallback: .longPressMS)
   /// Valid `segments` counts for a split edge.
   public static let segmentCounts = 1...4
 
@@ -275,7 +292,15 @@ public struct ConfigValidator: Sendable {
         add(.error, .invalidKeyCombo, parameter: parameter.key, detail: ValidationIssue.modifierOnlyNeedsHold)
       }
     }
-    let known = Set(descriptor.parameters.map(\.key)).union(Self.crossCuttingParameters)
+    var known = Set(descriptor.parameters.map(\.key)).union(Self.crossCuttingParameters)
+      .union(Self.legacyParameters[binding.action] ?? [])
+    let pressTime = Self.pressTimeParameter
+    if binding.gesture == .longPress, !known.contains(pressTime.key) {
+      known.insert(pressTime.key)
+      if let value = binding.parameters[pressTime.key], let code = Self.check(value, against: pressTime.kind) {
+        add(.error, code, parameter: pressTime.key)
+      }
+    }
     for key in binding.parameters.keys.sorted() where !known.contains(key) {
       add(.warning, .unknownParameter, parameter: key)
     }
@@ -327,7 +352,40 @@ public struct ConfigValidator: Sendable {
   ) -> [ValidationIssue] {
     let keys = Set(resolved.bindings.map(\.key))
     let wait = String(Int(GestureSettingsLimits.clamped(settings).doubleTapWindowMS.rounded()))
-    return resolved.bindings.compactMap { tap in
+    return tapNotes(resolved, ref, keys: keys, wait: wait, involving: involving)
+      + slideAndSwipeNotes(resolved, ref, involving: involving)
+  }
+
+  /// `slideAndSwipes` on every swipe that shares its edge with a slide (same zone, or overlapping
+  /// segments of one edge). `involving`: only when the swipe or one of those slides is in the set.
+  static func slideAndSwipeNotes(
+    _ resolved: Profile, _ ref: ProfileRef, involving: Set<BindingKey>?
+  ) -> [ValidationIssue] {
+    let live = resolved.bindings.filter { $0.action != .doNothing }
+    let slides = live.filter { $0.gesture == .slide }
+    return live.compactMap { swipe in
+      guard case .swipe = swipe.gesture else { return nil }
+      let sharing = slides.filter { sameEdgeOverlap($0.zone, swipe.zone) }
+      guard !sharing.isEmpty else { return nil }
+      if let involving, !involving.contains(swipe.key), !sharing.contains(where: { involving.contains($0.key) }) {
+        return nil
+      }
+      return ValidationIssue(.info, .slideAndSwipes, profile: ref, binding: swipe.key, action: swipe.action)
+    }
+  }
+
+  /// Two edge zones on one edge whose spans overlap (equal zones included).
+  static func sameEdgeOverlap(_ a: Zone, _ b: Zone) -> Bool {
+    guard case .edge(let edgeA, let segA, let countA) = a, case .edge(let edgeB, let segB, let countB) = b,
+      edgeA == edgeB, countA > 0, countB > 0
+    else { return false }
+    return segA * countB < (segB + 1) * countA && segB * countA < (segA + 1) * countB
+  }
+
+  private static func tapNotes(
+    _ resolved: Profile, _ ref: ProfileRef, keys: Set<BindingKey>, wait: String, involving: Set<BindingKey>?
+  ) -> [ValidationIssue] {
+    resolved.bindings.compactMap { tap in
       guard tap.gesture == .tap else { return nil }
       let doubleTap = BindingKey(zone: tap.zone, gesture: .doubleTap)
       guard keys.contains(doubleTap) else { return nil }

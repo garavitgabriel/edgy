@@ -322,6 +322,72 @@ swift run edgy-trace record --label tap-then-double-tap-top-right --seconds 4 --
 With tap-to-click on, watch the live line: if `BUTTON` shows while the finger is still down
 during a plain tap, taps would be rejected as clicks; note it in the done report.
 
+## Batch 20 scenarios — slide feel and holds
+
+No traces were in `Fixtures/traces/` when batch 20 was built, so `longPressMaxTravelMM` (1.0 mm), the
+end band (`endBandMM` 6 mm, at most a fifth of a zone) and the speed curve (`SlideFeel`: gain from
+60 to 300 mm/s, 3× stepped, 1.6× levels) are still first guesses. Record these on **both** the Magic
+Trackpad and the MacBook's built-in pad (add `-builtin` / `-magic` to label and file name).
+
+### 30. `short-strokes-right-edge`
+
+Five or six short upward strokes on the right edge, about 5–8 mm each, lifting between them with
+pauses of about 0.2–0.4 s (how you'd walk the app switcher).
+
+```bash
+swift run edgy-trace record --label short-strokes-right-edge --seconds 6 --out Fixtures/traces/short-strokes-right-edge.json \
+  --expect "Short repeated strokes up the right edge. Expect: one slide per stroke, each began/changed/ended."
+```
+
+Check in the replay: how long the gap between lift and the next claim really is (sets the
+`keepOpenMS` default of 400 ms).
+
+### 31. `flick-vs-slow-right-edge`
+
+One slow slide up the right edge (about 3 s for half the edge), lift, then the same distance as a
+quick flick that keeps the finger down at the end (not a swipe-and-lift).
+
+```bash
+swift run edgy-trace record --label flick-vs-slow-right-edge --seconds 8 --out Fixtures/traces/flick-vs-slow-right-edge.json \
+  --expect "Slow slide, then a quick flick-and-stay. Expect: two slides; the flick's speed peaks well above 300 mm/s."
+```
+
+### 32. `rest-at-top-end-right`
+
+Slide up the right edge all the way to the top and keep the finger resting at the very end for
+about 2 s, then slide back down a little and lift.
+
+```bash
+swift run edgy-trace record --label rest-at-top-end-right --seconds 6 --out Fixtures/traces/rest-at-top-end-right.json \
+  --expect "Slide to the top end and rest. Expect: atEnd +1 on every frame while resting, none after moving back."
+```
+
+Check in the replay: how far from the physical end the finger really rests (sets `endBandMM`), and
+how much it wanders while "still" (sets `restEpsilonMM`).
+
+### 33. `hold-corner-while-pointing`
+
+Hold the bottom-left corner with the thumb for about 1 s, then, still holding, move the pointer in
+circles with the index finger for 3 s; lift the index, then the thumb.
+
+```bash
+swift run edgy-trace record --label hold-corner-while-pointing --seconds 7 --out Fixtures/traces/hold-corner-while-pointing.json \
+  --expect "Thumb holds the corner, index points. Expect: hold began, survives the pointing, ends at thumb lift."
+```
+
+Check in the replay: how far the held thumb drifts while the index moves (sets
+`longPressMaxTravelMM`, and whether a hold that has begun needs any drift limit at all).
+
+### 34. `push-to-talk-300ms-bottom-edge`
+
+Press and hold the bottom edge for about 0.3–0.4 s at a time, three times, as you would to talk
+briefly (with a 300 ms hold bound there).
+
+```bash
+swift run edgy-trace record --label push-to-talk-300ms-bottom-edge --seconds 6 --out Fixtures/traces/push-to-talk-300ms-bottom-edge.json \
+  --expect "Three short holds on the bottom edge. Expect (holdMS 300): three holds, no slides."
+```
+
 ## After the session
 
 ```bash

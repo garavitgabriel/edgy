@@ -101,6 +101,13 @@ public final class Engine: @unchecked Sendable {
   private var running = false
   private var paused = false
   private var guardEngaged = false
+  /// Long-presses that have begun and not ended, by zone and device. While one is held the pointer
+  /// guard stays released (the held finger is still), so another finger can point (batch 20).
+  private var heldPresses: Set<HeldPress> = []
+  private struct HeldPress: Hashable {
+    var zone: Zone
+    var deviceID: UInt64
+  }
   private var lastGuardEngage: Double?
   private var pausedUntil: Date?
   private var lastStartError: String?
@@ -298,10 +305,12 @@ public final class Engine: @unchecked Sendable {
       secondsSinceLastKeyPress: typing.secondsSinceLastKeyPress,
       slideZones: zones(bound: .slide, in: profile),
       longPressZones: zones(bound: .longPress, in: profile),
-      doubleTapZones: zones(bound: .doubleTap, in: profile))
+      doubleTapZones: zones(bound: .doubleTap, in: profile),
+      longPressMSByZone: Self.longPressTimes(in: profile, catalog: router.actions.available))
     let output = recognizer.process(frame, device: device, context: context)
     lastFrame = (frame.timestamp, timer.now, bundleID)
     defer { scheduleFlush() }
+    trackHeldPresses(output.events)
     updatePointerGuard(claimed: !output.claimedContactIDs.isEmpty, at: frame.timestamp)
     for (contactID, reason) in output.rejections where reason != .startedOutsideZone {
       logger.log(.info, "Rejected contact \(contactID): \(reason)")
@@ -423,6 +432,37 @@ public final class Engine: @unchecked Sendable {
     for (queue, handler) in feed.observers.values { queue.async { handler(update) } }
   }
 
+  /// Per-zone long-press times for the recognizer: each long-press binding's `holdMS` when it is a
+  /// number in `holdMSRange`, else the action's own `holdMS` default (`keyboard.hold`: 300 ms),
+  /// else nothing (the zone uses the global `longPressMS`). `nil` when no zone has its own time.
+  static func longPressTimes(in profile: Profile, catalog: [ActionDescriptor]) -> [Zone: Double]? {
+    guard !profile.disabled else { return nil }
+    var times: [Zone: Double] = [:]
+    for binding in profile.bindings where binding.gesture == .longPress {
+      if let raw = binding.parameters[holdMSKey], let ms = Double(raw.trimmingCharacters(in: .whitespaces)),
+        holdMSRange.contains(ms)
+      {
+        times[binding.zone] = ms
+      } else if let fallback = catalog.first(where: { $0.id == binding.action })?.parameters
+        .first(where: { $0.key == holdMSKey })?.defaultValue.flatMap(Double.init), holdMSRange.contains(fallback)
+      {
+        times[binding.zone] = fallback
+      }
+    }
+    return times.isEmpty ? nil : times
+  }
+
+  /// The per-binding hold time parameter and its range (mirrors the Actions catalog).
+  static let holdMSKey = "holdMS"
+  static let holdMSRange: ClosedRange<Double> = 100...1500
+
+  private func trackHeldPresses(_ events: [GestureEvent]) {
+    for event in events where event.kind == .longPress {
+      let press = HeldPress(zone: event.zone, deviceID: event.deviceID)
+      if event.phase == .began { heldPresses.insert(press) } else { heldPresses.remove(press) }
+    }
+  }
+
   private func zones(bound kind: GestureKind, in profile: Profile) -> Set<Zone> {
     profile.disabled ? [] : Set(profile.bindings.filter { $0.gesture == kind }.map(\.zone))
   }
@@ -449,7 +489,11 @@ public final class Engine: @unchecked Sendable {
   /// While a claim lasts, re-engage this often so the guard's safety timeout never ends a long slide.
   static let guardKeepAliveS: Double = 1
 
-  private func updatePointerGuard(claimed: Bool, at timestamp: Double? = nil) {
+  /// Engages the guard while something is claimed, except while a long-press is held: the held
+  /// finger is still, so another finger may point (push-to-talk while pointing). A hold's guard is
+  /// released the frame it begins and nothing re-engages it until the next claim after it ends.
+  private func updatePointerGuard(claimed rawClaimed: Bool, at timestamp: Double? = nil) {
+    let claimed = rawClaimed && heldPresses.isEmpty
     if claimed && !guardEngaged {
       guardEngaged = true
       lastGuardEngage = timestamp
@@ -465,6 +509,7 @@ public final class Engine: @unchecked Sendable {
 
   private func quiesce() {
     cancelFlush()
+    heldPresses.removeAll()
     updatePointerGuard(claimed: false)
     recognizer.reset()
     router.reset()

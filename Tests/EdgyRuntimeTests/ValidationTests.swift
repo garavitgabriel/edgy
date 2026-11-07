@@ -170,6 +170,7 @@ import Testing
       Binding(zone: .corner(.bottomRight), gesture: .tap, action: "fake.press"),
       Binding(zone: .edge(.right), gesture: .slide, action: "audio.volume"),
       Binding(zone: .edge(.right, segment: 0, segments: 3), gesture: .slide, action: "audio.volume"),
+      Binding(zone: .edge(.right), gesture: .swipe(.up), action: "media.next"),
     ]
     let bad: [(String, String)] = [
       ("combo", "x+y"), ("link", "nowhere"), ("count", "x"), ("count", "99"), ("mode", "z"), ("app", "x"),

@@ -63,10 +63,12 @@ import Testing
         ActionParameter(key: "keys", kind: .keyCombo, required: true, displayName: "Keys")
       ])
     let steps = byID["keyboard.slideSteps"]?.parameters ?? []
-    #expect(steps.map(\.key) == ["upKeys", "downKeys", "step"])
-    #expect(steps.map(\.required) == [true, true, false])
-    #expect(steps.map(\.kind) == [.keyCombo, .keyCombo, .number(0.02...0.5)])
-    #expect(steps[2].defaultValue == "0.0625")
+    // Batch 20: `stepMM` (millimetres) replaced the fraction `step`, which is still read.
+    #expect(steps.map(\.key) == ["upKeys", "downKeys", "stepMM", "speedUp"])
+    #expect(steps.map(\.required) == [true, true, false, false])
+    #expect(steps.map(\.kind) == [.keyCombo, .keyCombo, .number(4...20), .choice(["on", "off"])])
+    #expect(steps[2].defaultValue == "8")
+    #expect(steps[3].defaultValue == "on")
     let app = byID["app.open"]?.parameters ?? []
     #expect(app.map(\.key) == ["bundleID", "whenFrontmost"])
     #expect(app.map(\.kind) == [.appBundleID, .choice(["stay", "hide"])])
@@ -82,16 +84,18 @@ import Testing
         ActionParameter(
           key: "maxSeconds", kind: .number(5...600), required: false, defaultValue: "120",
           displayName: "Release after"),
-      ])
-    #expect(
-      byID["apps.switcher"]?.parameters == [
         ActionParameter(
-          key: "step", kind: .number(0.04...0.5), required: false, defaultValue: "0.1", displayName: "Step")
+          key: "holdMS", kind: .number(100...1500), required: false, defaultValue: "300",
+          displayName: "Hold before it starts", helpText: "How long to press before the keys go down.", unit: "ms"),
       ])
+    #expect(byID["apps.switcher"]?.parameters.map(\.key) == ["stepMM", "speedUp", "keepOpenMS"])
+    for level in ["audio.volume", "display.brightness", "keyboard.backlight"] {
+      #expect(byID[level]?.parameters.map(\.key) == ["speedUp"])
+    }
     let parameterless = byID.values.filter {
       ![
         "shortcut.run", "keyboard.shortcut", "keyboard.slideSteps", "app.open", "url.open", "file.open",
-        "keyboard.hold", "apps.switcher",
+        "keyboard.hold", "apps.switcher", "audio.volume", "display.brightness", "keyboard.backlight",
       ]
       .contains($0.id.rawValue)
     }
