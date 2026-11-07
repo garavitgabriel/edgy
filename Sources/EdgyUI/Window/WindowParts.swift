@@ -150,21 +150,91 @@ struct OverlapNoteView: View {
   }
 }
 
-/// A small monochrome app mark: the app's own icon, desaturated. When the icon isn't known (no
-/// installed app at that bundle ID) there's no mark at all: a placeholder square reads as a
-/// checkbox, and generic squares are on the kill list.
+/// An app mark on tabs, add-app rows and popover chips (critique 21, design answer 3): the real
+/// app icon at 14 pt, desaturated, at 70% opacity in dark so a white icon doesn't glare. An app
+/// with no icon gets Edgy's own "Open App" tile icon in `ink2` (never a plain square: kill list).
 struct AppMark: View {
   let path: String?
+  /// On a filled `ink` chip the fallback draws in the window tint, not `ink2`.
+  var onInk = false
+  @Environment(\.colorScheme) private var scheme
+
+  static let size: CGFloat = 14
+  static let darkOpacity = 0.7
 
   static func hasIcon(_ path: String?) -> Bool {
     path.map { FileManager.default.fileExists(atPath: $0) } ?? false
   }
 
   var body: some View {
-    if let path, Self.hasIcon(path) {
-      Image(nsImage: NSWorkspace.shared.icon(forFile: path)).resizable().saturation(0)
-        .aspectRatio(contentMode: .fit)
-        .frame(width: WindowMetrics.markSize, height: WindowMetrics.markSize)
+    Group {
+      if let path, Self.hasIcon(path) {
+        Image(nsImage: NSWorkspace.shared.icon(forFile: path)).resizable().saturation(0)
+          .aspectRatio(contentMode: .fit)
+          .frame(width: Self.size, height: Self.size)
+          .opacity(scheme == .dark ? Self.darkOpacity : 1)
+      } else {
+        ActionIcon(id: "app.open", size: Self.size).foregroundStyle(onInk ? Tokens.windowTint : Tokens.ink2)
+      }
     }
+    .accessibilityHidden(true)
+  }
+}
+
+/// The app icon the title bar shows: the running app's own (the bundled `AppIcon.icns`, whose
+/// small sizes are the dotless drawing). Snapshots inject the exported `icon_16x16@2x.png`.
+private struct AppIconImageKey: EnvironmentKey {
+  static var defaultValue: NSImage? { nil }
+}
+
+extension EnvironmentValues {
+  var edgyAppIcon: NSImage? {
+    get { self[AppIconImageKey.self] }
+    set { self[AppIconImageKey.self] = newValue }
+  }
+}
+
+/// § Window identity and Advanced (a): after the traffic lights, the app icon at 18 pt and the
+/// wordmark "Edgy" (13 semibold `ink`), 8 pt apart. No larger mark, no tagline, no second hue.
+struct WindowIdentity: View {
+  @Environment(\.edgyAppIcon) private var injected
+
+  static let iconSize: CGFloat = 18
+  static let spacing: CGFloat = 8
+
+  var body: some View {
+    HStack(spacing: Self.spacing) {
+      Image(nsImage: injected ?? NSApplication.shared.applicationIconImage)
+        .resizable().interpolation(.high).aspectRatio(contentMode: .fit)
+        .frame(width: Self.iconSize, height: Self.iconSize)
+        .accessibilityHidden(true)
+      Text("Edgy").font(Tokens.font(Tokens.typeBody, semibold: true)).foregroundStyle(Tokens.ink)
+    }
+    .accessibilityElement(children: .combine)
+  }
+}
+
+/// § Window identity and Advanced: "Advanced…" as a quiet footer text button: the 16 pt sliders
+/// icon, then the label (13 regular `ink2`), no bezel. On hover both go to `ink` over the 10%
+/// `ink` wash (the popover rows' hover).
+struct AdvancedButton: View {
+  var action: () -> Void
+  var forceHover = false
+  @State private var hovering = false
+
+  var body: some View {
+    let hot = hovering || forceHover
+    Button(action: action) {
+      HStack(spacing: 6) {
+        AdvancedIcon()
+        Text("Advanced…").font(Tokens.font(Tokens.typeBody))
+      }
+      .foregroundStyle(hot ? Tokens.ink : Tokens.ink2)
+      .padding(.horizontal, 8).padding(.vertical, 4)
+      .background(RoundedRectangle(cornerRadius: Tokens.radiusControl).fill(Tokens.ink.opacity(hot ? 0.1 : 0)))
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .onHover { hovering = $0 }
   }
 }

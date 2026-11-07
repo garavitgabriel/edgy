@@ -234,14 +234,14 @@ struct ChipView: View {
   var body: some View {
     Button(action: open) {
       HStack(spacing: 5) {
-        if chip.isOff {
-          Image(systemName: "circle.slash").foregroundStyle(Tokens.ink2)
-        } else {
-          AppMark(path: chip.appPath)
-        }
+        // The same mark as the tab, the off mark after the name (critique 21 should-fix 3).
+        if chip.ref != .default { AppMark(path: chip.appPath, onInk: chip.isLive) }
         Text(chip.name)
           .font(Tokens.font(Tokens.typeBody, semibold: chip.isLive))
           .foregroundStyle(chip.isLive ? Tokens.windowTint : (chip.isOff ? Tokens.ink2 : Tokens.ink))
+        if chip.isOff {
+          Image(systemName: "nosign").foregroundStyle(Tokens.ink2).accessibilityLabel("Off")
+        }
       }
       .padding(.horizontal, 12)
       .padding(.vertical, 5)

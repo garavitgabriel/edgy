@@ -87,7 +87,7 @@ public struct AddAppView: View {
       step = .startFrom(app)
     } label: {
       HStack(spacing: 8) {
-        AppIcon(path: app.path)
+        AppMark(path: app.path)
         Text(app.name).foregroundStyle(taken ? Tokens.ink2 : Tokens.ink)
         Spacer()
         if taken { Text("Has a profile").foregroundStyle(Tokens.ink2) }
@@ -119,7 +119,7 @@ public struct AddAppView: View {
   private func startFrom(_ app: InstalledApp) -> some View {
     VStack(alignment: .leading, spacing: 10) {
       HStack(spacing: 8) {
-        AppIcon(path: app.path)
+        AppMark(path: app.path)
         Text(app.name).font(Tokens.font(Tokens.typeBody, semibold: true))
       }
       Text("Start from").foregroundStyle(Tokens.ink2)
