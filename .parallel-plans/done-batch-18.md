@@ -33,7 +33,7 @@ verification: pass
   - `plate-display-check`
   - `plate-component` (the component following the appearance)
   - `overlay-docked-test-mode` (D-like), `overlay-docked-level-check` (S8-like)
-- [✓] **≥ 20 tests: 40 new test functions** (UI test count went from 220 to 260 cases):
+- [✓] **≥ 20 tests: 41 new test functions** (UI test count went from 220 to 261 cases):
   - copy for every decision kind and every rejection variant;
   - dry-run copy;
   - no level plate with the HUD shown or in dry run, both in the mapper and through the controller;
@@ -46,7 +46,7 @@ verification: pass
 
 ## Verification
 - `swift build`: `Build complete!`
-- `swift test`: every target passes (56, 7, 134, **260 EdgyUI**, 250, 19, 57, 289).
+- `swift test`: every target passes (56, 7, 134, **261 EdgyUI**, 250, 19, 57, 289).
 - `swift format lint --strict -r Sources Tests Package.swift`: exit 0, no output.
 - `git grep -niE -f ~/.config/edgy-names-denylist`: no output (exit 1).
 - Token greps:
@@ -155,4 +155,10 @@ Tests are in `Tests/EdgyUITests/Overlay/` (copy, behaviour, snapshots).
 2. **`RejectionMeasure` has no variant field.** Adding one (e.g. `variant: palmMinor | edgeOutward | edgeDiagonal | swipeVeered | swipeSlow | swipeShort`) would remove the limit-matching above. It's a frozen-contract change.
 3. **App names:** `PlateContext.current(model:)` falls back to the bundle ID's last part. If `SettingsModel` grows a name cache (`installedApps` is async), pass it as `appNames`.
 4. **Skeleton shots:** `SkeletonTests` rewrites `docs/design/build-shots/skeleton/plate-*.png` because the plate now draws for real. I restored those files after every run (outside my glob). Regenerate them on `main`.
-5. **Chief's rule (ordinary pointer touches are never shown):** it holds. Plates come only from decisions, never from touch frames, and the `plainTouchesNeverMakeAPlate` test locks it in.
+5. **One shared feed switch.**
+   - `SettingsModel` has a single `feedToken`, and `EdgyApp/SettingsWindowController` calls `model.stopFeed()` when the window closes. That would silence the overlay.
+   - Workaround in my glob: `OverlayController.pump()` calls `model.startFeed()` on every tick. It's a no-op while the feed is on; after another surface stops it, the overlay restarts it within 33 ms. The test is `overlayKeepsTheFeedOnWhenAnotherSurfaceStopsIt`.
+   - Cleaner fix (frozen model): count the feed's users, or have EdgyApp own it.
+   - Side effect: while the overlay runs, `liveTouches` keeps updating after the window closes. That's harmless.
+6. **Hold release:** checked. The Router's release only calls `perform` and sends no decision, so "Released fn" can't be overwritten by a second "Holding" plate.
+7. **Chief's rule (ordinary pointer touches are never shown):** it holds. Plates come only from decisions, never from touch frames, and the `plainTouchesNeverMakeAPlate` test locks it in.

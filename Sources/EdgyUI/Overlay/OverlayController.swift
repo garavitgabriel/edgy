@@ -118,6 +118,9 @@ public final class OverlayController {
 
   /// One turn: take the model's decisions, update the plates, drop finished fades, draw.
   func pump() {
+    // The feed is one shared switch: another surface closing (the settings window calls
+    // `stopFeed()`) must not silence the overlay. `startFeed()` does nothing while it is on.
+    model.startFeed()
     let decisions = model.takeDecisions()
     if !decisions.isEmpty { receive(decisions) }
     timeline.tick(now: clock.now)

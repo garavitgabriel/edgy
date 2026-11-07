@@ -339,8 +339,12 @@ final class OverlayFakeEngine: LiveEngine, @unchecked Sendable {
       TouchDeviceInfo(id: 1, kind: .externalTrackpad, sensorSizeMM: Size2D(width: 160, height: 115), familyID: 0)
     ])
   var isTestMode = false
+  var feedObservers = 0
   func onStatusChange(_ handler: @escaping @Sendable (EngineStatus) -> Void) {}
-  func observeFeed(on queue: DispatchQueue, _ handler: @escaping @Sendable (LiveFeedUpdate) -> Void) -> UUID { UUID() }
+  func observeFeed(on queue: DispatchQueue, _ handler: @escaping @Sendable (LiveFeedUpdate) -> Void) -> UUID {
+    feedObservers += 1
+    return UUID()
+  }
   func removeFeedObserver(_ id: UUID) {}
   func setTestMode(_ on: Bool) { isTestMode = on }
   func pause(until: Date?) {}
@@ -465,4 +469,17 @@ final class OverlayFakeEngine: LiveEngine, @unchecked Sendable {
       #expect(contrast(Tokens.ink2, overDocument: document, dark: dark) >= 4.5)
     }
   }
+}
+
+/// Another surface closing (the settings window calls `stopFeed()`) must not silence the overlay.
+@MainActor @Test func overlayKeepsTheFeedOnWhenAnotherSurfaceStopsIt() {
+  let engine = OverlayFakeEngine()
+  let model = SettingsModel(editor: PreviewFixtures.model().editor, engine: engine)
+  let (controller, _, _, _) = overlayRig(model: model)
+  #expect(engine.feedObservers == 1)
+  model.stopFeed()
+  controller.pump()
+  #expect(engine.feedObservers == 2)
+  controller.pump()
+  #expect(engine.feedObservers == 2)
 }
