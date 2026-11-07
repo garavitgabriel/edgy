@@ -188,6 +188,30 @@ Shots: `docs/design/build-shots/batch-21/` (new, integrated), plus re-shot `batc
   - The broken-config strip has two buttons, and the split, "+", HUD, Advanced… and Add gesture… are disabled. The headless shots draw switches the same whether disabled or not; check the switches on the device.
   - The popover block keeps Enabled and Test Mode under it, and the list is Pause / Settings… / About / Quit.
 
+### Second visual pass (after merging main, every shot below opened in the transcript)
+- Batch 21:
+  - `state-disabled`: faded once, editing on.
+  - `window-live-right`: the Volume tab takes the lit fill, and the accent traces bar and tab.
+  - `popover-disabled` (dark, the mini-disabled check): faded once.
+  - `popover-paused-test-mode`: faded, Pause row hidden, Don’t run actions shown.
+  - `popover-last-touch`: contact on the lit right edge. Keeping it after the lift is tested in `miniMirrorKeepsTheLastTouchAfterTheLift`.
+  - `popover-app-chip-live`: Wayfare's chip first and filled; the mirror draws Wayfare's left edge as a hairline and its Hold Keys corner as a tile.
+  - `preset-windows`: square tiles, not dots.
+  - `advanced`: defaults in `ink2`.
+  - `add-app-step2`: icon before the name, and ’ in "what’s".
+- Batch 14:
+  - `pad-default-idle-dark`: no lighter ring around the slab, so no dark halo.
+  - `pad-split-bottom4-long-label`: "⌘ Left Arrow, Nex" clipped with a fade, no "…".
+- Batch 15:
+  - `param-path`: "File or folder", plus a bordered Choose… button.
+  - `param-recorder-error`: "⌘" alone, label aligned with the field, message below.
+  - `param-app-list`: no empty row, 13 pt semibold headers.
+  - `inspector-corner-needs-keys`: only Long-press open; "Hold before it starts", then "Let go after" last.
+  - `inspector-wayfare-sources`: each source row form.
+  - `inspector-overlap-warning`: "Whole edge and upper half both use Slide." under the split control.
+  - `param-presentation-fields`: helper lines, values right-aligned.
+- Device-only checks are under Needs Gabriel. No tick above depends on them.
+
 ## Diff summary
 - **Mirror:**
   - `MirrorPad.swift`: union tabs, ring, manual shadow, fitting, touch filter, corner radius cap.
