@@ -59,6 +59,19 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
    - **Recognized:** a filled accent contact.
    - **Rejected:** a hollow, struck circle.
    - A rejection states the measured value against the limit: **"Ignored: palm, 21 mm wide, limit 18 mm"**. This plate was every critic's KEEP; build it exactly like that.
+   - **Copy pattern for every reason:** "Ignored: <reason>, <measured>, limit <limit>". Use the setting's own unit (mm or ms). When no number means anything, stop after the reason.
+
+     | Reason | Plate copy |
+     |---|---|
+     | palm | Ignored: palm, 21 mm wide, limit 18 mm |
+     | typing | Ignored: typing, last key 200 ms ago, limit 500 ms |
+     | too many contacts | Ignored: 3 fingers, set to 1 |
+     | off-axis motion | Ignored: off-axis, 38° from the edge, limit 25° *(use the runtime's real measure; if it has none, "Ignored: off-axis")* |
+     | too fast (dwell) | Ignored: too quick, 60 ms, needs 120 ms |
+     | started outside a zone | Ignored: started 14 mm in, edge is 8 mm |
+     | handed off to a system gesture | Ignored: system gesture |
+     | click | Ignored: click |
+     | zone disabled / Edgy off in app | Ignored: Edgy is off in Huddle *(or "Ignored: zone off")* |
    - Recognized is louder.
 5. **You map on the pad.**
    - Clicking a zone selects it.
@@ -72,11 +85,11 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
    - It ends with "Add gesture…".
    - Clicking a row opens the same pad popover. There is one place to map, not two.
    - While the picker is open, the row's value is blank (the popover header already says it).
-7. **Conflicts are named with their fix:**
-   - It's a compact note in the inspector with a warning icon.
-   - It states the real misfire ("Mapping Tap here makes every double-tap fire the tap action first, then Play/Pause.").
-   - It gives two inline fixes ("Delay tap by 300 ms", "Use long-press instead").
-   - It doesn't repeat the zone name.
+7. **Interaction notes are named with their fix** (since v0.4 they inform; they don't warn):
+   - A tap on a zone that also has a double-tap **waits out the double-tap window**, so nothing misfires. The note is informational: **"Tap waits 300 ms here to tell it from a double-tap."** (use the real `doubleTapWindowMS` value).
+   - One inline fix: **"Use long-press instead"**.
+   - It keeps the icon plus inline-fix shape, but uses an **info** icon in `ink2`, not a warning triangle. It must never read as an error.
+   - It doesn't repeat the zone name. *(Render B's copy, "fires the tap action first", and its "Delay tap by 300 ms" button are out of date. Follow this text, not the render.)*
 8. **Each status is said once, next to the thing it describes.**
    - Live feedback appears on the mirror at the touch.
    - In onboarding, the system's own volume indicator carries "64%"; Edgy doesn't repeat it.
@@ -88,6 +101,8 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
    - **One plate component** is shared by the overlay and the onboarding feedback: same radius, same 17/13 type pair, same inset. In the render, C and D look like two products; don't build that.
 10. **The menu-bar popover** (not a plain menu):
     - **Top half:** a live mini mirror (zones of the active profile plus the last touch where it landed), profile chips, and **Enabled** and **Test Mode** switches.
+    - **Profile chips don't select anything.** Profiles follow the frontmost app automatically. The chip of the profile in effect is filled; the others are outlined. Clicking a chip opens Settings on that profile's tab. If the frontmost app has its own profile, its chip comes first.
+    - **Two trackpads attached:** the mirrors (window, popover, onboarding) show **the pad touched last**, with no picker. Its outline follows that device's real proportions. When it switches, the outline cross-fades (150 ms).
     - **Bottom half:** a plain list with the system highlight: Pause for 1 hour, Settings… ⌘,, Open config file, Reload config ⌘R, About Edgy, Quit Edgy ⌘Q.
     - No power button, hero numeral or cards on cards.
 
@@ -144,13 +159,116 @@ Plain, specific and measured. Name the thing, the number and the limit.
 
 Use one clause, no slogans, and no two-part oracular lines.
 
+### App profiles (spec, 2026-11-07; renders to follow)
+
+The runtime API is in `SettingsEditor`: `effectiveBindings(forApp:)` with sources, `overrideBinding`, `turnOff`, `revertToDefault`, `addAppProfile(startingAs:)`, `setProfileDisabled`, `convertToInheriting`.
+
+**Tabs.** The order is Default, then app tabs alphabetically (app mark + name), then "+". A tab whose app has Edgy turned off shows its name in `ink2` with a small slashed-circle mark; there's no other colour.
+
+**The top-right switch follows the tab.**
+- On Default it is **Enabled** (global).
+- On an app tab it is **"On in Huddle"** (`setProfileDisabled`).
+- Global Enabled is still in the popover. Each status is said once, where it applies.
+
+**The mirror on an app tab shows the *effective* bindings,** meaning what will actually happen in that app, drawn with the normal zone shapes. Two source marks appear on the pad:
+- **Overridden:** the zone's label tab gets a small solid `ink` dot before its text.
+- **Turned off here:** the zone is drawn as unmapped (hairline), and its tab reads "Off here" in `ink2`.
+- Inherited and app-only zones look normal. Inherited is the expected case, so it isn't marked.
+
+**Inspector rows on an app tab**, one per slot, from `effectiveBindings`:
+
+| Source | Row |
+|---|---|
+| inherited | Gesture · action in `ink2` · trailing caption "from Default" (13, `ink2`). Clicking opens the pad picker, and choosing creates an override. |
+| overridden | Gesture · **action** in `ink`, preceded by the dot · trailing text button **Revert**. A second line in `ink2`: "Default: Volume". |
+| turned off | Gesture · "Off here" in `ink2` · trailing **Revert**. Second line: "Default: Play/Pause". |
+| app-only | Gesture · **action** in `ink`. No caption (the default has nothing on this slot). |
+
+Every row has a "…" menu with Change action…, Turn off here and Revert to Default (each greyed out when it doesn't apply). There's no extra colour; the source is carried by the text and the dot.
+
+**"Edgy is off in this app".**
+- The mirror fades to 40% with every zone as a hairline.
+- One line is centred on the pad: "Edgy is off in Huddle", with a **Turn on** button.
+- The inspector stays empty; there's nothing else to say.
+- The popover's mini mirror shows the same faded pad while that app is in front.
+
+**The add-app flow ("+").** A popover anchored to "+", single column:
+1. Header "Add an app" · a search field · a **Running** section (apps open now) · an **All apps** section (alphabetical). Rows show the real app icon and name. Apps that already have a profile are listed but disabled, with "Has a profile".
+2. Choosing an app turns the same popover into its second step: "Start from", with three radio rows:
+   - **"Default, with changes"**, preselected. Its sub-line: "Follows Default; change only what's different."
+   - **"A copy of Default"**, sub-line "Starts the same, then goes its own way."
+   - **"Empty"**, sub-line "Nothing mapped until you add it."
+3. Then **Add** (the default button) and Back.
+4. The new tab opens selected.
+
+**Removing and resetting.** The tab's context menu has "Reset Huddle to Default" and "Remove Huddle profile…". Remove asks for confirmation in a standard sheet.
+
+**Legacy (full-replace) profile.**
+- A one-line info note sits at the top of the inspector, with an info icon in `ink2`: "This profile doesn't follow Default."
+- Text button: **Follow Default**. Under it in `ink2`: "It keeps working exactly as it does now."
+- The rows show no source marks; a full-replace profile has no inheritance.
+
+### Binding parameters (spec, 2026-11-07; renders to follow)
+
+**One rule.**
+- The parameters sit directly under their binding row in the inspector, indented 24 pt.
+- Each takes one 28 pt row: the label on the left (13, `ink2`), the control on the right.
+- Validation text sits under its control (13, `ink`, with a small error icon). It is never red or accent.
+- A required parameter that's still empty leaves the binding row reading "Needs keys" / "Needs an app" in `ink2`. The pad tab shows the action name with "…".
+
+**Key-combo recorder** (`keys`, `upKeys`, `downKeys`):
+- **Idle:** a field showing the combo as system key symbols plus the key name ("⌃⌥ Space", "⌘⇧ 4"). Empty, it reads "Click to record" in `ink2`.
+- **Recording:**
+  - The field gets a 2 pt **accent** ring (recording is live) and reads "Press keys…".
+  - Modifiers you're holding appear live in `ink2` as you press them, and turn `ink` when the combo commits.
+  - Esc cancels. ⌫ while idle clears. Recording swallows the keys, so nothing reaches the app.
+- **Right-hand modifiers** show as "Right ⌘" or "Right ⌥" when the runtime distinguishes them.
+- **Modifiers alone:**
+  - On a **hold** action (push-to-talk), releasing all held modifiers after holding them ≥0.6 s commits them ("fn", "⌃⌥").
+  - On a trigger action, the same gesture shows: "Add a key. Modifiers alone work only on Hold Keys."
+
+**App chooser** (`bundleID`):
+- A pop-up button showing the app icon and name. It opens the same list popover as add-app: search, Running first, then All apps.
+- `whenFrontmost` sits under it as a two-option segmented control: **Hide it** / **Stay**, labelled "If already in front".
+
+**URL** (`url`): a text field with the placeholder "https://…". Validation: "Needs a scheme, like https://".
+
+**File or folder** (`path`): a text field with the placeholder "~/Documents", plus a **Choose…** button that opens the system panel. Validation: "Use a full path or start with ~".
+
+**Number** (`step`, `sensitivity`): a slider with its value as text on the right, in proportional figures.
+
+**Choice:** a segmented control for ≤3 options; otherwise a pop-up.
+
+**Text** (`name` for Run Shortcut): a pop-up of the user's shortcuts if the runtime can list them; otherwise a text field.
+
+**Per-binding haptics:** the last parameter row of every binding is a checkbox, "Haptics for this gesture", on by default.
+
+### Level plate and display check (spec)
+
+- **External display brightness and keyboard backlight.** The system draws no indicator for these, so Edgy uses **the one plate component**:
+  - The value line (17) reads "Brightness 40%" or "Keyboard 60%".
+  - The second line (13, `ink2`) names the device: the display's name, or "Keyboard".
+  - A slim level bar uses the accent fill.
+  - It docks at the screen edge of the touched zone, on the display being changed, and fades 1.2 s after the slide ends. It shows whether or not Test Mode is on, because it replaces a system HUD.
+- **"Did the screen change?"** This is asked once per external display, the first time brightness is used on it:
+  - It's a small plate beside the level plate. It **does** accept clicks (a non-activating panel that never takes focus) and is the only clickable plate.
+  - Copy: "Did this screen change brightness?" with **Yes** and **No, turn off for this display**.
+  - Unanswered, it fades after 15 s and asks again next time, at most 3 times.
+  - When the user says No, the inspector's brightness binding gets a second line in `ink2` with a re-enable path: "Off for Desk 34: it ignores brightness commands." · **Turn back on**.
+
+### Test Mode: what it does (needs the owner's call)
+
+Render D shows real values ("Volume 64%") while Test Mode is on. The runtime as built is a dry run: gestures are recognized but nothing runs.
+
+**The build chief's proposal:** the UI's Test Mode switch shows the overlay **while actions still run**, so you can test in real work and the plates show real values. The dry-run switch stays in the runtime, unused by the UI for now. The design follows the render, so this proposal matches it. **Waiting on the owner's confirmation.**
+
 ### Not yet designed (the sprint drew 8 actions; the real catalog is bigger)
 
 The sprint's renders assumed 8 actions and simple app profiles. The runtime (`docs/settings-reference.md`) has more, and these surfaces still need design. They must follow every rule above:
 
 1. **The picker at catalog scale:** 34 actions in 8 categories (sound, display, media, system, windows, apps, keyboard, shortcuts), unavailable actions greyed out with their reason, and "Do nothing" last in app profiles.
-2. **Binding parameter editors** in the inspector: a key-combo recorder (including modifier-only for holds), an app chooser, URL and file-path fields, number and choice controls, a shortcut name, a per-binding haptics toggle, and sensitivity.
-3. **App profiles:**
+2. ~~Binding parameter editors~~ (specced above). Originally: **Binding parameter editors** in the inspector: a key-combo recorder (including modifier-only for holds), an app chooser, URL and file-path fields, number and choice controls, a shortcut name, a per-binding haptics toggle, and sensitivity.
+3. ~~App profiles~~ (specced above). Originally: **App profiles:**
    - Inheriting rows showing their source (inherited / overridden / turned off / app-only), with Turn off and Revert actions.
    - The "Edgy off in this app" state.
    - The add-app flow (choose the app; inherit / copy default / empty).
