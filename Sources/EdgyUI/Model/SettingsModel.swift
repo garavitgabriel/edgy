@@ -44,7 +44,19 @@ public final class SettingsModel {
   // MARK: Engine and live feed
 
   public private(set) var engineStatus = EngineStatus()
+  /// The engine's dry run ("Don't run actions"): gestures are recognized, nothing runs. The
+  /// overlay draws the outline "would run" mark while this is on. (Test Mode's overlay itself is
+  /// the popover's state; actions run unless this is on.)
   public private(set) var isTestMode = false
+  /// Alias of `isTestMode` under the name the design uses.
+  public var isDryRun: Bool { isTestMode }
+  /// Bundle ID of the frontmost app (set by the app on activation; never Edgy's own). The mini
+  /// mirror and the popover chips follow it.
+  public var frontmostBundleID: String?
+  /// The last trackpad size seen, so the mirror keeps its shape while no trackpad is attached.
+  public private(set) var lastKnownPadSizeMM: Size2D?
+  /// Used before any trackpad was ever seen (a Magic Trackpad's sensor).
+  public static let defaultPadSizeMM = Size2D(width: 160, height: 115)
   /// The pad the mirror shows: the one touched last, else the first attached.
   public private(set) var mirroredDevice: TouchDeviceInfo?
   /// Fingers on `mirroredDevice` right now.
@@ -144,5 +156,6 @@ public final class SettingsModel {
     if mirroredDevice == nil || !status.devices.contains(where: { $0.id == mirroredDevice?.id }) {
       mirroredDevice = status.devices.first { $0.kind != .mouse }
     }
+    if let size = mirroredDevice?.sensorSizeMM { lastKnownPadSizeMM = size }
   }
 }

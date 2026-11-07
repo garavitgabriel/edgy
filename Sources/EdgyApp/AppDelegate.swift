@@ -117,7 +117,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     ) { [weak self] note in
       let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication
       let id = app?.bundleIdentifier
-      MainActor.assumeIsolated { self?.menuBar?.state.frontmostBundleID = id }
+      MainActor.assumeIsolated {
+        guard id != Bundle.main.bundleIdentifier else { return }
+        self?.menuBar?.state.frontmostBundleID = id
+        self?.settingsModel?.frontmostBundleID = id
+      }
     }
     if let apps = settingsModel.installedApps {
       Task { @MainActor [weak self] in self?.menuBar?.state.installedApps = await apps.installedApps() }
