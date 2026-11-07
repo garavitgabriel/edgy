@@ -191,8 +191,24 @@ struct MirrorPad: View {
       .compositingGroup()
       .opacity(faded ? Self.fadedOpacity : 1)
       if !dashedOutline {
-        ForEach(Self.drawnTouches(touches, geometry: geometry, mapped: mapped), id: \.id) { contact($0) }
+        let drawn = Self.drawnTouches(touches, geometry: geometry, mapped: mapped)
+        ForEach(drawn, id: \.id) { contact($0) }
           .allowsHitTesting(false)
+        // The mini mirror: "The live zone keeps its icon." A contact is as big as the bar, so the
+        // touched zone's icons draw again above it (critique 22 should-fix 5).
+        if zoneIcons {
+          let touched = Set(drawn.compactMap { geometry.zone(atNormalized: $0.position, mapped: mapped) })
+          ForEach(zones.filter { touched.contains($0.zone) && $0.style == .mapped }) { zone in
+            let rect = geometry.shapeFrame(for: zone.zone)
+            Group {
+              if zone.isCorner { cornerIcon(zone) } else { barIcons(zone, rect: rect) }
+            }
+            .frame(width: rect.width, height: rect.height)
+            .offset(x: rect.minX, y: rect.minY)
+            .opacity(faded ? Self.fadedOpacity : 1)
+            .allowsHitTesting(false)
+          }
+        }
       }
       if let message { messageView(message, size: size) }
     }
@@ -372,12 +388,22 @@ struct MirrorPad: View {
         }
       }
       .fixedSize()
+      // While the Split control previews this edge, its labels fade so the dividers never cut
+      // through a name (critique 22 should-fix 2).
+      .opacity(splitPreviewHides(zone.zone) ? 0 : 1)
+      .animation(.easeOut(duration: 0.12), value: splitPreview)
       .modifier(PickerTabAnchor(zone: zone.zone, enabled: publishesPickerAnchors && !placement.inBar))
       .alignmentGuide(HorizontalAlignment.leading) { d in d.width * placement.anchor.x - placement.point.x }
       .alignmentGuide(VerticalAlignment.top) { d in d.height * placement.anchor.y - placement.point.y }
       .onTapGesture { onSelect?(zone.zone) }
       .allowsHitTesting(onSelect != nil)
     }
+  }
+
+  /// Whether the Split control's hover preview is drawing dividers across `zone`'s edge.
+  func splitPreviewHides(_ zone: Zone) -> Bool {
+    guard let preview = splitPreview, preview.parts > 1, case .edge(let edge, _, _) = zone else { return false }
+    return edge == preview.edge
   }
 
   /// The label's text as it fits: the full name, or a shorter form, or the last form clipped

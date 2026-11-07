@@ -84,6 +84,7 @@ public struct MenuPopoverView: View {
       // 40% fade (Disabled, Paused, off in the app in front).
       MiniMirrorView(model: model, frontmostApp: state.frontmost(model: model))
         .fadedByHost()
+        .hoverLineWidth(PopoverMetrics.width - 2 * PopoverMetrics.inset)
         .frame(width: size.width, height: size.height)
         .opacity(mirror.faded ? PopoverMetrics.fadedOpacity : 1)
         .frame(maxWidth: .infinity)

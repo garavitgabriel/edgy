@@ -75,7 +75,7 @@ struct PickerCatalog: Equatable {
     var others: [Item] = []
     for group in groups {
       var fitting: [Item] = []
-      for descriptor in group.actions where descriptor.id != .doNothing && matches(descriptor) {
+      for descriptor in Self.ordered(group.actions) where descriptor.id != .doNothing && matches(descriptor) {
         let item = Item(descriptor: descriptor, availability: availability(descriptor.id))
         if ConfigValidator.shape(descriptor.shape, fits: gesture) { fitting.append(item) } else { others.append(item) }
       }
@@ -85,6 +85,45 @@ struct PickerCatalog: Equatable {
     self.others = others
     self.othersTitle = others.isEmpty ? nil : "\(others.count) more \(Self.need(others.map(\.descriptor.shape)))"
     self.offersDoNothing = isAppTab && (needle.isEmpty || "do nothing here".contains(needle))
+  }
+
+  /// BRIEF § Picker clarity: within a group, the icon table's order (most-used first), never
+  /// alphabetical; search keeps it (critique 22, design answer 2). Keyed by action ID so the
+  /// catalog itself stays as it is. An action the table doesn't name keeps its catalog place,
+  /// after the named ones.
+  static let iconTableOrder: [ActionID] = [
+    // Sound
+    "audio.volume", "audio.mute", "mic.mute",
+    // Display
+    "display.brightness", "keyboard.backlight", "keyboard.backlightToggle",
+    // Media
+    "media.playPause", "media.next", "media.previous",
+    // System
+    "system.missionControl", "system.appWindows", "system.showDesktop", "spaces.left", "spaces.right",
+    "system.lockScreen", "system.sleepDisplay", "system.dictation",
+    // Windows
+    "window.leftHalf", "window.rightHalf", "window.topHalf", "window.bottomHalf", "window.maximize",
+    "window.center", "window.minimize", "window.restore",
+    // Apps
+    "app.open", "url.open", "file.open", "apps.switcher",
+    // Keyboard
+    "keyboard.shortcut", "keyboard.slideSteps", "keyboard.hold",
+    // Shortcuts
+    "shortcut.run",
+  ]
+
+  private static let rank: [ActionID: Int] = Dictionary(
+    uniqueKeysWithValues: iconTableOrder.enumerated().map { ($1, $0) })
+
+  /// `actions` in icon-table order; unnamed ones after, in their given order.
+  static func ordered(_ actions: [ActionDescriptor]) -> [ActionDescriptor] {
+    actions.enumerated()
+      .sorted { a, b in
+        let ra = rank[a.element.id] ?? iconTableOrder.count + a.offset
+        let rb = rank[b.element.id] ?? iconTableOrder.count + b.offset
+        return ra < rb
+      }
+      .map(\.element)
   }
 
   /// "need a slide", "need a long-press", "need a slide or long-press", "need a tap, swipe or

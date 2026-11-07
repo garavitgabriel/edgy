@@ -8,24 +8,30 @@ import Observation
 
 /// How "Split into N" moves an edge's bindings (bone 6: the runtime allows 1…4 segments).
 ///
-/// **Rule:** each new segment takes the bindings of the old segment under its centre. So
-/// splitting copies (1 → 2: both halves do what the whole edge did, nothing changes under the
-/// finger), and merging keeps the binding at the middle of the edge. Bindings on other zones are
-/// untouched. The whole change is one undo step.
+/// **Rule (critique 22, design answer 3):** the first part keeps the edge's bindings and the other
+/// parts start empty. First = top/upper for side edges, left for top and bottom. Going to fewer
+/// parts keeps the first part's bindings and drops the rest. Copying a slide to every part would
+/// leave identical slides, which is never what someone splitting an edge wants. Bindings on other
+/// zones are untouched. The whole change is one undo step.
 enum SplitPlan {
-  /// The bindings of `edge` in `bindings`, re-laid on `segments` parts.
+  /// The runtime index of the first part in reading order: side edges count bottom to top, so
+  /// their first (upper) part is the last index; top and bottom count from the left.
+  static func firstSegment(edge: Zone.Edge, segments: Int) -> Int {
+    edge == .left || edge == .right ? max(segments - 1, 0) : 0
+  }
+
+  /// The bindings of `edge` in `bindings`, re-laid on `segments` parts: the old first part's
+  /// bindings move to the new first part; nothing else survives.
   static func remap(_ bindings: [Binding], edge: Zone.Edge, to segments: Int) -> [Binding] {
     var result: [Binding] = []
-    for target in 0..<segments {
-      let centre = (Double(target) + 0.5) / Double(segments)
-      for binding in bindings {
-        guard case .edge(let e, let segment, let count) = binding.zone, e == edge, count > 0 else { continue }
-        guard Int(centre * Double(count)) == segment else { continue }
-        var moved = binding
-        moved.zone = .edge(edge, segment: target, segments: segments)
-        guard !result.contains(where: { $0.key == moved.key }) else { continue }
-        result.append(moved)
-      }
+    let target = firstSegment(edge: edge, segments: segments)
+    for binding in bindings {
+      guard case .edge(let e, let segment, let count) = binding.zone, e == edge, count > 0 else { continue }
+      guard segment == firstSegment(edge: edge, segments: count) else { continue }
+      var moved = binding
+      moved.zone = .edge(edge, segment: target, segments: segments)
+      guard !result.contains(where: { $0.key == moved.key }) else { continue }
+      result.append(moved)
     }
     return result
   }

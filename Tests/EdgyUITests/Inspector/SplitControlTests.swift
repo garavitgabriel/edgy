@@ -37,10 +37,29 @@ import Testing
 
   @Test func noteSaysWhatSplitPlanDoes() {
     let whole = [binding(.edge(.right), "audio.volume")]
-    // Splitting copies: every new part keeps what the whole edge did.
-    #expect(SplitNaming.note(bindings: whole, edge: .right, from: 1, to: 2, name: name) == "Both halves keep Volume.")
+    // Before the ruling (critique 22, design answer 3: the first part keeps the bindings, the others start empty), splitting copied, and the note said so:
+    // #expect(SplitNaming.note(bindings: whole, edge: .right, from: 1, to: 2, name: name) == "Both halves keep Volume.")
+    // #expect(
+    //   SplitNaming.note(bindings: whole, edge: .right, from: 1, to: 3, name: name) == "All three thirds keep Volume.")
     #expect(
-      SplitNaming.note(bindings: whole, edge: .right, from: 1, to: 3, name: name) == "All three thirds keep Volume.")
+      SplitNaming.note(bindings: whole, edge: .right, from: 1, to: 2, name: name)
+        == "Upper half keeps Volume; lower half starts empty.")
+    // BRIEF § Split control's own example, word for word.
+    #expect(
+      SplitNaming.note(bindings: whole, edge: .right, from: 1, to: 3, name: name)
+        == "Upper third keeps Volume; the other two start empty.")
+    let bottom = [binding(.edge(.bottom), "audio.mute", .tap)]
+    #expect(
+      SplitNaming.note(bindings: bottom, edge: .bottom, from: 1, to: 2, name: name)
+        == "Left half keeps Mute; right half starts empty.")
+    // Fewer parts: the first part's bindings stay, the rest are named as dropped before the click.
+    let thirds = [
+      binding(.edge(.right, segment: 2, segments: 3), "audio.volume"),
+      binding(.edge(.right, segment: 1, segments: 3), "display.brightness"),
+    ]
+    #expect(
+      SplitNaming.note(bindings: thirds, edge: .right, from: 3, to: 2, name: name)
+        == "Upper half keeps Volume; lower half starts empty; Brightness is dropped.")
     // Only the top third mapped; going to halves, the upper half keeps it.
     let top = [binding(.edge(.right, segment: 2, segments: 3), "audio.volume")]
     #expect(
@@ -84,7 +103,10 @@ import Testing
     }
     let note = model.splitNote(for: .edge(.right), parts: 2)
     #expect(note == SplitNaming.note(bindings: right, edge: .right, from: 1, to: 2) { model.actionName($0) })
-    #expect(note?.hasPrefix("Both halves keep") == true)
+    // Before the ruling (critique 22, design answer 3: the first part keeps the bindings, the others start empty):
+    // #expect(note?.hasPrefix("Both halves keep") == true)
+    #expect(note?.hasPrefix("Upper half keeps") == true)
+    #expect(note?.hasSuffix("lower half starts empty.") == true)
     #expect(model.splitNote(for: .corner(.topLeft), parts: 2) == nil)
   }
 

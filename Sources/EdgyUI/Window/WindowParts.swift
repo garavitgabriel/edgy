@@ -163,14 +163,37 @@ struct AppMark: View {
   static let size: CGFloat = 14
   static let darkOpacity = 0.7
 
+  /// Critique 22 must-fix: only a bundle that ships its own icon counts. A missing path, a bundle
+  /// with no `CFBundleIconFile`/`CFBundleIconName`, or one whose named icon isn't in its resources
+  /// (the system would draw its generic application icon, a pale square) has no icon.
   static func hasIcon(_ path: String?) -> Bool {
-    path.map { FileManager.default.fileExists(atPath: $0) } ?? false
+    guard let path, FileManager.default.fileExists(atPath: path) else { return false }
+    let url = URL(fileURLWithPath: path)
+    let contents = url.appendingPathComponent("Contents")
+    guard
+      let data = try? Data(contentsOf: contents.appendingPathComponent("Info.plist")),
+      let info = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+    else { return false }
+    let resources = contents.appendingPathComponent("Resources")
+    let exists = { (name: String) in FileManager.default.fileExists(atPath: resources.appendingPathComponent(name).path)
+    }
+    if let name = info["CFBundleIconName"] as? String, !name.isEmpty, exists("Assets.car") { return true }
+    if let file = info["CFBundleIconFile"] as? String, !file.isEmpty {
+      return exists(file) || exists(file + ".icns")
+    }
+    return false
+  }
+
+  /// The mark for `path`: its own icon desaturated, or `nil` when `hasIcon` says it has none.
+  static func icon(_ path: String?) -> NSImage? {
+    guard let path, hasIcon(path) else { return nil }
+    return NSWorkspace.shared.icon(forFile: path)
   }
 
   var body: some View {
     Group {
-      if let path, Self.hasIcon(path) {
-        Image(nsImage: NSWorkspace.shared.icon(forFile: path)).resizable().saturation(0)
+      if let icon = Self.icon(path) {
+        Image(nsImage: icon).resizable().saturation(0)
           .aspectRatio(contentMode: .fit)
           .frame(width: Self.size, height: Self.size)
           .opacity(scheme == .dark ? Self.darkOpacity : 1)

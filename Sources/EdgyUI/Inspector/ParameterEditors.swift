@@ -133,24 +133,31 @@ private struct ParameterRow: View {
     case .action(let parameter) where ActionNaming.isOnOff(parameter):
       // On/off (`speedUp`): a checkbox with its helper line (BRIEF § Slide feel).
       let isOn = (row.binding.parameters[parameter.key] ?? parameter.defaultValue ?? "off") == "on"
-      VStack(alignment: .leading, spacing: 2) {
-        Toggle(
-          isOn: SwiftUI.Binding(
-            get: { isOn },
-            set: { on in
-              let value = on ? "on" : "off"
-              model.setParameter(parameter.key, to: value == parameter.defaultValue ? nil : value, in: row)
-            })
-        ) {
+      let set = { (on: Bool) in
+        let value = on ? "on" : "off"
+        model.setParameter(parameter.key, to: value == parameter.defaultValue ? nil : value, in: row)
+      }
+      // The helper starts at the label's x, not the box's, and has 8 pt after it like every other
+      // helper line (critique 22 should-fix 1).
+      HStack(alignment: .firstTextBaseline, spacing: CheckboxHelperRow.boxSpacing) {
+        Toggle(isOn: SwiftUI.Binding(get: { isOn }, set: set)) {
           Text(ActionNaming.parameterLabel(parameter, action: row.binding.action))
-            .font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink)
         }
         .toggleStyle(.checkbox)
+        .labelsHidden()
         .tint(Tokens.ink)
-        .frame(minHeight: ParameterRowsView.rowHeight)
-        if let help = ActionNaming.parameterHelp(parameter) {
-          Text(help).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
-            .fixedSize(horizontal: false, vertical: true)
+        VStack(alignment: .leading, spacing: 2) {
+          Text(ActionNaming.parameterLabel(parameter, action: row.binding.action))
+            .font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink)
+            .frame(minHeight: ParameterRowsView.rowHeight)
+            .contentShape(Rectangle())
+            .onTapGesture { set(!isOn) }
+            .accessibilityHidden(true)
+          if let help = ActionNaming.parameterHelp(parameter) {
+            Text(help).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
+              .fixedSize(horizontal: false, vertical: true)
+              .padding(.bottom, LabeledParameter<EmptyView>.helperSpacing)
+          }
         }
       }
     case .action(let parameter):
@@ -407,12 +414,19 @@ struct AppChooserField: View {
   }
 }
 
-/// The real app icon from its bundle (the system's own icon, never a drawn square).
+/// The real app icon from its bundle. A bundle with no icon of its own gets the Open App tile in
+/// `ink2` (critique 22 must-fix), never the system's generic pale square.
 struct AppIcon: View {
   var path: String
   var body: some View {
-    Image(nsImage: NSWorkspace.shared.icon(forFile: path)).resizable().frame(width: 16, height: 16)
-      .accessibilityHidden(true)
+    Group {
+      if let icon = AppMark.icon(path) {
+        Image(nsImage: icon).resizable().frame(width: 16, height: 16)
+      } else {
+        ActionIcon(id: "app.open", size: 16).foregroundStyle(Tokens.ink2)
+      }
+    }
+    .accessibilityHidden(true)
   }
 }
 
@@ -705,6 +719,12 @@ struct ChoiceParameterField: View {
       .fixedSize()
     }
   }
+}
+
+/// A checkbox row whose label and helper line share one leading edge.
+enum CheckboxHelperRow {
+  /// The gap between the box and its label (the system checkbox's own).
+  static let boxSpacing: CGFloat = 6
 }
 
 /// "Haptics for this gesture", on by default (BRIEF § Binding parameters → Per-binding haptics).

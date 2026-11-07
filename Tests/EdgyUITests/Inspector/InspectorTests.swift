@@ -202,7 +202,7 @@ import Testing
 }
 
 @MainActor @Suite struct SplitAndNoteTests {
-  @Test func splittingCopiesTheEdgeIntoEachPartAsOneUndoStep() throws {
+  @Test func splittingKeepsTheEdgeOnTheFirstPartAsOneUndoStep() throws {
     let model = InspectorFixtures.model()
     model.selectedZone = .edge(.right)
     model.split(.edge(.right), into: 2)
@@ -210,22 +210,38 @@ import Testing
       if case .edge(.right, _, _) = $0.zone { return true }
       return false
     }
-    #expect(Set(right.map(\.zone)) == [.edge(.right, segment: 0, segments: 2), .edge(.right, segment: 1, segments: 2)])
+    // Before the ruling (critique 22, design answer 3: the first part keeps the bindings, the others start empty), splitting copied the edge into every part:
+    // #expect(Set(right.map(\.zone)) == [.edge(.right, segment: 0, segments: 2), .edge(.right, segment: 1, segments: 2)])
+    #expect(Set(right.map(\.zone)) == [.edge(.right, segment: 1, segments: 2)])
     #expect(right.allSatisfy { $0.action == "audio.volume" })
     #expect(model.selectedZone == .edge(.right, segment: 1, segments: 2))
     try model.editor.undo()
     #expect(model.editor.config == PreviewFixtures.demoConfig)
   }
 
-  @Test func mergingKeepsThePartUnderEachCentre() {
+  @Test func remapKeepsOnlyTheFirstPart() {
     let bindings = [
       Binding(zone: .edge(.left, segment: 0, segments: 2), gesture: .slide, action: "audio.volume"),
       Binding(zone: .edge(.left, segment: 1, segments: 2), gesture: .slide, action: "display.brightness"),
     ]
+    // Merging: the upper half (segment 1, the first part) survives. Unchanged by the ruling.
     #expect(SplitPlan.remap(bindings, edge: .left, to: 1).map(\.action) == ["display.brightness"])
+    // Before the ruling (critique 22, design answer 3: the first part keeps the bindings, the others start empty), each new part took the part under its centre:
+    // #expect(
+    //   SplitPlan.remap(bindings, edge: .left, to: 4).map(\.action)
+    //     == ["audio.volume", "audio.volume", "display.brightness", "display.brightness"])
+    let four = SplitPlan.remap(bindings, edge: .left, to: 4)
+    #expect(four.map(\.action) == ["display.brightness"])
+    #expect(four.map(\.zone) == [.edge(.left, segment: 3, segments: 4)])
+    // Top and bottom edges: the first part is the left one.
+    let bottom = [
+      Binding(zone: .edge(.bottom, segment: 0, segments: 3), gesture: .tap, action: "audio.mute"),
+      Binding(zone: .edge(.bottom, segment: 2, segments: 3), gesture: .tap, action: "media.next"),
+    ]
+    #expect(SplitPlan.remap(bottom, edge: .bottom, to: 2).map(\.zone) == [.edge(.bottom, segment: 0, segments: 2)])
+    #expect(SplitPlan.remap(bottom, edge: .bottom, to: 2).map(\.action) == ["audio.mute"])
     #expect(
-      SplitPlan.remap(bindings, edge: .left, to: 4).map(\.action)
-        == ["audio.volume", "audio.volume", "display.brightness", "display.brightness"])
+      SplitPlan.firstSegment(edge: .right, segments: 3) == 2 && SplitPlan.firstSegment(edge: .top, segments: 3) == 0)
     #expect(
       SplitPlan.selection(after: .edge(.left, segment: 1, segments: 2), segments: 4)
         == .edge(.left, segment: 3, segments: 4))
