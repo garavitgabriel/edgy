@@ -91,6 +91,14 @@ final class FakeActions: ActionPerforming {
         id: id, input: input, frontmostBundleID: context.frontmostBundleID, parameters: context.parameters))
     if let errorToThrow { throw errorToThrow }
   }
+
+  /// What `performReporting` reports after performing; `nil` = the protocol default (nothing).
+  var outcome: ((ActionID, ActionInput) -> ActionOutcome?)?
+
+  func performReporting(_ id: ActionID, input: ActionInput, context: ActionContext) throws -> ActionOutcome? {
+    try perform(id, input: input, context: context)
+    return outcome?(id, input)
+  }
 }
 
 final class FakePointerGuard: PointerGuarding, @unchecked Sendable {

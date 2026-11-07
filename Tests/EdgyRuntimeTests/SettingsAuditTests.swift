@@ -153,6 +153,10 @@ import Testing
       "updateAppSettings", "updateGestureSettings", "setBinding", "removeBinding", "addAppProfile", "overrideBinding",
       "turnOff", "revertToDefault", "convertToInheriting", "setProfileDisabled", "resetProfile", "resetAll",
       "effectiveBindings", "setTestMode", "observeFeed",
+      // v0.5
+      "countDisplayCheckAsk", "answerDisplayCheck", "turnDisplayBackOn", "displayCheckDue", "applyPreset",
+      "configProblem", "replaceFileWithCurrentSettings", "reportConfigProblem", "Presets.windows",
+      "Presets.minimal", "Presets.media", "rejectionMeasures", "displayCheckDue(key:name:)", "actionUpdated",
     ] {
       #expect(Self.reference.contains(method), "settings-reference.md doesn't mention \(method)")
     }
