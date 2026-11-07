@@ -2,12 +2,12 @@
 
 Neither item stops the batch. Each has a local stand-in inside `Sources/EdgyUI/Mirror/`, documented there. The chief decides the real home.
 
-## 1. The mini mirror's "active profile" has no source
+## 1. The mini mirror's "active profile" has no source (resolved inside Mirror; model field still nicer)
 
 - **Bone 10 says** the popover's mini mirror shows "zones of the active profile". § App profiles adds that the mini mirror shows the faded pad while an off app is in front.
 - **Missing:** `SettingsModel` has no frontmost-app field, and `MiniMirrorView.init(model:)` is frozen.
-- **Stand-in:** `MiniMirrorView(model:)` shows Default. I added `MiniMirrorView(model:frontmostApp:)` so the popover batch can pass the bundle ID once it has one. It draws that app's effective bindings, or the faded pad if the app's profile is off.
-- **Ask:** add `SettingsModel.frontmostApp: String?`, fed by the engine/router. Then the frozen init can read it directly.
+- **Resolved (2026-11-07):** `MiniMirrorView(model:)` now follows the frontmost app itself. It reads `NSWorkspace.frontmostApplication` on appear and listens for `didActivateApplicationNotification` (read-only, ignores Edgy's own bundle), then draws that app's effective bindings (Default when the app has no profile, faded when its profile is off). `MiniMirrorView(model:frontmostApp:)` pins an app for tests or hosts.
+- **Still worth it:** a `SettingsModel.frontmostApp` fed by the engine's `FrontmostAppProviding` would make every surface agree with the router, so the view wouldn't keep its own observer.
 
 ## 2. No-trackpad fallback size has no token or model field
 

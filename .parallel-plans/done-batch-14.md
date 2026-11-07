@@ -4,7 +4,7 @@ tag: EDGY-MIRROR
 branch: worktree-edgy-mirror
 worktree_path: ~/Projects/edgy/.claude/worktrees/edgy-mirror
 completed_at: 2026-11-07
-verification: swift build ✓ · swift test ✓ (all suites; EdgyUITests 142 tests, 15 suites, after merging batch 15) · swift format lint --strict ✓ · token greps empty · denylist empty
+verification: swift build ✓ · swift test ✓ (all suites; EdgyUITests 148 tests, 15 suites, after merging batch 15) · swift format lint --strict ✓ · token greps empty · denylist empty
 ---
 
 # Done — batch 14: the pad mirror (big and mini)
@@ -23,17 +23,17 @@ verification: swift build ✓ · swift test ✓ (all suites; EdgyUITests 142 tes
 | Click selects; zone frame published for the picker | ✓ | `SettingsModel.selectZone`; test `clickingAZoneSelects…`; batch 15's `.pickerAnchor(for:)` on every zone + `.pickerMirrorBounds()` on the pad (and `PadMirrorView.ZoneAnchor`); `window-picker-bottom-*` shows the real window with the picker anchored to the bottom bar with its arrow (render B's state) |
 | States: no trackpad, disabled, off in app | ✓ | `pad-no-trackpad-*`, `pad-disabled-*`, `pad-huddle-off-*`; test `systemStatesFollowThePrecedence` |
 | Two pads: outline cross-fades 150 ms | ✓ (code) | `.id(device?.id).transition(.opacity)` with `.animation(.easeInOut(duration: 0.15), value: device?.id)`; motion is judged on the device |
-| `MiniMirrorView`: same drawing at `miniMirrorPointsPerMM`, no labels, active profile + last touch | ✓ (active profile: see blocker #1) | `mini-idle-*`, `mini-last-touch-*`, `mini-no-trackpad-*`, `mini-paused-*`, `mini-huddle-off-*` |
+| `MiniMirrorView`: same drawing at `miniMirrorPointsPerMM`, no labels, active profile + last touch | ✓ | `MiniMirrorView(model:)` follows the frontmost app itself: read on appear and on every activation (read-only `NSWorkspace` observation, Edgy's own activations ignored). It draws `effectiveBindings(forApp:)` for that app, which is Default when the app has no profile. Tests `miniMirrorFollowsTheFrontmostAppButNotEdgyItself` and `miniMirrorDrawsTheActiveProfilesZones`; `mini-wayfare-active-*`, `mini-idle-*`, `mini-last-touch-*`, `mini-no-trackpad-*`, `mini-paused-*`, `mini-huddle-off-*` |
 | Snapshots light + dark, every listed state | ✓ | `docs/design/build-shots/batch-14/` (16 pairs, below) |
-| ≥ 12 tests | ✓ | 16 test functions in `MirrorTests.swift` (30 cases with arguments) + 18 snapshot tests |
+| ≥ 12 tests | ✓ | 19 test functions in `MirrorTests.swift` + `MiniMirrorProfileTests.swift` + 21 snapshot tests |
 
-Snapshots (each `-light.png` and `-dark.png`): `window-picker-bottom` (whole window, picker open on the bottom edge), `pad-default-idle`, `pad-split-bottom4-long-label` (in-bar text truncates inside a quarter bar), `pad-right-selected`, `pad-live-slide-right`, `pad-rejected-touch`, `pad-split-bottom2-right3`, `pad-wayfare`, `pad-huddle-off`, `pad-no-trackpad`, `pad-disabled`, `pad-built-in` (134 × 87 mm with a live bottom touch), `mini-idle`, `mini-last-touch`, `mini-no-trackpad`, `mini-paused`, `mini-huddle-off`, `preset-media-minimal`.
+Snapshots (each `-light.png` and `-dark.png`): `window-picker-bottom` (whole window, picker open on the bottom edge), `pad-default-idle`, `pad-split-bottom4-long-label` (in-bar text truncates inside a quarter bar), `pad-right-selected`, `pad-live-slide-right`, `pad-rejected-touch`, `pad-split-bottom2-right3`, `pad-wayfare`, `pad-huddle-off`, `pad-no-trackpad`, `pad-disabled`, `pad-built-in` (134 × 87 mm with a live bottom touch), `mini-idle`, `mini-last-touch`, `mini-no-trackpad`, `mini-paused`, `mini-huddle-off`, `mini-wayfare-active` (Wayfare in front), `pad-try-it-right-slide` (render C's state), `pad-switched-to-built-in` (second pad touched), `preset-media-minimal`.
 
 ## Verification (run in this session, after the last change)
 
 ```
 swift build                                     → Build complete!
-swift test                                      → every suite passed (EdgyUITests: 142 tests in 15 suites, after merging main 50776d9)
+swift test                                      → every suite passed (EdgyUITests: 148 tests in 15 suites, after merging main 50776d9)
 swift format lint --strict -r Sources Tests Package.swift → exit 0, no output
 token greps (shared brief rule 7, plus no .custom fonts / second hue / Unicode arrows in Mirror) → no output
 git grep -niE -f ~/.config/edgy-names-denylist → no output
@@ -93,6 +93,19 @@ Kill list: no rulers, no grey drop-shadowed rectangle (warm slab gradient from t
 - Tabs (≥13 pt) and corner icons read at 10 mm corners and 8 mm strips.
 - The right edge's selection ring shows.
 - Batch 16's committed window shots predate this mirror (they show the stub), so they will change after merge.
+
+**Onboarding "Try it" vs C** (`pad-try-it-right-slide-*`: a config with only right-edge Volume mapped, one finger sliding on it, the way step 2 sets the pad up).
+- **Matches:**
+  - Only the taught zone is solid. The left, top and bottom edges are hairlines and all four corners are dashed (pass-through), as in C.
+  - The right bar is lit: an accent tint with a thin accent border.
+  - "Volume" is a tab from the bar's inner side, ≥13 pt semibold `ink`, with the same accent border.
+  - The contact is a filled accent oval with a pale slab-coloured ring and a slight inner shade (pressed in, no glow), as in C.
+  - The slab is warm, lit top-left, with a soft lower edge. No rulers.
+- **Differs:**
+  - C puts the tab near the top of the bar. Ours sits at the bar's middle (the rule that holds for 1–4 segments).
+  - C's tab border flows into the bar's border with a fillet. Ours is a rounded tab overlapping the bar, so its accent border also runs along the seam.
+  - C draws the pad smaller inside the 640 × 520 onboarding window. Scale belongs to the host, so onboarding can use `MiniMirrorView`/`PadMirrorView` or ask for a scale.
+  - The system volume indicator beside the mirror is the system's, not this batch's (bone 8).
 
 **App tab vs S1.**
 - **Matches:** an ink dot before the overridden tab's text ("• Keyboard Shortcut, Next Track and Play/Pause" in `pad-wayfare`), and "Off here" in `ink2` text-only beside a hairline zone, as S1 draws it.
@@ -165,7 +178,7 @@ Kill list: no rulers, no grey drop-shadowed rectangle (warm slab gradient from t
 ## Open questions
 
 - See `.parallel-plans/blockers-batch-14.md`:
-  1. The mini mirror needs a frontmost-app source.
+  1. Resolved in the Mirror folder: the mini mirror observes the frontmost app itself. A model field would still be cleaner.
   2. Last-known pad size / default proportion has no home in the model or tokens.
   3. Dry-run flag for the outline contact mark.
 - The window's paused copy (`WindowCopy.paused`) floors the minutes. BRIEF says whole minutes. The mirror's own copy rounds up so the countdown never reads "0 min" early. Which rounding should both use?
