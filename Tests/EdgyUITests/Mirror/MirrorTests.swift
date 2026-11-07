@@ -164,7 +164,7 @@ func drawnBarsSitInsideTheirZoneAndClearTheCornerTiles(segments: Int) {
   let micOff = try #require(zones[.corner(.topLeft)])
   #expect(pad.fittedLabel(micOff, placement: pad.labelPlacement(micOff)).text == "Mic off")
   #expect(zones[.corner(.topRight)]?.label == "Mute")
-  #expect(zones[.corner(.topRight)]?.symbol == "speaker.slash")
+  #expect(zones[.corner(.topRight)]?.symbol == ActionID("audio.mute"))
   #expect(zones[.edge(.top)]?.style == .unmapped)
   #expect(zones[.corner(.bottomLeft)]?.style == .unmapped)
 }

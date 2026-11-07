@@ -47,6 +47,7 @@ struct Batch21SnapshotTests {
     _ model: SettingsModel, conditions: WindowConditions = .normal, _ name: String
   ) throws {
     let view = SettingsWindowView(model: model, apps: IconApps.list).environment(\.windowConditions, conditions)
+      .withExportedAppIcon()
     let urls = try Snapshot.write(view, folder: Self.folder, name: name, size: SettingsWindowView.minimumSize)
     #expect(urls.count == 2)
   }
@@ -56,9 +57,8 @@ struct Batch21SnapshotTests {
   @Test func windowDefault() throws {
     let model = PreviewFixtures.model()
     model.selectedZone = .edge(.right)
-    // Render A shows the right edge's slide open (as if clicked).
-    model.inspectorDrafts.open = InspectorDrafts.Key(
-      profile: .default, binding: BindingKey(zone: .edge(.right), gesture: .slide))
+    // Selecting a zone opens no binding by itself (critique 21, design answer 4): collapsed.
+    #expect(model.openBinding(in: .edge(.right), rows: model.inspectorRows(for: .edge(.right))) == nil)
     try window(model, "window-default")
   }
 
@@ -154,7 +154,17 @@ struct Batch21SnapshotTests {
 
   @Test func pointerTouchInTheMiddleIsNotDrawn() throws {
     let model = PreviewFixtures.model()
-    model.simulate(MirrorFixtures.touch(0.5, 0.5, .down))
+    // One frame, two fingers: a pointer touch mid-pad (never drawn) and a claim on the right edge
+    // (drawn), so the shot proves the filter rather than showing an idle pad (critique 21 S5).
+    model.simulate(
+      LiveFeedUpdate(
+        touches: LiveTouchFrame(
+          deviceID: MirrorFixtures.pad.id, timestamp: 1,
+          touches: [
+            LiveTouch(id: 1, position: Point2D(x: 0.5, y: 0.5), state: .down),
+            LiveTouch(id: 2, position: Point2D(x: 0.975, y: 0.6), state: .claimed),
+          ]),
+        decisions: []))
     try Snapshot.write(
       PadMirrorView(model: model).padding(28).background(Tokens.windowTint), folder: Self.folder,
       name: "pad-pointer-touch-hidden")
@@ -187,16 +197,29 @@ struct Batch21SnapshotTests {
     let model = PreviewFixtures.model()
     // The contact where it landed on the right edge. The mirror keeps it after the lift by holding
     // the last frame in its own state while on screen; a headless snapshot builds a fresh view, so
-    // the shot is taken with the finger down.
+    // the shot is taken with the finger down. A pad must be attached: the mini draws touches only
+    // for a device (critique 21 must-fix 2: the old shot had none, so it matched popover-normal).
+    model.simulate(WindowFixtures.status())
     model.simulate(MirrorFixtures.touch(0.975, 0.55, .claimed))
+    #expect(!model.liveTouches.isEmpty)
     try popover("popover-last-touch", model: model)
   }
 
   @Test func popoverUnavailableZoneIsUnmapped() throws {
     var config = PreviewFixtures.demoConfig
+    // On a mapped zone, so the change shows (critique 21: bottom-left was already pass-through).
+    // The right edge's only binding becomes an unavailable action, so it draws as a hairline.
+    config.defaultProfile.bindings.removeAll {
+      if case .edge(.right, _, _) = $0.zone { return true }
+      return false
+    }
     config.defaultProfile.bindings.append(
-      Binding(zone: .corner(.bottomLeft), gesture: .doubleTap, action: "keyboard.backlightToggle"))
+      Binding(zone: .edge(.right), gesture: .doubleTap, action: "keyboard.backlightToggle"))
     let model = InspectorFixtures.model(config: config)
+    #expect(!model.editor.availability(of: "keyboard.backlightToggle").isUsable)
+    #expect(
+      model.mirrorZones(forApp: nil, unavailableAsUnmapped: true).first { $0.zone == .edge(.right) }?.style == .unmapped
+    )
     model.simulate(
       EngineStatus(
         running: true, paused: false, pausedUntil: nil, enabled: true, devices: [PreviewFixtures.externalPad]))

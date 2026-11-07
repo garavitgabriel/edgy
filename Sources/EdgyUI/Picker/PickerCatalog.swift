@@ -49,6 +49,16 @@ struct PickerCatalog: Equatable {
   /// "Do nothing here" (app tabs only, last, after a separator).
   var offersDoNothing: Bool
 
+  /// Nothing to list at all (only possible with a search typed).
+  var isEmpty: Bool { sections.isEmpty && others.isEmpty && !offersDoNothing }
+
+  /// The empty state with a search typed: "No actions match “xyz”." (13, `ink2`). `nil` for an
+  /// empty search.
+  static func noMatches(_ query: String) -> String? {
+    let typed = query.trimmingCharacters(in: .whitespaces)
+    return typed.isEmpty ? nil : "No actions match \u{201C}\(typed)\u{201D}."
+  }
+
   /// Every selectable item in list order (arrows and Return walk this).
   var selectable: [Item] { sections.flatMap(\.items) }
 
@@ -126,6 +136,33 @@ enum PickerPlacement {
     return max(min(maxHeight, mirrorHeight - mirrorInset), 120)
   }
 
+  /// At most the pad's interior (between the top and bottom bars' inner edges), so the picker never
+  /// covers a bar (§ Picker at catalog scale, ruled 2026-11-07), and never past 420.
+  static func height(interiorHeight: CGFloat) -> CGFloat {
+    max(min(maxHeight, interiorHeight), 120)
+  }
+
+  /// A picker beside a side edge: vertically centred on the anchor, clamped into the free band
+  /// between whatever sits above and below it in its column (corner tiles and their tabs, cleared by
+  /// `zoneClearance`), and shorter if the band is (§ Picker clarity → Scrolling and placement).
+  static func sideFrame(
+    side: Side, anchor: CGRect, avoiding cleared: [CGRect], size: CGSize, bounds: CGRect
+  ) -> Result {
+    let reach = gap + arrowSize
+    let x = side == .left ? anchor.minX - reach - size.width : anchor.maxX + reach
+    let column = CGRect(x: x, y: bounds.minY, width: size.width, height: bounds.height)
+    var top = bounds.minY
+    var bottom = bounds.maxY
+    for other in cleared where other.intersects(column) {
+      if other.midY < anchor.midY { top = max(top, other.maxY) } else { bottom = min(bottom, other.minY) }
+    }
+    let height = max(min(size.height, bottom - top), minHeight)
+    let y = min(max(anchor.midY - height / 2, top), max(bottom - height, top))
+    let frame = CGRect(x: x, y: y, width: size.width, height: height)
+    let offset = min(max(anchor.midY - frame.minY, 20), height - 20)
+    return Result(frame: frame, side: side, arrowOffset: offset)
+  }
+
   /// Sides to try, inner side first: a bottom bar opens upward, a right strip to its left.
   static func preferredSides(for zone: Zone) -> [Side] {
     switch zone {
@@ -157,6 +194,10 @@ enum PickerPlacement {
     // scrolls) until it clears its zone and every other zone (BRIEF: it never covers the pad's
     // other bars). Only when no side fits does the least-covering full-size spot win.
     for side in preferredSides(for: zone) {
+      if case .edge(let edge, _, _) = zone, edge == .left || edge == .right, side == .left || side == .right {
+        let result = sideFrame(side: side, anchor: anchor, avoiding: cleared, size: size, bounds: bounds)
+        if overlap(result) == 0 { return result }
+      }
       var height = size.height
       while true {
         let result = frame(for: side, anchor: anchor, size: CGSize(width: size.width, height: height), bounds: bounds)

@@ -49,18 +49,15 @@ private struct ZoneInspector: View {
   var zone: Zone
 
   var body: some View {
-    let rows = model.inspectorRows(for: zone)
-    let drafts = model.inspectorDrafts
     VStack(alignment: .leading, spacing: 0) {
-      Text(ZoneNaming.title(zone))
+      Text(Self.title(zone))
         .font(Tokens.font(Tokens.typeTitle, semibold: true))
         .foregroundStyle(Tokens.ink)
         .accessibilityAddTraits(.isHeader)
-      if let count = model.splitCount(for: zone) {
-        // No "Split into" on app tabs: hidden, not greyed out (§ App profiles, chief ruling).
+      if case .edge(let edge, _, let count) = zone {
+        // No Split on app tabs: hidden, not greyed out (§ App profiles, chief ruling).
         if model.selectedProfile == .default {
-          SplitControl(count: count, enabled: model.canSplit) { model.split(zone, into: $0) }
-            .padding(.top, 12)
+          SplitControl(model: model, zone: zone, enabled: model.canSplit).padding(.top, 12)
         }
         ForEach(Array(model.overlaps(onEdgeOf: zone).enumerated()), id: \.offset) { _, overlap in
           IssueLine(style: .warning, text: IssueCopy.overlap(overlap.0, overlap.1, gesture: overlap.2)) {
@@ -68,10 +65,52 @@ private struct ZoneInspector: View {
           }
           .padding(.top, 8)
         }
+        InspectorRule().padding(.top, 14).padding(.bottom, 10)
+        if count > 1 {
+          // A split edge's bindings group by segment (§ Split control), in reading order.
+          VStack(alignment: .leading, spacing: 14) {
+            ForEach(SplitNaming.readingOrder(edge: edge, segments: count), id: \.self) { segment in
+              if case .edge(_, let index, _) = segment {
+                VStack(alignment: .leading, spacing: 6) {
+                  Text(SplitNaming.heading(edge: edge, segment: index, segments: count))
+                    .font(Tokens.font(Tokens.typeBody, semibold: true)).foregroundStyle(Tokens.ink2)
+                    .accessibilityAddTraits(.isHeader)
+                  SegmentBindings(model: model, zone: segment, rules: false)
+                }
+              }
+            }
+          }
+        } else {
+          SegmentBindings(model: model, zone: zone, rules: true)
+        }
+      } else {
+        InspectorRule().padding(.top, 14).padding(.bottom, 10)
+        SegmentBindings(model: model, zone: zone, rules: true)
       }
-      InspectorRule().padding(.top, 14).padding(.bottom, 10)
-      let open = model.openBinding(in: zone, rows: rows)
-      let pending = pendingGesture(rows: rows)
+    }
+  }
+
+  /// The 26 pt title. A split edge is named as the edge ("Right edge"); its parts are the headings.
+  static func title(_ zone: Zone) -> String {
+    if case .edge(let edge, _, let count) = zone, count > 1 { return ZoneNaming.title(.edge(edge)) }
+    return ZoneNaming.title(zone)
+  }
+}
+
+/// One zone's (or one segment's) mapped gestures, the pending row while picking, "Add gesture…" and
+/// its interaction notes.
+private struct SegmentBindings: View {
+  @Bindable var model: SettingsModel
+  var zone: Zone
+  /// Hairlines around the rows (a whole zone); a segment group is spaced, not ruled.
+  var rules: Bool
+
+  var body: some View {
+    let rows = model.inspectorRows(for: zone)
+    let drafts = model.inspectorDrafts
+    let open = model.openBinding(in: zone, rows: rows)
+    let pending = pendingGesture(rows: rows)
+    VStack(alignment: .leading, spacing: 0) {
       VStack(alignment: .leading, spacing: 12) {
         ForEach(rows) { row in
           let key = InspectorDrafts.Key(profile: model.selectedProfile, binding: row.id)
@@ -83,7 +122,7 @@ private struct ZoneInspector: View {
         }
         if let pending { PendingRowView(gesture: pending) }
       }
-      if !rows.isEmpty || pending != nil { InspectorRule().padding(.vertical, 10) }
+      if rules, !rows.isEmpty || pending != nil { InspectorRule().padding(.vertical, 10) }
       if !model.unmappedGestures(for: zone).isEmpty {
         Button {
           drafts.open = nil
@@ -97,8 +136,9 @@ private struct ZoneInspector: View {
           .frame(minHeight: 28).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .padding(.top, rules || (rows.isEmpty && pending == nil) ? 0 : 4)
       }
-      TapNotes(model: model, zone: zone, rows: rows).padding(.top, 14)
+      TapNotes(model: model, zone: zone, rows: rows).padding(.top, rules ? 14 : 4)
     }
     .onChange(of: drafts.focus) { _, focus in
       // The focused field has drawn; one handoff per choice.
@@ -134,28 +174,13 @@ struct PendingRowView: View {
   }
 }
 
-/// "Split into 1 2 3 4" (bone 6).
-struct SplitControl: View {
-  var count: Int
-  var enabled: Bool
-  var set: (Int) -> Void
-
-  var body: some View {
-    HStack(spacing: 12) {
-      Text("Split into").font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
-      Picker("Split into", selection: SwiftUI.Binding(get: { count }, set: set)) {
-        ForEach(1...4, id: \.self) { Text("\($0)").tag($0) }
-      }
-      .pickerStyle(.segmented)
-      .labelsHidden()
-      .fixedSize()
-      .disabled(!enabled)
-    }
-  }
-}
-
 /// One mapped gesture: icon, gesture, action in plain text, source marks (§ App profiles rows),
 /// the "…" menu, issue lines, then its parameter rows.
+///
+/// **The action name always wins** (critique 21, design answer 1): it is never cut with "…". When
+/// the name plus "from Default" or **Revert** doesn't fit on one line, "from Default" becomes the
+/// row's sub-line and **Revert** goes trailing on the "Default: X" sub-line; a name still too long
+/// wraps at a word boundary, two lines at most. The short forms are for pad tabs only.
 struct BindingRowView: View {
   @Bindable var model: SettingsModel
   var row: InspectorRow
@@ -164,36 +189,15 @@ struct BindingRowView: View {
   var isOpen = false
   var autofocus: Bool
 
-  private static let textInset = GestureIcon.size + 10
+  static let textInset = GestureIcon.size + 10
 
   var body: some View {
     VStack(alignment: .leading, spacing: 4) {
-      HStack(spacing: 10) {
-        GestureIcon(gesture: row.gesture)
-        Text(GestureNaming.name(row.gesture)).foregroundStyle(Tokens.ink).lineLimit(1).fixedSize()
-        Spacer(minLength: 8)
-        // While the picker is open the value is blank: its header already says it (bone 6).
-        // One line: the gesture name stays whole; a long action name shortens (the inspector's
-        // "…" for a cut is the system's; the pad never uses one).
-        if !isPicking { value.lineLimit(1) }
-        RowMenu(model: model, row: row)
+      ViewThatFits(in: .horizontal) {
+        block(inline: true)
+        block(inline: false)
       }
-      .font(Tokens.font(Tokens.typeBody))
-      .frame(minHeight: 28)
-      .padding(.horizontal, 6)
-      .background(
-        RoundedRectangle(cornerRadius: Tokens.radiusControl).fill(isPicking ? Tokens.bar.opacity(0.35) : .clear)
-      )
-      .contentShape(Rectangle())
-      .onTapGesture { model.openRow(row.id) }
-      .padding(.horizontal, -6)
-      .accessibilityElement(children: .combine)
-      .accessibilityAddTraits(.isButton)
-
       Group {
-        if let base = row.defaultBinding, row.source == .overridden || row.source == .turnedOff {
-          Text("Default: \(model.actionName(base.action))").foregroundStyle(Tokens.ink2)
-        }
         ForEach(Array(issueLines.enumerated()), id: \.offset) { _, line in
           IssueLine(style: line.0, text: line.1)
         }
@@ -209,31 +213,90 @@ struct BindingRowView: View {
     }
   }
 
-  @ViewBuilder private var value: some View {
-    let name = model.actionName(row.binding.action, withEllipsis: true)
-    let needs = model.needsLabel(row.binding)
+  /// The row and its source sub-lines. `inline`: everything on the row's one line (its ideal width
+  /// is the whole line, so `ViewThatFits` falls back when it doesn't fit).
+  @ViewBuilder private func block(inline: Bool) -> some View {
+    VStack(alignment: .leading, spacing: 4) {
+      HStack(alignment: .firstTextBaseline, spacing: 10) {
+        GestureIcon(gesture: row.gesture).alignmentGuide(.firstTextBaseline) { $0[VerticalAlignment.center] + 4 }
+        Text(GestureNaming.name(row.gesture)).foregroundStyle(Tokens.ink).lineLimit(1).fixedSize()
+        Spacer(minLength: 8)
+        // While the picker is open the value is blank: its header already says it (bone 6).
+        if !isPicking { value(inline: inline) }
+        RowMenu(model: model, row: row)
+      }
+      .font(Tokens.font(Tokens.typeBody))
+      .frame(minHeight: 28)
+      .padding(.horizontal, 6)
+      .background(
+        RoundedRectangle(cornerRadius: Tokens.radiusControl).fill(isPicking ? Tokens.bar.opacity(0.35) : .clear)
+      )
+      .contentShape(Rectangle())
+      .onTapGesture { model.openRow(row.id) }
+      .padding(.horizontal, -6)
+      .accessibilityElement(children: .combine)
+      .accessibilityAddTraits(.isButton)
+      subLines(inline: inline)
+        .font(Tokens.font(Tokens.typeBody))
+        .padding(.leading, Self.textInset)
+    }
+  }
+
+  // The catalog name: the "…" that means "it will ask for something" belongs to the picker (critique 21).
+  private var name: String { model.actionName(row.binding.action) }
+  private var needs: String? { model.needsLabel(row.binding) }
+
+  /// The action as text: one line, whole, when inline; else up to two lines at word boundaries.
+  private func actionText(_ text: String, inline: Bool) -> some View {
+    Text(text)
+      .lineLimit(inline ? 1 : 2)
+      .multilineTextAlignment(.trailing)
+      .fixedSize(horizontal: inline, vertical: true)
+  }
+
+  @ViewBuilder private func value(inline: Bool) -> some View {
     switch row.source {
     case .inherited:
       HStack(spacing: 12) {
-        Text(name)
-        Text("from Default")
+        actionText(name, inline: inline)
+        if inline { Text("from Default").fixedSize() }
       }
       .foregroundStyle(Tokens.ink2)
     case .turnedOff:
       HStack(spacing: 12) {
-        Text("Off here").foregroundStyle(Tokens.ink2)
-        TextAction(title: "Revert") { model.revert(row) }
+        Text("Off here").foregroundStyle(Tokens.ink2).fixedSize()
+        if inline { TextAction(title: "Revert") { model.revert(row) }.fixedSize() }
       }
     case .overridden:
-      HStack(spacing: 12) {
-        HStack(spacing: 6) {
-          Circle().fill(Tokens.ink).frame(width: 5, height: 5)
-          Text(needs ?? name).foregroundStyle(needs == nil ? Tokens.ink : Tokens.ink2)
+      HStack(alignment: .firstTextBaseline, spacing: 12) {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+          Circle().fill(Tokens.ink).frame(width: 5, height: 5).alignmentGuide(.firstTextBaseline) { $0.height + 3 }
+          actionText(needs ?? name, inline: inline).foregroundStyle(needs == nil ? Tokens.ink : Tokens.ink2)
         }
-        TextAction(title: "Revert") { model.revert(row) }
+        if inline { TextAction(title: "Revert") { model.revert(row) }.fixedSize() }
       }
     case .appOnly, nil:
-      Text(needs ?? name).foregroundStyle(needs == nil ? Tokens.ink : Tokens.ink2)
+      actionText(needs ?? name, inline: inline).foregroundStyle(needs == nil ? Tokens.ink : Tokens.ink2)
+    }
+  }
+
+  /// "Default: X" under an overridden or turned-off row (with **Revert** trailing when the row had
+  /// no room for it), and "from Default" when it moved off the row.
+  @ViewBuilder private func subLines(inline: Bool) -> some View {
+    if let base = row.defaultBinding, row.source == .overridden || row.source == .turnedOff {
+      HStack(alignment: .firstTextBaseline, spacing: 12) {
+        Text("Default: \(model.actionName(base.action))").foregroundStyle(Tokens.ink2)
+          .fixedSize(horizontal: false, vertical: true)
+        if !inline {
+          Spacer(minLength: 8)
+          TextAction(title: "Revert") { model.revert(row) }.fixedSize()
+        }
+      }
+    } else if row.source == .inherited, !inline, !isPicking {
+      HStack {
+        Spacer(minLength: 0)
+        Text("from Default").foregroundStyle(Tokens.ink2)
+      }
     }
   }
 

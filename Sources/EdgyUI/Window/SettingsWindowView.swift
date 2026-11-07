@@ -56,7 +56,7 @@ public struct SettingsWindowView: View {
       }
       .disabled(status.isReadOnly)
       .actionPickerHost(model: model)
-      footer.disabled(status.isReadOnly)
+      footer(readOnly: status.isReadOnly)
     }
     .font(Tokens.font(Tokens.typeBody))
     .foregroundStyle(Tokens.ink)
@@ -91,6 +91,10 @@ public struct SettingsWindowView: View {
   private func tabBar(readOnly: Bool) -> some View {
     let toggle = model.topSwitch(apps: apps)
     return ZStack {
+      HStack(spacing: 0) {
+        WindowIdentity()
+        Spacer(minLength: 0)
+      }
       HStack(spacing: 0) {
         ForEach(model.profileTabs(apps: apps), id: \.self) { ref in tab(ref, readOnly: readOnly) }
         Button {
@@ -135,7 +139,7 @@ public struct SettingsWindowView: View {
         Text(name).font(Tokens.font(Tokens.typeBody, semibold: selected))
         if off { Image(systemName: "nosign").accessibilityLabel("Off") }
       }
-      .foregroundStyle(off ? Tokens.ink2 : Tokens.ink)
+      .foregroundStyle(off || readOnly ? Tokens.ink2 : Tokens.ink)
       .padding(.horizontal, 12)
       .padding(.vertical, 4)
       .background(
@@ -225,14 +229,14 @@ public struct SettingsWindowView: View {
 
   // MARK: Footer
 
-  private var footer: some View {
+  private func footer(readOnly: Bool) -> some View {
     let app = model.editor.config.app
     return HStack(spacing: 20) {
-      Toggle("Haptics", isOn: Binding(get: { app.haptics }, set: model.setHaptics))
-      Toggle("Launch at login", isOn: Binding(get: { app.launchAtLogin }, set: model.setLaunchAtLogin))
+      Toggle("Haptics", isOn: Binding(get: { app.haptics }, set: { model.setHaptics($0) }))
+      Toggle("Launch at login", isOn: Binding(get: { app.launchAtLogin }, set: { model.setLaunchAtLogin($0) }))
       HStack(spacing: 8) {
         Text("HUD")
-        Picker("HUD", selection: Binding(get: { app.hud }, set: model.setHUD)) {
+        Picker("HUD", selection: Binding(get: { app.hud }, set: { model.setHUD($0) })) {
           Text("Native").tag(HUDMode.native)
           Text("None").tag(HUDMode.none)
         }
@@ -240,8 +244,11 @@ public struct SettingsWindowView: View {
         .fixedSize()
       }
       Spacer()
-      Button("Advanced…") { showingAdvanced = true }
+      AdvancedButton { showingAdvanced = true }
     }
+    // Read-only (broken config): every footer label dims with its control (critique 16 S1).
+    .disabled(readOnly)
+    .foregroundStyle(readOnly ? Tokens.ink2 : Tokens.ink)
     .toggleStyle(.switch)
     .tint(Tokens.accent)
     .padding(.horizontal, WindowMetrics.gutter)

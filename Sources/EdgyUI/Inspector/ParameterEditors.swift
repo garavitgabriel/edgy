@@ -34,7 +34,11 @@ enum ParameterEditor: Equatable, Identifiable {
       parameters.append(parameters.remove(at: index))
     }
     var editors = parameters.map(ParameterEditor.action)
-    if descriptor.shape == .continuous { editors.append(.sensitivity) }
+    // The generic Sensitivity row hides where "Distance per app/press" (`stepMM`) already sets the
+    // feel (batch-20 critique): Switch Apps and Slide to Repeat Keys. Levels keep it.
+    if descriptor.shape == .continuous, !parameters.contains(where: { $0.key == "stepMM" }) {
+      editors.append(.sensitivity)
+    }
     let pressTime = ConfigValidator.pressTimeParameter
     if gesture == .longPress, !parameters.contains(where: { $0.key == pressTime.key }) {
       editors.append(.action(pressTime))
@@ -216,6 +220,9 @@ struct LabeledParameter<Control: View>: View {
   var help: String? = nil
   @ViewBuilder var control: Control
 
+  /// Space after a helper line, before the next parameter row.
+  static var helperSpacing: CGFloat { 8 }
+
   /// The least a control gets beside its label before the label moves above it.
   static var controlMinWidth: CGFloat { 140 }
 
@@ -237,8 +244,10 @@ struct LabeledParameter<Control: View>: View {
         }
       }
       if let help {
+        // 8 pt after a helper line so it doesn't crowd the next row (critique 21 should-fix 2).
         Text(help).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
           .fixedSize(horizontal: false, vertical: true)
+          .padding(.bottom, Self.helperSpacing)
       }
     }
   }
@@ -704,7 +713,7 @@ struct HapticsCheckbox: View {
   var set: (Bool) -> Void
 
   var body: some View {
-    Toggle(isOn: SwiftUI.Binding(get: { isOn }, set: set)) {
+    Toggle(isOn: SwiftUI.Binding(get: { isOn }, set: { set($0) })) {
       Text("Haptics for this gesture").font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink)
     }
     .toggleStyle(.checkbox)

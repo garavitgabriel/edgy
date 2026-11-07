@@ -84,10 +84,10 @@ struct Batch21MirrorTests {
       // The tab's start is inside the tile's x span, past its rounded corner.
       #expect(placement.point.x > tile.minX + mirror.tileRadius(tile) - 0.01)
       #expect(placement.point.x < tile.maxX - mirror.tileRadius(tile) + 0.01)
-      // The tab's top (or bottom) edge overlaps the tile's edge: no gap, no corner-only touch.
+      // The tab tucks under the tile by its own corner radius (critique 14 M2): no gap, no notch.
       switch corner {
-      case .topLeft, .topRight: #expect(placement.point.y < tile.maxY && placement.point.y > tile.maxY - 4)
-      case .bottomLeft, .bottomRight: #expect(placement.point.y > tile.minY && placement.point.y < tile.minY + 4)
+      case .topLeft, .topRight: #expect(abs(tile.maxY - placement.point.y - Tokens.radiusControl) < 0.01)
+      case .bottomLeft, .bottomRight: #expect(abs(placement.point.y - tile.minY - Tokens.radiusControl) < 0.01)
       }
       // The tab clears the side strip's bar.
       let side = mirror.geometry.shapeFrame(for: .edge(corner == .topLeft || corner == .bottomLeft ? .left : .right))

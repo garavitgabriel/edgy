@@ -9,6 +9,11 @@ import SwiftUI
 public struct PickerAnchors {
   public var zones: [Zone: Anchor<CGRect>] = [:]
   public var mirror: Anchor<CGRect>?
+  /// The pad's interior: between the inner edges of the top and bottom bars (the picker is never
+  /// taller, § Picker at catalog scale).
+  public var interior: Anchor<CGRect>?
+  /// Label tabs that grow out of a zone (corner and side tabs): the picker clears them too.
+  public var tabs: [Zone: Anchor<CGRect>] = [:]
 }
 
 public struct PickerAnchorKey: PreferenceKey {
@@ -16,7 +21,9 @@ public struct PickerAnchorKey: PreferenceKey {
   public static func reduce(value: inout PickerAnchors, nextValue: () -> PickerAnchors) {
     let next = nextValue()
     value.zones.merge(next.zones) { _, new in new }
+    value.tabs.merge(next.tabs) { _, new in new }
     value.mirror = next.mirror ?? value.mirror
+    value.interior = next.interior ?? value.interior
   }
 }
 
@@ -29,6 +36,16 @@ extension View {
   /// Publishes this view's bounds as the mirror's (the picker is at most its height − 16 pt).
   public func pickerMirrorBounds() -> some View {
     anchorPreference(key: PickerAnchorKey.self, value: .bounds) { PickerAnchors(mirror: $0) }
+  }
+
+  /// Publishes this view's bounds as the pad interior (the picker's height cap).
+  public func pickerInterior() -> some View {
+    anchorPreference(key: PickerAnchorKey.self, value: .bounds) { PickerAnchors(interior: $0) }
+  }
+
+  /// Publishes this view's bounds as `zone`'s label tab (the picker keeps clear of it).
+  public func pickerTab(for zone: Zone) -> some View {
+    anchorPreference(key: PickerAnchorKey.self, value: .bounds) { PickerAnchors(tabs: [zone: $0]) }
   }
 
   /// Shows `ActionPickerView` for `model.picking`, anchored to the picked zone with an arrow,
@@ -48,9 +65,14 @@ private struct PickerPopoverLayer: View {
   var body: some View {
     GeometryReader { proxy in
       if let target = model.picking, let anchor = anchors.zones[target.zone] {
-        let rect = proxy[anchor]
-        let others = anchors.zones.filter { $0.key != target.zone }.map { proxy[$0.value] }
-        let height = PickerPlacement.height(mirrorHeight: anchors.mirror.map { proxy[$0].height })
+        // The trigger is the zone plus its own label tab: the picker covers neither (bone 5).
+        let rect = anchors.tabs[target.zone].map { proxy[anchor].union(proxy[$0]) } ?? proxy[anchor]
+        let others =
+          anchors.zones.filter { $0.key != target.zone }.map { proxy[$0.value] }
+          + anchors.tabs.filter { $0.key != target.zone }.map { proxy[$0.value] }
+        let height =
+          anchors.interior.map { PickerPlacement.height(interiorHeight: proxy[$0].height) }
+          ?? PickerPlacement.height(mirrorHeight: anchors.mirror.map { proxy[$0].height })
         let placement = PickerPlacement.place(
           anchor: rect, zone: target.zone, avoiding: others,
           size: CGSize(width: PickerPlacement.width, height: height), in: CGRect(origin: .zero, size: proxy.size))
