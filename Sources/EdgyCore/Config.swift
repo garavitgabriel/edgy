@@ -20,7 +20,7 @@ public struct GestureSettings: Codable, Hashable, Sendable {
   public var fingers: Int
 
   public static let defaults = GestureSettings(
-    edgeWidthMM: 8, cornerSizeMM: 12, dwellMS: 120, palmMajorAxisMM: 18,
+    edgeWidthMM: 8, cornerSizeMM: 10, dwellMS: 120, palmMajorAxisMM: 18,
     typingSuppressionMS: 500, doubleTapWindowMS: 300, longPressMS: 500, fingers: 1)
 
   public init(

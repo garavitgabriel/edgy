@@ -3,6 +3,7 @@ import AppKit
 @MainActor
 protocol StatusMenuHandler: AnyObject {
   func toggleEnabled()
+  func toggleTestMode()
   func pauseForOneHour()
   func resumeNow()
   func grantAccessibility()
@@ -23,6 +24,8 @@ final class StatusMenu: NSObject {
     var needsAccessibility: Bool
     /// The engine sees a built-in or external trackpad.
     var hasTrackpad: Bool
+    /// Gestures are recognized but no action runs.
+    var testMode: Bool
   }
 
   private let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -35,7 +38,7 @@ final class StatusMenu: NSObject {
 
   func update(_ state: State) {
     let active = state.enabled && state.pausedUntil == nil
-    item.button?.title = "Edgy"
+    item.button?.title = state.testMode ? "Edgy · Test" : "Edgy"
     item.button?.appearsDisabled = !active
     item.button?.toolTip = active ? "Edgy is on" : "Edgy is off"
 
@@ -52,6 +55,10 @@ final class StatusMenu: NSObject {
     let enabled = entry("Enabled", #selector(toggleEnabled))
     enabled.state = state.enabled ? .on : .off
     menu.addItem(enabled)
+    let test = entry("Test Mode", #selector(toggleTestMode))
+    test.state = state.testMode ? .on : .off
+    test.toolTip = "Gestures are recognized but nothing runs; each one is written to the log."
+    menu.addItem(test)
 
     if let until = state.pausedUntil {
       let time = until.formatted(date: .omitted, time: .shortened)
@@ -85,6 +92,7 @@ final class StatusMenu: NSObject {
   }
 
   @objc private func toggleEnabled() { handler?.toggleEnabled() }
+  @objc private func toggleTestMode() { handler?.toggleTestMode() }
   @objc private func pauseForOneHour() { handler?.pauseForOneHour() }
   @objc private func resumeNow() { handler?.resumeNow() }
   @objc private func grantAccessibility() { handler?.grantAccessibility() }

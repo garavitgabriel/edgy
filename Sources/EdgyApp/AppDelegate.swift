@@ -25,15 +25,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var statusMenu: StatusMenu?
   private var pauseTimer: Timer?
   private var activationObserver: NSObjectProtocol?
+  private var feedObserver: UUID?
 
   func applicationDidFinishLaunching(_ notification: Notification) {
-    let config = loadConfig()
-    applied = config
+    let firstRun = !FileManager.default.fileExists(atPath: store.fileURL.path)
+    var config = loadConfig()
 
     // Sibling modules are reached only through their frozen factories.
     let actions = makeLiveActionRegistry(settings: config.app)
+    if firstRun {
+      // First launch: start from defaults that work on this Mac (no brightness slide on a Mac
+      // whose screens can't take it, no keyboard backlight without one).
+      config = MachineDefaults.build(from: .defaults, actions: actions)
+      do {
+        try store.save(config)
+      } catch {
+        logger.log(.error, "Could not save first-run defaults: \(error)")
+      }
+      logger.log(.info, "First run: defaults chosen for this Mac")
+    }
+    applied = config
+
+    let base = makeGestureRecognizer()
     let engine = Engine(
-      touchSource: makeLiveTouchSource(), recognizer: makeGestureRecognizer(), actions: actions,
+      touchSource: makeLiveTouchSource(), recognizer: FlushingRecognizer(base) ?? base, actions: actions,
       pointerGuard: makeLivePointerGuard(), typing: makeLiveTypingActivitySource(), frontmost: frontmost,
       config: config, logger: SystemLogger(category: "engine"), queue: .main)
     self.engine = engine
@@ -48,7 +63,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     engineStatus = engine.status
 
     let editor = SettingsEditor(
-      config: config, catalog: actions.available, store: store, scheduler: scheduler,
+      config: config, catalog: actions.available, store: store, scheduler: scheduler, actions: actions,
       apply: { [weak self] in self?.apply($0) })
     editor.observe { [weak self] _ in self?.refreshMenu() }
     self.editor = editor
@@ -110,7 +125,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       StatusMenu.State(
         enabled: editor?.config.app.enabled ?? applied.app.enabled, pausedUntil: engineStatus.pausedUntil,
         configPath: store.fileURL.path, needsAccessibility: (permissions?.accessibility ?? .unknown) != .granted,
-        hasTrackpad: engineStatus.hasTrackpad))
+        hasTrackpad: engineStatus.hasTrackpad, testMode: engine?.isTestMode ?? false))
   }
 
   private func endPause() {
@@ -127,6 +142,24 @@ extension AppDelegate: StatusMenuHandler {
     } catch {
       logger.log(.error, "Could not change Enabled: \(error)")
     }
+  }
+
+  /// Test Mode until the settings window exists: gestures are recognized but nothing runs, and
+  /// each decision goes to the log (`log stream --predicate 'subsystem == "com.garavit.edgy"'`).
+  func toggleTestMode() {
+    guard let engine else { return }
+    let on = !engine.isTestMode
+    if on {
+      let log = SystemLogger(category: "testmode")
+      feedObserver = engine.observeFeed { update in
+        for decision in update.decisions { log.log(.info, "\(decision)") }
+      }
+    } else if let feedObserver {
+      engine.removeFeedObserver(feedObserver)
+      self.feedObserver = nil
+    }
+    engine.setTestMode(on)
+    refreshMenu()
   }
 
   func pauseForOneHour() {
@@ -171,4 +204,26 @@ extension AppDelegate: StatusMenuHandler {
   func quit() {
     NSApp.terminate(nil)
   }
+}
+
+/// Lets the engine wake the gesture recognizer for a tap that waits out the double-tap window.
+/// EdgyRuntime can't see Gestures, so it asks for its own `GestureFlushing`; this forwards to the
+/// recognizer's `DeferredGestureFlushing`.
+private final class FlushingRecognizer: GestureRecognizing, GestureFlushing {
+  private let inner: GestureRecognizing & DeferredGestureFlushing
+
+  init?(_ recognizer: GestureRecognizing) {
+    guard let flushing = recognizer as? (GestureRecognizing & DeferredGestureFlushing) else { return nil }
+    inner = flushing
+  }
+
+  func process(_ frame: TouchFrame, device: TouchDeviceInfo, context: GestureContext) -> GestureOutput {
+    inner.process(frame, device: device, context: context)
+  }
+
+  func reset() { inner.reset() }
+
+  var nextFlushDeadline: Double? { inner.nextFlushDeadline }
+
+  func flush(now: Double) -> GestureOutput { inner.flush(now: now) }
 }

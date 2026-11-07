@@ -40,7 +40,7 @@ from the device), time in milliseconds.
 | Field | Range | Default | What it does |
 |---|---|---|---|
 | `edgeWidthMM` | 3…20 mm | 8 | Depth of each edge strip, measured from the physical edge. |
-| `cornerSizeMM` | 5…30 mm | 12 | Side of each corner square. A mapped corner wins over the edges inside its square. |
+| `cornerSizeMM` | 5…30 mm | 10 | Side of each corner square. A mapped corner wins over the edges inside its square. |
 | `dwellMS` | 0…1000 ms | 120 | How long a finger rests (or moves along the edge) before Edgy claims a slide. |
 | `palmMajorAxisMM` | 10…40 mm | 18 | Contacts wider than this are palms and never gestures. |
 | `typingSuppressionMS` | 0…3000 ms | 500 | Edge gestures are ignored this long after a key press (0 = off). |

@@ -1,6 +1,7 @@
 import Actions
 import EdgyCore
 import EdgyRuntime
+import Foundation
 import Testing
 
 // The real action catalog checked against the settings validator, so the two sides of the
@@ -86,6 +87,29 @@ private func placement(for descriptor: ActionDescriptor) -> (Zone, GestureKind) 
     #expect(zone.supports(gesture))
     #expect(
       validator.validate(Binding(zone: zone, gesture: .slide, action: descriptor.id)).map(\.code)
-        .contains(.shapeMismatch) == (descriptor.shape != .continuous))
+        .contains(.shapeMismatch) == (descriptor.shape != .continuous && descriptor.id != .doNothing))
+  }
+}
+
+/// The customization audit against the real catalog: every parameter of every action can be set
+/// through `SettingsEditor` and comes back from disk unchanged.
+@MainActor @Test func everyRealCatalogParameterIsSettableAndSurvivesReload() throws {
+  let url = FileManager.default.temporaryDirectory.appendingPathComponent("edgy-\(UUID())/config.json")
+  defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+  let store = ConfigStore(fileURL: url, debounce: 0.3, logger: SystemLogger(category: "test"))
+  try store.save(.defaults)
+  let editor = SettingsEditor(
+    config: .defaults, catalog: catalog, store: store, scheduler: MainQueueScheduler(), apply: { _ in })
+  for descriptor in catalog where !descriptor.parameters.isEmpty {
+    let gesture: GestureKind =
+      switch descriptor.shape {
+      case .continuous: .slide
+      case .hold: .longPress
+      case .trigger: .tap
+      }
+    let parameters = Dictionary(uniqueKeysWithValues: descriptor.parameters.map { ($0.key, sample($0)) })
+    let binding = Binding(zone: .edge(.top), gesture: gesture, action: descriptor.id, parameters: parameters)
+    try editor.setBinding(binding, in: .default)
+    #expect(try store.load().defaultProfile.bindings.contains(binding), "\(descriptor.id.rawValue)")
   }
 }

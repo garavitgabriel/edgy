@@ -24,7 +24,7 @@ import Testing
   /// Each `GestureSettings` field → an edit to a non-default value inside its limits.
   static let gestureEdits: [String: (inout GestureSettings) -> Void] = [
     "edgeWidthMM": { $0.edgeWidthMM = 10 },
-    "cornerSizeMM": { $0.cornerSizeMM = 10 },
+    "cornerSizeMM": { $0.cornerSizeMM = 14 },
     "dwellMS": { $0.dwellMS = 200 },
     "palmMajorAxisMM": { $0.palmMajorAxisMM = 20 },
     "typingSuppressionMS": { $0.typingSuppressionMS = 800 },
