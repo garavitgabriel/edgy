@@ -256,17 +256,99 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
   - Unanswered, it fades after 15 s and asks again next time, at most 3 times.
   - When the user says No, the inspector's brightness binding gets a second line in `ink2` with a re-enable path: "Off for Desk 34: it ignores brightness commands." · **Turn back on**.
 
-### Test Mode: what it does (needs the owner's call)
+### Test Mode: what it does (decided)
 
 Render D shows real values ("Volume 64%") while Test Mode is on. The runtime as built is a dry run: gestures are recognized but nothing runs.
 
-**The build chief's proposal:** the UI's Test Mode switch shows the overlay **while actions still run**, so you can test in real work and the plates show real values. The dry-run switch stays in the runtime, unused by the UI for now. The design follows the render, so this proposal matches it. **Waiting on the owner's confirmation.**
+**The build chief's proposal:** the UI's Test Mode switch shows the overlay **while actions still run**, so you can test in real work and the plates show real values. The dry-run switch stays in the runtime, unused by the UI for now. **Confirmed by the owner (2026-11-07): Test Mode shows the overlay and actions still run.**
+
+### System states (spec, 2026-11-07)
+
+**Each state is said once per surface, and never in colour.** The glyph changes its *shape*. The popover and the window say it in words, once, beside the thing it affects.
+
+| State | Menu glyph (16 pt template) | Popover | Settings window |
+|---|---|---|---|
+| Normal | Outline plus the heavy right bar | as designed | as designed |
+| Test Mode | + a solid dot inside the outline (≥2 pt) | the Test Mode switch is on | — |
+| **Disabled** (Enabled off) | The whole glyph at 40% opacity (template "off" look) | The mini mirror fades to 40%; the Enabled switch, off, is the statement. No extra line. | The Default tab's Enabled switch is off and the mirror fades to 40%. Editing still works. |
+| **Paused** | The heavy bar becomes two short stacked dashes (a pause shape inside the glyph) | Under the mini mirror, one line: "Paused, 47 min left" with a **Resume** text button. While paused, the list's "Pause for 1 hour" row is hidden. | The mirror fades to 40%, with one line centred on the pad: "Paused, 47 min left" · **Resume**. |
+| **No Accessibility** | The heavy bar becomes a drawn exclamation (a short bar plus a dot) | The top half is replaced by one block: "Edgy needs Accessibility access to run actions." · **Open Settings**. Below it in `ink2`: "Touches still show in Test Mode." The list below is unchanged. | A one-line strip under the tabs, full width, with an info icon in `ink`: the same sentence plus **Open Settings**. It disappears the moment access is granted (the runtime polls). |
+| **No trackpad** | 40% opacity, like Disabled; nothing can fire, so it reads the same | The mini mirror becomes a dashed pad outline at the default proportion, with one line inside: "No trackpad connected". | The mirror becomes the same dashed outline, with "Connect a trackpad to see it here." Bindings stay editable; the pad's zones still draw from the last-known size. |
+
+- **Precedence when several apply:** No Accessibility > No trackpad > Paused > Disabled > Test Mode. The glyph shows the top one only.
+- **Copy:** time left counts down in whole minutes ("47 min left"). Under 1 minute it reads "less than a minute left". There's no clock time, to avoid a 12/24-hour mismatch.
+
+### Onboarding (spec, 2026-11-07; step 2 is in render C)
+
+The same 640 × 520 glass window, with a step row at the top ("1 Accessibility ✓  2 Try it  3 Pick a preset  4 Launch at login"; done steps take a ✓, the current one is semibold). One 26 pt headline (one clause, no colon), at most one body sentence, and the round primary at the bottom right. That round button is the only chunky round control in the app.
+
+**Step 1: Accessibility.**
+- Headline: "Let Edgy run your actions".
+- Body: "Volume and media work without it. Shortcuts, windows and keys need Accessibility access."
+- Primary: **Open Settings**, which opens the system privacy pane.
+- The window watches the permission live. When it turns granted, the step row shows ✓, the body becomes "Access granted.", and the primary becomes **Continue**.
+- A quiet text button, **Skip for now**, continues without access; the No Accessibility state above then applies.
+- *(Before shipping, check the body sentence against the runtime: which actions really need access.)*
+
+**Step 3: Pick a preset.** The headline is "Pick a starting point". Three radio rows, each with a 120 pt mini mirror showing that preset's zones (normal zone shapes), the name, and one line:
+
+| Preset | Line | Bindings (zone, gesture → action id) |
+|---|---|---|
+| **Media** (preselected; = `EdgyConfig.defaults`) | "Volume, brightness and music on the edges." | right slide → `audio.volume` · left slide → `display.brightness` · bottom swipe left → `media.previous` · bottom swipe right → `media.next` · bottom double-tap → `media.playPause` · top-right double-tap → `audio.mute` · top-left double-tap → `mic.mute` |
+| **Windows** | "Volume and brightness, plus window moves on the bottom edge." | right slide → `audio.volume` · left slide → `display.brightness` · bottom swipe left → `window.leftHalf` · bottom swipe right → `window.rightHalf` · bottom swipe up → `window.maximize` · bottom double-tap → `window.center` · top swipe down → `system.missionControl` · top-left double-tap → `system.showDesktop` · top-right double-tap → `audio.mute` |
+| **Minimal** | "Just volume and brightness." | right slide → `audio.volume` · left slide → `display.brightness` |
+
+Primary: **Continue**. One line in `ink2` under the rows: "You can change any of it in Settings." *(MachineDefaults substitutes unavailable actions on this Mac, per the build chief. **Build chief: run every preset binding through `validate`; if a gesture isn't supported on that zone, e.g. a vertical swipe on the bottom or top edge, swap it for a supported one and tell design.**)*
+
+**Step 4: Launch at login.**
+- Headline: "Keep Edgy running".
+- One switch row: "Open Edgy when you log in". It is **on** in onboarding (an explicit choice here; the runtime default stays off for config files).
+- Primary: **Done**.
+- On Done, the window closes and the menu-bar popover opens once, pointing at the glyph, so the user sees where Edgy lives. There's no separate "find me in the menu bar" step.
+
+### Issue states (spec, 2026-11-07)
+
+**Errors, warnings and info are told apart by icon and wording, never by colour** (one hue). Error = an error icon plus `ink` text. Warning = a warning icon plus `ink2`. Info = an info icon plus `ink2`.
+
+- **Error (it blocks the edit):** the edit doesn't apply. The message sits directly under the control that caused it ("Needs a scheme, like https://"). The control keeps the user's input so they can fix it.
+- **`actionUnavailable` (warning; the binding is kept):**
+  - The pad tab shows the action name in `ink2` with a small slashed-circle mark.
+  - The inspector row gets a second line with the availability reason ("Needs a backlit keyboard").
+  - The popover's mini mirror draws that zone as unmapped.
+- **`overlappingZones` (warning):** one line under the split control: "Upper and lower halves both use Swipe up." · **Show**, which selects the second zone.
+- **`settingOutOfRange` (warning):** beside that field in Advanced…: "The config file said 90 mm; using 30 mm."
+- **`tapWaitsForDoubleTap` (info):** the interaction note in bone 7.
+- **The config file is broken when it is reloaded** (this one comes first: put it above No Accessibility in the glyph precedence):
+  - Edgy keeps running the last working settings.
+  - **Glyph:** the exclamation shape.
+  - **Popover:** the top block reads "config.json has an error on line 14: <parser message>. Edgy kept the last working settings." · **Open config file** · **Reload**.
+  - **Window:** a strip under the tabs with the same sentence, plus **Open config file** and **Replace with current settings** (writes the last working config, after a confirm sheet). **The window is read-only while the file is broken**, so nothing silently overwrites the user's edit.
+
+### Picker at catalog scale (spec, 2026-11-07)
+
+- **Layout:**
+  - Single column, at most 420 pt tall, with the header ("Tap, bottom edge") and the search field pinned and the list scrolling.
+  - The search field is focused on open. Arrows and Return work; typing filters.
+- **Groups, in catalog order:** Sound, Display, Media, System, Windows, Apps, Keyboard, Shortcuts. The group headers are the only 11 pt type.
+- **Actions that don't fit the gesture's shape are not listed in their groups.** They collapse into one disclosure row at the end in `ink2`, "6 more need a slide", which expands in place. The search covers them too.
+- **Actions unavailable on this Mac** stay in their group, dimmed (`ink2`, still ≥4.5:1), with the reason as a 13 pt second line ("Needs a backlit keyboard"). They stay selectable, and the binding then carries the `actionUnavailable` warning above.
+- **Limited actions** carry their note as a second line ("Uses the system Control–Left shortcut").
+- **Actions with parameters** end in "…" ("Open App…", "Keyboard Shortcut…"). Choosing one closes the picker and opens its parameter rows in the inspector, with the first field focused or recording.
+- **"Do nothing"** appears only on app tabs, last, after a separator, labelled "Do nothing here".
+
+### Hold actions in Test Mode (spec, 2026-11-07)
+
+- **While held:**
+  - A plate docks at the touched edge: value line (17) "Holding fn", second line (13, `ink2`) "Bottom edge, long-press".
+  - The contact icon is the filled accent contact, static, with no pulse and no glow.
+- **On release:** the value line reads "Released fn" for 0.6 s, then the plate fades out over 200 ms.
+- **If the hold is cancelled** (the finger slides off the zone), the plate reads "Released fn, finger left the zone" and fades the same way.
 
 ### Not yet designed (the sprint drew 8 actions; the real catalog is bigger)
 
 The sprint's renders assumed 8 actions and simple app profiles. The runtime (`docs/settings-reference.md`) has more, and these surfaces still need design. They must follow every rule above:
 
-1. **The picker at catalog scale:** 34 actions in 8 categories (sound, display, media, system, windows, apps, keyboard, shortcuts), unavailable actions greyed out with their reason, and "Do nothing" last in app profiles.
+1. ~~The picker at catalog scale~~ (specced above). Originally: **The picker at catalog scale:** 34 actions in 8 categories (sound, display, media, system, windows, apps, keyboard, shortcuts), unavailable actions greyed out with their reason, and "Do nothing" last in app profiles.
 2. ~~Binding parameter editors~~ (specced above). Originally: **Binding parameter editors** in the inspector: a key-combo recorder (including modifier-only for holds), an app chooser, URL and file-path fields, number and choice controls, a shortcut name, a per-binding haptics toggle, and sensitivity.
 3. ~~App profiles~~ (specced above). Originally: **App profiles:**
    - Inheriting rows showing their source (inherited / overridden / turned off / app-only), with Turn off and Revert actions.
@@ -274,10 +356,10 @@ The sprint's renders assumed 8 actions and simple app profiles. The runtime (`do
    - The add-app flow (choose the app; inherit / copy default / empty).
    - Converting a legacy full-replace profile.
 4. **The Advanced… sheet:** gesture tuning (edge width, corner size, dwell, palm size, typing suppression, double-tap window, long-press, fingers) and haptics (events, tick and click strength).
-5. **Issue states:** errors that block an edit, warnings (`actionUnavailable`, `overlappingZones`, `settingOutOfRange`), info notes (`tapWaitsForDoubleTap`, already designed as the conflict note), and a broken config file on reload.
-6. **System states:** missing Accessibility permission, paused (with the time left), no trackpad attached, and disabled. Each appears in the popover, the glyph and the window.
-7. **Onboarding steps 1, 3 and 4:** the permission grant, picking a preset, launch at login.
-8. **A hold action in Test Mode and the overlay:** long-press push-to-talk (down/up).
+5. ~~Issue states~~ (specced above). Originally: **Issue states:** errors that block an edit, warnings (`actionUnavailable`, `overlappingZones`, `settingOutOfRange`), info notes (`tapWaitsForDoubleTap`, already designed as the conflict note), and a broken config file on reload.
+6. ~~System states~~ (specced above). Originally: **System states:** missing Accessibility permission, paused (with the time left), no trackpad attached, and disabled. Each appears in the popover, the glyph and the window.
+7. ~~Onboarding steps 1, 3 and 4~~ (specced above). Originally: **Onboarding steps 1, 3 and 4:** the permission grant, picking a preset, launch at login.
+8. ~~A hold action in Test Mode~~ (specced above). Originally: **A hold action in Test Mode and the overlay:** long-press push-to-talk (down/up).
 
 ### Open for the G1 cut list (decide on the device)
 
