@@ -82,6 +82,6 @@ private func placement(for descriptor: ActionDescriptor) -> (Zone, GestureKind) 
     #expect(zone.supports(gesture))
     #expect(
       validator.validate(Binding(zone: zone, gesture: .slide, action: descriptor.id)).map(\.code)
-        .contains(.shapeMismatch) == (descriptor.shape == .trigger))
+        .contains(.shapeMismatch) == (descriptor.shape != .continuous))
   }
 }
