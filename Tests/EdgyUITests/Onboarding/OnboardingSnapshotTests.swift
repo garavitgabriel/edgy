@@ -7,13 +7,14 @@ import Testing
 @testable import EdgyUI
 
 /// Snapshots for review against `docs/design/final/26F-1TVB-C.png` and `supp/26F-SUPP-S6/S7.png`.
-/// Written to `docs/design/build-shots/batch-19/<name>-<light|dark>.png` at the window's 640 × 520.
+/// Written to `docs/design/build-shots/batch-19/<name>-<light|dark>.png` at the window's 640 × 520;
+/// shots new in batch 24 (critique 19) go to `batch-24/`.
 @MainActor
 @Suite(.serialized)
 struct OnboardingSnapshotTests {
-  private func shoot(_ state: OnboardingState, _ name: String) throws {
+  private func shoot(_ state: OnboardingState, _ name: String, folder: String = "batch-19") throws {
     try Snapshot.write(
-      OnboardingView(model: state.model, state: state), folder: "batch-19", name: name,
+      OnboardingView(model: state.model, state: state), folder: folder, name: name,
       size: OnboardingMetrics.windowSize)
   }
 
@@ -44,8 +45,21 @@ struct OnboardingSnapshotTests {
     state.primary()
     model.simulate(MirrorFixtures.touch(0.975, 0.62, .claimed))
     state.receive([OnboardingFixtures.rightSlide])
-    #expect(state.canContinue)
+    #expect(state.isDone(.tryIt))
     try shoot(state, "step2-after-slide")
+  }
+
+  /// Ruling 3: the struck contact on the right edge and the one dark plate beside the mirror.
+  @Test func step2RejectedSlide() throws {
+    let model = OnboardingFixtures.model()
+    let state = OnboardingState(model: model)
+    state.setAccessibility(.granted)
+    state.primary()
+    model.simulate(MirrorFixtures.touch(0.975, 0.55, .rejected))
+    state.receive([OnboardingFixtures.tooShort])
+    #expect(state.rejection?.title == "Ignored: swipe too short, 4 mm, needs 6 mm")
+    #expect(!state.isDone(.tryIt))
+    try shoot(state, "step2-rejected", folder: "batch-24")
   }
 
   @Test(arguments: Presets.Preset.allCases)

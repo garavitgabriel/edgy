@@ -30,8 +30,10 @@ public struct OnboardingActions: Sendable {
 ///   flips the body to "Access granted." and the primary to Continue; **Skip for now** continues
 ///   without it.
 /// - **Step 2** reads `model.recentDecisions` without taking them (the overlay owns
-///   `takeDecisions()`); Continue enables once a slide is recognized on the right edge, and stays
-///   enabled.
+///   `takeDecisions()`), counting only decisions that arrive after the step opens (a baseline is
+///   taken on every entry). Continue is always enabled; a slide recognized on the right edge only
+///   adds the step's check mark (critique 19 ruling 2). A rejected touch on the right edge shows
+///   the one dark plate beside the mirror (ruling 3), until a slide lands or the step closes.
 /// - **Step 3** applies the chosen preset at once through `SettingsEditor.applyPreset` (which runs
 ///   it through `MachineDefaults`). Every choice made while the step is open is one continuous
 ///   edit, so the whole step is **one undo step**, however often the user changes their mind.
@@ -63,8 +65,11 @@ public final class OnboardingState {
   public private(set) var step: Step = .accessibility
   /// The live Accessibility permission (`.unknown` until a checker reports).
   public private(set) var accessibility: PermissionState = .unknown
-  /// A slide was recognized on the right edge since onboarding opened (step 2's gate).
+  /// A slide was recognized on the right edge while step 2 was open (step 2's check mark).
   public private(set) var slideRecognized = false
+  /// The plate for the last right-edge rejection on step 2 (`nil` = no plate). Cleared when a
+  /// slide lands and when the step closes.
+  public private(set) var rejection: PlateContent?
   /// Step 3's radio choice. Media is preselected (`EdgyConfig.defaults`).
   public private(set) var preset: Presets.Preset = .media
   /// Step 4's switch: on in onboarding (an explicit choice; the runtime default stays off).
@@ -78,6 +83,8 @@ public final class OnboardingState {
   /// Runs before `actions.finish` (the controller closes the window).
   @ObservationIgnored var beforeFinish: (@MainActor () -> Void)?
   @ObservationIgnored private var watching = false
+  /// `model.recentDecisions` as last read; decisions past it are new (the step-2 baseline).
+  @ObservationIgnored private var seenDecisions: [LiveDecision] = []
   @ObservationIgnored private let logger: EdgyLogging = SystemLogger(category: "onboarding")
 
   public init(model: SettingsModel, actions: OnboardingActions = .none) {
@@ -89,31 +96,20 @@ public final class OnboardingState {
 
   public var isAccessibilityGranted: Bool { accessibility == .granted }
 
-  /// A step is done once passed. Step 1 counts only when access is granted (skipping isn't done),
-  /// and shows its check mark the moment access is granted, even while it is the current step.
+  /// A step is done once passed. Steps 1 and 2 count only for what they teach: step 1 when access
+  /// is granted, step 2 when a right-edge slide landed (skipping or continuing past isn't done).
+  /// Both show their check mark the moment it happens, even while they are the current step.
   public func isDone(_ step: Step) -> Bool {
-    if step == .accessibility { return isAccessibilityGranted }
-    return step < self.step
-  }
-
-  /// Step 2 has something to try: the Default profile slides on the right edge.
-  public var hasTaughtSlide: Bool {
-    _ = model.revision
-    return model.editor.effectiveBindings(forApp: nil).contains {
-      $0.binding.gesture == .slide && Self.isRightEdge($0.binding.zone)
-    }
-  }
-
-  /// Whether the primary button works on the current step.
-  public var canContinue: Bool {
     switch step {
-    case .tryIt:
-      // Nothing to try without a trackpad or a right-edge slide: don't trap the user.
-      return slideRecognized || model.mirroredDevice == nil || !hasTaughtSlide
-    case .accessibility, .preset, .launchAtLogin:
-      return true
+    case .accessibility: return isAccessibilityGranted
+    case .tryIt: return slideRecognized
+    case .preset, .launchAtLogin: return step < self.step
     }
   }
+
+  /// Whether the primary button works on the current step: always (critique 19 ruling 2; nobody
+  /// gets stuck on Try it, with or without a trackpad, after Skip for now or not).
+  public var canContinue: Bool { true }
 
   /// The round primary's title.
   public var primaryTitle: String {
@@ -139,7 +135,8 @@ public final class OnboardingState {
     model.startFeed()
     guard !watching else { return }
     watching = true
-    receive(model.recentDecisions)
+    // Everything already in the feed predates step 2; only later decisions count.
+    seenDecisions = model.recentDecisions
     watchDecisions()
   }
 
@@ -149,7 +146,6 @@ public final class OnboardingState {
     case .accessibility:
       if isAccessibilityGranted { go(to: .tryIt) } else { actions.openAccessibilitySettings() }
     case .tryIt:
-      guard canContinue else { return }
       go(to: .preset)
     case .preset:
       apply(preset)
@@ -181,10 +177,22 @@ public final class OnboardingState {
     accessibility = state
   }
 
-  /// Decisions from the feed; a recognized right-edge slide opens step 2's gate.
+  /// Decisions that arrived from the feed. They count only while step 2 is open: a recognized
+  /// right-edge slide adds the check mark and clears the plate; a right-edge rejection shows its
+  /// plate ("Ignored: swipe too short, 4 mm, needs 6 mm").
   public func receive(_ decisions: [LiveDecision]) {
-    guard !slideRecognized else { return }
-    if decisions.contains(where: Self.isTaughtSlide) { slideRecognized = true }
+    guard step == .tryIt else { return }
+    for decision in decisions {
+      if Self.isTaughtSlide(decision) {
+        slideRecognized = true
+        rejection = nil
+      } else if case .rejected(_, let zone?, _, _, _) = decision, Self.isRightEdge(zone),
+        let plate = PlateContent.from(
+          decision, catalog: model.mirrorCatalog, context: PlateContext.current(model: model))
+      {
+        rejection = plate
+      }
+    }
   }
 
   /// The window closed (Done, or the close button): end any open preset edit.
@@ -197,6 +205,18 @@ public final class OnboardingState {
   static func isRightEdge(_ zone: Zone) -> Bool {
     if case .edge(.right, _, _) = zone { return true }
     return false
+  }
+
+  /// The decisions in `current` that came after `seen`. `recentDecisions` is a capped rolling
+  /// suffix, so `current` is `(seen + new).suffix(limit)`: the new ones follow the longest run
+  /// where `seen`'s tail is `current`'s head. When that is ambiguous (a repeated pattern), the
+  /// longest run is taken, so a decision from before the baseline is never counted as new.
+  static func newDecisions(seen: [LiveDecision], current: [LiveDecision]) -> ArraySlice<LiveDecision> {
+    for overlap in stride(from: min(seen.count, current.count), through: 1, by: -1)
+    where seen.suffix(overlap).elementsEqual(current.prefix(overlap)) {
+      return current.dropFirst(overlap)
+    }
+    return current[...]
   }
 
   /// A slide on the right edge that the engine recognized (or ran, or would have run).
@@ -215,7 +235,10 @@ public final class OnboardingState {
   private func go(to next: Step) {
     guard next != step else { return }
     if step == .preset { endPresetEdit() }
+    if step == .tryIt { rejection = nil }
     step = next
+    // The baseline: decisions already seen never count on step 2 (critique 19 fix list 2).
+    if next == .tryIt { seenDecisions = model.recentDecisions }
     if next == .preset { model.editor.beginContinuousEdit(Self.presetEditKey) }
   }
 
@@ -246,17 +269,25 @@ public final class OnboardingState {
     }
   }
 
-  /// Re-reads `pendingDecisions` after every change, without taking them.
+  /// Re-reads `recentDecisions` after every change, without taking them, and passes on only the
+  /// ones that are new since the last read.
   private func watchDecisions() {
     withObservationTracking {
       _ = model.recentDecisions
     } onChange: { [weak self] in
       Task { @MainActor in
         guard let self else { return }
-        self.receive(self.model.recentDecisions)
+        self.readNewDecisions()
         self.watchDecisions()
       }
     }
+  }
+
+  private func readNewDecisions() {
+    let current = model.recentDecisions
+    let fresh = Self.newDecisions(seen: seenDecisions, current: current)
+    seenDecisions = current
+    if !fresh.isEmpty { receive(Array(fresh)) }
   }
 }
 

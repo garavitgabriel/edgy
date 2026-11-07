@@ -68,15 +68,35 @@ public struct OnboardingView: View {
   private var content: some View {
     switch state.step {
     case .accessibility:
-      OnboardingMirror(model: model, box: OnboardingMetrics.accessibilityMirrorBox)
+      OnboardingMirror(model: model, illustration: true)
     case .tryIt:
-      // The system's own volume indicator carries the level beside the window (bone 8); Edgy
-      // draws nothing next to the mirror.
-      OnboardingMirror(model: model, box: OnboardingMetrics.tryItMirrorBox, onlyTaughtZone: true)
+      tryIt
     case .preset:
       presets
     case .launchAtLogin:
       launchRow
+    }
+  }
+
+  /// The mirror and, under its right edge, the plate slot. A landed slide draws nothing here: the
+  /// system's own volume indicator carries the level wherever the system puts it (bone 8, ruling
+  /// 4). A rejected touch shows the one dark plate (bone 9, ruling 3): the struck contact on the
+  /// mirror and "Ignored: …" beside it. The slot is always reserved, so the mirror never moves.
+  private var tryIt: some View {
+    VStack(alignment: .trailing, spacing: OnboardingMetrics.plateGap) {
+      OnboardingMirror(model: model, onlyTaughtZone: true)
+      // A zero-width slot at the mirror's right edge: the plate (wider than the mirror) hangs
+      // from it without widening the stack, so the mirror never moves when a plate appears.
+      Color.clear
+        .frame(width: 0, height: OnboardingMetrics.plateSlotHeight)
+        .overlay(alignment: .topTrailing) {
+          if let plate = state.rejection {
+            PlateView(plate)
+              .fixedSize()
+              .transition(.opacity)
+          }
+        }
+        .animation(OnboardingMotion.plate, value: state.rejection)
     }
   }
 
@@ -104,7 +124,8 @@ public struct OnboardingView: View {
           .labelsHidden()
           .tint(Tokens.accent)
       }
-      .frame(width: OnboardingMetrics.switchRowWidth)
+      // Full width: the switch's right edge lines up with Done's (critique 19 should-fix 4).
+      .frame(maxWidth: .infinity)
       .padding(.top, 20)
       Spacer()
     }
@@ -113,7 +134,7 @@ public struct OnboardingView: View {
 
   private var footer: some View {
     HStack(alignment: .bottom) {
-      VStack(alignment: .leading, spacing: 18) {
+      VStack(alignment: .leading, spacing: OnboardingMetrics.noteGap) {
         if state.step == .preset {
           Text(OnboardingCopy.presetNote)
             .font(Tokens.font(Tokens.typeBody))
@@ -132,4 +153,9 @@ public struct OnboardingView: View {
         .keyboardShortcut(.defaultAction)
     }
   }
+}
+
+/// Onboarding's one animation: the step-2 plate's fade (the overlay's 200 ms).
+enum OnboardingMotion {
+  static let plate = Animation.easeOut(duration: 0.2)
 }

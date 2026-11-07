@@ -55,6 +55,11 @@ enum OnboardingFixtures {
   static let rightSlide = LiveDecision.recognized(
     zone: .edge(.right), kind: .slide, phase: .began, deviceID: PreviewFixtures.externalPad.id)
 
+  /// BRIEF bone 4's "too short" row, on the right edge.
+  static let tooShort = LiveDecision.rejected(
+    contactID: 1, zone: .edge(.right), reason: .tooFast, deviceID: PreviewFixtures.externalPad.id,
+    measure: RejectionMeasure(measured: 4, limit: 6, unit: .mm))
+
   static func decisions(_ decisions: [LiveDecision]) -> LiveFeedUpdate {
     LiveFeedUpdate(touches: nil, decisions: decisions)
   }
@@ -157,14 +162,16 @@ enum OnboardingFixtures {
     #expect(state.quietTitle == "Skip for now")
   }
 
-  @Test func continueWaitsForARecognizedRightEdgeSlideFromTheFeed() async {
+  /// Critique 19 ruling 2: Continue is always enabled; the feed's right-edge slide only adds the
+  /// step's check mark (this test used to assert the old Continue gate).
+  @Test func theCheckMarkWaitsForARecognizedRightEdgeSlideFromTheFeed() async {
     let model = OnboardingFixtures.model()
     let state = OnboardingState(model: model)
     state.start()
     state.quiet()
-    #expect(!state.canContinue)
-    state.primary()
     #expect(state.step == .tryIt)
+    #expect(state.canContinue)
+    #expect(!state.isDone(.tryIt))
 
     model.simulate(
       OnboardingFixtures.decisions([
@@ -172,18 +179,112 @@ enum OnboardingFixtures {
         .recognized(zone: .edge(.right), kind: .swipe(.up), phase: .ended, deviceID: 1),
         .rejected(contactID: 3, zone: .edge(.right), reason: .palm, deviceID: 1),
       ]))
-    await OnboardingFixtures.settle()
-    #expect(!state.canContinue)
+    await OnboardingFixtures.settle { state.rejection != nil }
+    #expect(!state.slideRecognized)
+    #expect(!state.isDone(.tryIt))
+    #expect(state.rejection?.title == "Ignored: palm")
 
     model.simulate(OnboardingFixtures.decisions([OnboardingFixtures.rightSlide]))
     await OnboardingFixtures.settle { state.slideRecognized }
     #expect(state.slideRecognized)
-    #expect(state.canContinue)
+    #expect(state.isDone(.tryIt))
+    #expect(state.rejection == nil)
     // Read, not taken: the overlay's channel is untouched.
     #expect(model.pendingDecisions.count == 4)
 
     state.primary()
     #expect(state.step == .preset)
+    #expect(state.isDone(.tryIt))
+  }
+
+  /// Fix list 2: decisions from before step 2 opened never count (a baseline on entry).
+  @Test func slidesBeforeTryItOpensDoNotCount() async {
+    let model = OnboardingFixtures.model()
+    let state = OnboardingState(model: model)
+    state.start()
+    model.simulate(
+      OnboardingFixtures.decisions([
+        OnboardingFixtures.rightSlide,
+        .rejected(contactID: 3, zone: .edge(.right), reason: .palm, deviceID: 1),
+      ]))
+    await OnboardingFixtures.settle()
+    #expect(state.step == .accessibility)
+    state.quiet()
+    await OnboardingFixtures.settle()
+    #expect(!state.slideRecognized)
+    #expect(state.rejection == nil)
+
+    model.simulate(OnboardingFixtures.decisions([OnboardingFixtures.rightSlide]))
+    await OnboardingFixtures.settle { state.slideRecognized }
+    #expect(state.isDone(.tryIt))
+  }
+
+  /// The baseline holds when the rolling `recentDecisions` (capped) has already wrapped, and a
+  /// slide that arrives while the step is open still counts.
+  @Test func theBaselineSurvivesTheCappedFeed() async {
+    let model = OnboardingFixtures.model()
+    let state = OnboardingState(model: model)
+    state.start()
+    let noise = LiveDecision.recognized(zone: .edge(.left), kind: .slide, phase: .began, deviceID: 1)
+    let limit = SettingsModel.recentDecisionLimit
+    model.simulate(OnboardingFixtures.decisions(Array(repeating: OnboardingFixtures.rightSlide, count: limit + 8)))
+    await OnboardingFixtures.settle()
+    state.quiet()
+    model.simulate(OnboardingFixtures.decisions(Array(repeating: noise, count: limit + 8)))
+    await OnboardingFixtures.settle()
+    #expect(!state.slideRecognized)
+
+    model.simulate(OnboardingFixtures.decisions([OnboardingFixtures.rightSlide] + Array(repeating: noise, count: 4)))
+    await OnboardingFixtures.settle { state.slideRecognized }
+    #expect(state.slideRecognized)
+  }
+
+  @Test func newDecisionsFollowTheOverlapWithWhatWasSeen() {
+    let a = LiveDecision.recognized(zone: .edge(.left), kind: .slide, phase: .began, deviceID: 1)
+    let b = LiveDecision.recognized(zone: .edge(.left), kind: .slide, phase: .ended, deviceID: 1)
+    let c = OnboardingFixtures.rightSlide
+    #expect(Array(OnboardingState.newDecisions(seen: [], current: [a, b])) == [a, b])
+    #expect(Array(OnboardingState.newDecisions(seen: [a, b], current: [a, b])).isEmpty)
+    #expect(Array(OnboardingState.newDecisions(seen: [a, b], current: [a, b, c])) == [c])
+    // Rolled: the cap dropped `a`.
+    #expect(Array(OnboardingState.newDecisions(seen: [a, b], current: [b, c])) == [c])
+    // Nothing in common: everything is new.
+    #expect(Array(OnboardingState.newDecisions(seen: [a, b], current: [c, c])) == [c, c])
+  }
+
+  /// Ruling 3: a rejected slide on step 2 shows the one plate with bone 4's copy.
+  @Test func aRejectedRightEdgeSlideShowsTheIgnoredPlate() {
+    let state = OnboardingFixtures.state(at: .tryIt, model: OnboardingFixtures.model())
+    state.receive([OnboardingFixtures.tooShort])
+    #expect(state.rejection?.title == "Ignored: swipe too short, 4 mm, needs 6 mm")
+    #expect(state.rejection?.mark == .rejected)
+    #expect(state.rejection?.kind == .rejected)
+
+    // A slide lands: the plate goes, the check mark comes.
+    state.receive([OnboardingFixtures.rightSlide])
+    #expect(state.rejection == nil)
+    #expect(state.isDone(.tryIt))
+
+    // Leaving the step clears a plate.
+    state.receive([OnboardingFixtures.tooShort])
+    #expect(state.rejection != nil)
+    state.primary()
+    #expect(state.rejection == nil)
+  }
+
+  @Test func onlyRightEdgeRejectionsOnTryItShowAPlate() {
+    let model = OnboardingFixtures.model()
+    let state = OnboardingState(model: model)
+    // Not on step 2 yet: nothing counts.
+    state.receive([OnboardingFixtures.tooShort])
+    #expect(state.rejection == nil)
+    state.quiet()
+    state.receive([
+      .rejected(contactID: 4, zone: .edge(.left), reason: .palm, deviceID: 1),
+      .rejected(contactID: 5, zone: nil, reason: .palm, deviceID: 1),
+      .rejected(contactID: 6, zone: .edge(.right), reason: .startedOutsideZone, deviceID: 1),
+    ])
+    #expect(state.rejection == nil)
   }
 
   @Test func theGateCountsSlidesOnTheRightEdgeOnly() {
@@ -199,22 +300,39 @@ enum OnboardingFixtures {
       !OnboardingState.isTaughtSlide(.recognized(zone: .corner(.topRight), kind: .tap, phase: .ended, deviceID: 1)))
   }
 
-  @Test func theGateStaysOpenAfterGoingBack() {
+  @Test func theCheckMarkStaysAfterGoingBack() {
     let state = OnboardingFixtures.state(at: .tryIt, model: OnboardingFixtures.model())
     state.receive([OnboardingFixtures.rightSlide])
     state.quiet()
+    #expect(state.isDone(.tryIt))
     state.quiet()
     #expect(state.step == .tryIt)
+    #expect(state.isDone(.tryIt))
     #expect(state.canContinue)
   }
 
-  @Test func withoutATrackpadTryItDoesNotTrapTheUser() {
+  /// Ruling 2: Try it never traps the user, with a trackpad or without one (this test used to
+  /// assert the no-trackpad escape from the old gate).
+  @Test func continueIsAlwaysEnabledOnTryIt() {
     let model = OnboardingFixtures.model()
     let state = OnboardingFixtures.state(at: .tryIt, model: model)
-    #expect(!state.canContinue)
+    #expect(model.mirroredDevice != nil)
+    #expect(state.canContinue)
     model.simulate(EngineStatus(running: true, devices: []))
     #expect(model.mirroredDevice == nil)
     #expect(state.canContinue)
+    state.primary()
+    #expect(state.step == .preset)
+    #expect(!state.isDone(.tryIt))
+  }
+
+  /// Should-fix 1: steps 1 and 2 draw the pad at one scale.
+  @Test func stepsOneAndTwoShareOneScale() {
+    let model = OnboardingFixtures.model()
+    let size = OnboardingMirror.sensorSize(model)
+    let scale = OnboardingMirror.pointsPerMM(for: size)
+    #expect(abs(scale - 230.0 / 115.0) < 0.001)
+    #expect(size.width * scale <= OnboardingMetrics.mirrorBox.width)
   }
 
   @Test func choosingAPresetAppliesItAndTheStepIsOneUndoStep() throws {

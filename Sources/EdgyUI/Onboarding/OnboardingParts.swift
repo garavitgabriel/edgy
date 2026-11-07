@@ -14,20 +14,27 @@ enum OnboardingMetrics {
   static let stepMarkSize: CGFloat = 22
   static let headlineTop: CGFloat = 26
   static let bodyTop: CGFloat = 8
-  /// The largest box the live mirror may fill, per step (the pad keeps its real proportion).
-  static let tryItMirrorBox = CGSize(width: 440, height: 262)
-  static let accessibilityMirrorBox = CGSize(width: 380, height: 214)
+  /// The one box steps 1 and 2 fit the pad into, so both draw it at the same scale (critique 19
+  /// should-fix 1; BRIEF § Onboarding "one scale"). Sized by step 1 (which has a body line) and
+  /// step 2 (which keeps room for the rejection plate under the mirror). For a 160 × 115 mm pad it
+  /// is 2.0 pt/mm (320 × 230 pt).
+  static let mirrorBox = CGSize(width: 360, height: 230)
+  /// Step 2's plate slot under the mirror, reserved even when empty so the mirror never jumps.
+  static let plateGap: CGFloat = 12
+  static let plateSlotHeight: CGFloat = 54
   static let primaryHeight: CGFloat = 50
   static let primaryMinWidth: CGFloat = 140
   static let primaryPadding: CGFloat = 30
   /// Step 3's mini mirrors (BRIEF: "a 120 pt mini mirror").
   static let presetMirrorWidth: CGFloat = 120
-  static let presetRowPadding: CGFloat = 5
-  static let presetRowSpacing: CGFloat = 2
+  /// Inside each preset row, above and below the mini mirror (critique 19 should-fix 5).
+  static let presetRowPadding: CGFloat = 8
+  static let presetRowSpacing: CGFloat = 0
+  /// Step 3: "You can change any of it in Settings." to Back.
+  static let noteGap: CGFloat = 10
   static let radioSize: CGFloat = 18
   static let radioDot: CGFloat = 8
-  static let switchRowWidth: CGFloat = 380
-  /// A control that can't be used yet (Continue before the slide).
+  /// A disabled primary (none today: Continue is always enabled, critique 19 ruling 2).
   static let disabledOpacity = 0.4
   static let pressedOpacity = 0.85
   static let doneWash = 0.1
@@ -115,26 +122,39 @@ struct OnboardingQuietStyle: ButtonStyle {
 }
 
 /// The live pad on steps 1 and 2: the mirror's own drawing (`MirrorPad`, zones from
-/// `PadLayout`), fitted into the step's box at the pad's real proportion. `PadMirrorView` draws at
-/// the settings window's 3.7 pt/mm, which doesn't fit a 640 × 520 window, and scaling it down
-/// would take its labels under 13 pt; drawing the same pad at a fitted scale keeps them at 13.
+/// `PadLayout`), fitted into `OnboardingMetrics.mirrorBox` at the pad's real proportion, the
+/// same scale on both steps. `PadMirrorView` draws at the settings window's 3.7 pt/mm, which
+/// doesn't fit a 640 × 520 window, and scaling it down would take its labels under 13 pt; drawing
+/// the same pad at a fitted scale keeps them at 13.
 ///
-/// `onlyTaughtZone` (step 2, render C): only the right edge is drawn as mapped, every other zone
-/// as unmapped, so the one thing to try stands out. Presentation only; the config is untouched.
+/// - `illustration` (step 1): zone shapes and corner icons only, no label tabs or in-bar text
+///   (critique 19 ruling 1; BRIEF § Onboarding).
+/// - `onlyTaughtZone` (step 2, render C): only the right edge is drawn as mapped, every other zone
+///   as unmapped, so the one thing to try stands out. Presentation only; the config is untouched.
 struct OnboardingMirror: View {
   let model: SettingsModel
-  let box: CGSize
+  var illustration = false
   var onlyTaughtZone = false
+
+  /// The pad's size on screen; one scale for every onboarding mirror.
+  static func pointsPerMM(for sizeMM: Size2D) -> CGFloat {
+    let box = OnboardingMetrics.mirrorBox
+    return min(box.width / sizeMM.width, box.height / sizeMM.height)
+  }
+
+  static func sensorSize(_ model: SettingsModel) -> Size2D {
+    model.mirroredDevice?.sensorSizeMM ?? model.lastKnownPadSizeMM ?? MirrorGeometry.defaultSensorSizeMM
+  }
 
   var body: some View {
     let state = model.mirrorState(forApp: nil, includesPaused: false)
     let device = model.mirroredDevice
-    let sizeMM = device?.sensorSizeMM ?? model.lastKnownPadSizeMM ?? MirrorGeometry.defaultSensorSizeMM
-    let scale = min(box.width / sizeMM.width, box.height / sizeMM.height)
-    let geometry = MirrorGeometry(sensorSizeMM: sizeMM, settings: model.editor.config.gestures, pointsPerMM: scale)
+    let sizeMM = Self.sensorSize(model)
+    let geometry = MirrorGeometry(
+      sensorSizeMM: sizeMM, settings: model.editor.config.gestures, pointsPerMM: Self.pointsPerMM(for: sizeMM))
     MirrorPad(
       geometry: geometry, zones: zones, selected: nil, touches: device == nil ? [] : model.liveTouches,
-      faded: state.faded, dashedOutline: state == .noTrackpad,
+      faded: state.faded, dashedOutline: state == .noTrackpad, showsLabels: !illustration,
       message: state == .noTrackpad ? MirrorMessage(text: MirrorCopy.noTrackpadWindow) : nil
     )
     .id(device?.id)
