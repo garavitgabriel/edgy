@@ -168,6 +168,18 @@ git grep -niE -f ~/.config/edgy-names-denylist         → nothing (exit 1)
 - Recorder feel: the 0.6 s modifiers-alone threshold, and that recording really swallows keys, on a real keyboard with the live recorder.
 - Gesture icon legibility at real size (16 pt, 1.5 pt stroke), especially swipe up vs down.
 
+## What remains (turn limit reached)
+
+- **The `/builder-close` clause "commit ONLY your own vault return file" is not met.**
+  - The vault's `sync-vault.sh` commit d74b1ba (pushed) also swept in 15 files other sessions had left uncommitted: `hot.md`, `index.md`, `log.md`, `planning/decisions-log.md`, Edgy venture files, wiki concepts and others.
+  - Undoing it means either rewriting vault history (forbidden) or a revert commit that would strip the other sessions' work.
+  - **Gabriel decided (2026-11-07): leave it.** The sweep is accepted as the vault sync script's own behaviour; nothing is reverted.
+- Everything else in the goal holds:
+  - build, test and strict lint pass on the final code
+  - the token greps and the denylist print nothing
+  - every listed shot exists in light and dark
+  - the bones checklist and the reader-first review are above
+
 ## Open questions
 
 1. ~~**Picker height:**~~ **Resolved after merge.** The chief decided to cap the picker at the pad's interior. The follow-up commit makes `PickerPlacement.place` shorten the picker until it clears its zone and every other zone, with min(420, mirror − 16) as the upper bound and 200 pt as the floor. Tested on a to-scale 3.7 pt/mm pad (`onAShortPadThePickerShrinksBetweenTheBars`).
