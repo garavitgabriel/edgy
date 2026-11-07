@@ -420,14 +420,16 @@ Primary: **Continue**. One line in `ink2` under the rows: "You can change any of
 ### Window identity and Advanced (spec, 2026-11-07, from the owner's hardware notes)
 
 **Brand in the window.** The owner said: "I don't see any logo or anything to recognize our app when open." Decision: **(a) + (c)**.
-- **(a) Title bar: the app icon only** (owner's ruling on device, 2026-11-07, replacing "18 pt icon + Edgy wordmark": the word added nothing and the small icon read as a pale square).
-  - **Size:** **26 pt**, the height of the profile-tab pill. At that size it renders from the small drawing (under 128 px, no rust dot).
-  - **Position:** 12 pt after the last traffic light, at the title bar's leading edge. Its **vertical centre lines up with the tab pill's centre**, not the traffic lights'.
-  - **No wordmark.** On hover, a standard tooltip reads "Edgy", and the accessibility label is "Edgy". It isn't clickable and has no hover wash.
-  - **Edge:** in light mode, a 0.5 pt `rgba(59,34,25,.18)` outline so the pale tile separates from the light glass. In dark mode there's no outline (the pale tile already separates). No shadow beyond the icon's own.
-  - Use the **V3 "Lit strip"** icon. The pale-square impression came from a pre-V3 build; re-judge on the rebuilt app.
+- **(a) Title bar: the Edgy mark** (owner's ruling on device, 2026-11-07, replacing the 26 pt app icon, which read as "too small, doesn't follow the design, should be clean without background": a pale tile floating on dark glass).
+  - **The mark** is the V3 "Lit strip" shape (the solid pad plus its cut-out lit strip) drawn **alone, with no tile**, filled in **`ink`** like the rest of the UI. The lit strip is `ink` too, not accent: accent means live, and the Enabled switch already says that (bone 8).
+  - **Size:** **18 pt tall × about 26 pt wide** (the 16:11 proportion), so it fills the tab pill's height minus its padding. One size in light and dark.
+  - **Position:** 12 pt after the last traffic light, with its vertical centre on the tab pill's centre.
+  - **No wordmark, no states:** the mark never shows the Test Mode hole or other glyph states. Those belong to the menu-bar glyph. Tooltip and accessibility label "Edgy"; not clickable.
+  - **Light and dark:** just `ink` in each appearance (`#3B2219` / `#FBEADB`). No outline, no shadow.
+  - **Asset:** `docs/design/assets/mark-edgy.pdf` and `svg/mark-edgy.svg` (the same vector as `glyph-normal`), drawn as a non-template image tinted with `ink` at 26 × 18 pt.
+  - Earlier ruling (b), "glyph alone is a status symbol", is superseded by the owner's taste call. It's kept distinct from the menu glyph by colour (`ink`, not system template), by size, and by never changing state.
 - **(c) Dock and app switcher:** while the Settings window (or onboarding) is open, Edgy shows in the Dock and the app switcher with its real icon. When the last window closes, it goes back to menu-bar only.
-- The glyph alone (b) was rejected: it's a status symbol, not an identity.
+- (b) was first rejected as a status symbol, then adopted as the stateless ink mark above (owner, 2026-11-07).
 
 **Advanced… is a quiet text button in the footer.**
 - **Keep it in the footer:** it is app-wide like Haptics, Launch at login and HUD, so it belongs in their row, not in the title bar (that's for identity and the global switch) and not as a tab (tabs are profiles).

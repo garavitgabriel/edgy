@@ -44,3 +44,6 @@ Exported 2026-11-07 from the final design source. The menu glyph and the app-ico
 
 - Glyph PDFs: each `svg/glyph-<state>.svg` converted by a small script that writes the SVG paths as PDF vector operators (arcs become Bézier curves; `fill-rule="evenodd"` becomes the even-odd fill `f*`, so the Test Mode hole stays open), page set to the viewBox exactly. Each PDF was rasterized back to check that the strip, the hole and the page background are transparent. Headless Chrome's print-to-PDF was tried first and rejected: it gave a 16.08 × 11.04 pt page with a 0.9993 scale.
 - Icon PNGs: headless Chrome screenshots of the SVG at each native pixel size (`--force-device-scale-factor=1`, transparent default background), then `iconutil`.
+
+## Identity mark (title bar)
+- `mark-edgy.pdf` and `svg/mark-edgy.svg`: the V3 "Lit strip" shape, the same vector as `glyph-normal`. It's drawn as a **non-template** image tinted with `ink` (`#3B2219` light / `#FBEADB` dark) at **26 × 18 pt** in the settings window's title bar. It is stateless: it never shows the Test Mode hole or other glyph states. See BRIEF § Window identity (a).
