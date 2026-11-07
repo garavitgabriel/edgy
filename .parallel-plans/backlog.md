@@ -33,4 +33,4 @@ Items found in testing or left open by builders, to fold into a future round.
 
 ## From batch 24
 - `SettingsModel.decisionSerial` (monotonic) so onboarding step 2 counts new decisions exactly (today: overlap inference, can only miss a decision repeating a full 32-window).
-- Design question: does the rejected (struck) mark on a plate also take the cream rim? Today only filled/dry-run contacts do.
+- ~~Rejected mark rim?~~ Resolved by design: no rim on the struck mark (ink2 on the dark plate already clears 3:1); PlateView stays as is.
