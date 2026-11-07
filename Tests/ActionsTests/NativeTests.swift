@@ -358,15 +358,18 @@ private let panel = DisplayInfo(id: 1, name: "Built-in Display", kind: .builtIn,
 
 @Suite struct AppSwitcherTests {
   static let id: ActionID = "apps.switcher"
+  /// These tests pin the stroke-at-a-time switcher, which batch 20 keeps as `keepOpenMS` 0 (the
+  /// default now keeps the session open between strokes; see `SwitcherKeepOpenTests`).
+  static let off = ["keepOpenMS": "0"]
 
   @Test func fullLifecycle() throws {
     let h = Harness()
-    try h.slide(Self.id, 0, phase: .began)
+    try h.slide(Self.id, 0, phase: .began, Self.off)
     #expect(h.keyboard.events == ["cmd down", "cmd+tab down", "cmd+tab up"])
     #expect(h.keyboard.heldModifiers == [.cmd])
-    try h.slide(Self.id, 0.25)  // two steps of 0.1 (0.05 carried)
-    try h.slide(Self.id, -0.15)  // pays off the carry, then one step back
-    try h.slide(Self.id, 0, phase: .ended)
+    try h.slide(Self.id, 0.25, Self.off)  // two steps of 0.1 (0.05 carried)
+    try h.slide(Self.id, -0.15, Self.off)  // pays off the carry, then one step back
+    try h.slide(Self.id, 0, phase: .ended, Self.off)
     #expect(
       h.keyboard.events == [
         "cmd down", "cmd+tab down", "cmd+tab up",
@@ -379,38 +382,40 @@ private let panel = DisplayInfo(id: 1, name: "Built-in Display", kind: .builtIn,
 
   @Test func cancelSendsEscapeThenReleases() throws {
     let h = Harness()
-    try h.slide(Self.id, 0, phase: .began)
-    try h.slide(Self.id, 0, phase: .cancelled)
+    try h.slide(Self.id, 0, phase: .began, Self.off)
+    try h.slide(Self.id, 0, phase: .cancelled, Self.off)
     #expect(Array(h.keyboard.events.suffix(3)) == ["cmd+escape down", "cmd+escape up", "cmd up"])
     #expect(h.keyboard.allReleased)
   }
 
   @Test func newBeganWithoutEndCancelsTheOldSessionFirst() throws {
     let h = Harness()
-    try h.slide(Self.id, 0, phase: .began)
-    try h.slide(Self.id, 0, phase: .began)
+    try h.slide(Self.id, 0, phase: .began, Self.off)
+    try h.slide(Self.id, 0, phase: .began, Self.off)
     #expect(
       h.keyboard.events == [
         "cmd down", "cmd+tab down", "cmd+tab up",
         "cmd+escape down", "cmd+escape up", "cmd up",
         "cmd down", "cmd+tab down", "cmd+tab up",
       ])
-    try h.slide(Self.id, 0, phase: .ended)
+    try h.slide(Self.id, 0, phase: .ended, Self.off)
     #expect(h.keyboard.allReleased)
   }
 
   @Test func errorMidSlideReleasesTheModifier() throws {
     let h = Harness()
-    try h.slide(Self.id, 0, phase: .began)
+    try h.slide(Self.id, 0, phase: .began, Self.off)
+    // One app forward first: a step back from the starting point would cancel (batch 20).
+    try h.slide(Self.id, 0.1, Self.off)
     h.keyboard.failOnEvent = "shift+cmd+tab down"
     #expect(throws: ActionError.unavailable(Self.id, reason: "key event failed")) {
-      try h.slide(Self.id, -0.1)
+      try h.slide(Self.id, -0.1, Self.off)
     }
     #expect(h.keyboard.allReleased)
     #expect(h.keyboard.events.last == "cmd up")
     // The rest of that gesture does nothing; it can't re-press command.
-    try h.slide(Self.id, 0.3)
-    try h.slide(Self.id, 0, phase: .ended)
+    try h.slide(Self.id, 0.3, Self.off)
+    try h.slide(Self.id, 0, phase: .ended, Self.off)
     #expect(h.keyboard.events.last == "cmd up")
     #expect(h.keyboard.allReleased)
   }

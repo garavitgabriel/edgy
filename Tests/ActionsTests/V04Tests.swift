@@ -263,19 +263,21 @@ import Testing
   }
 
   @Test func normalEndDisarms() throws {
+    // keepOpenMS 0: the stroke-at-a-time switcher this test was written for (batch 20).
     let h = Harness()
-    try h.slide("apps.switcher", 0, phase: .began)
-    try h.slide("apps.switcher", 0, phase: .ended)
+    try h.slide("apps.switcher", 0, phase: .began, ["keepOpenMS": "0"])
+    try h.slide("apps.switcher", 0, phase: .ended, ["keepOpenMS": "0"])
     #expect(h.scheduler.pending.isEmpty)
     h.scheduler.advance(by: 60)
     #expect(h.keyboard.events == ["cmd down", "cmd+tab down", "cmd+tab up", "cmd up"])
   }
 
   @Test func staleFireCannotEndANewerSession() throws {
+    // keepOpenMS 0: the stroke-at-a-time switcher this test was written for (batch 20).
     let h = Harness()
-    try h.slide("apps.switcher", 0, phase: .began)
-    try h.slide("apps.switcher", 0, phase: .cancelled)
-    try h.slide("apps.switcher", 0, phase: .began)
+    try h.slide("apps.switcher", 0, phase: .began, ["keepOpenMS": "0"])
+    try h.slide("apps.switcher", 0, phase: .cancelled, ["keepOpenMS": "0"])
+    try h.slide("apps.switcher", 0, phase: .began, ["keepOpenMS": "0"])
     let eventsBefore = h.keyboard.events
     h.scheduler.fireLate(h.scheduler.scheduled[0])
     #expect(h.keyboard.events == eventsBefore)

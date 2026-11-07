@@ -188,3 +188,30 @@ protocol ActionScheduler: AnyObject, Sendable {
   /// returned handle is cancelled first.
   func schedule(after delay: TimeInterval, _ work: @escaping @Sendable () -> Void) -> ScheduledWork
 }
+
+/// What ends a lingering app switcher session (batch 20 keep-open between strokes).
+enum SwitcherInterrupt: Equatable, Sendable {
+  /// A mouse button went down anywhere.
+  case click
+  /// The pointer moved clearly (past the monitor's own threshold), so the user moved on.
+  case pointerMoved
+  /// Escape was pressed: the system closes its switcher; Edgy releases command without selecting.
+  case escape
+}
+
+/// Listen-only input the app switcher watches while it lingers between strokes, plus how many apps
+/// the switcher shows (for the wrap click). Installed only while a session lingers.
+protocol SwitcherInputMonitor: AnyObject, Sendable {
+  /// Starts listening; `handler` may be called on any thread, any number of times, until `stop`.
+  func start(_ handler: @escaping @Sendable (SwitcherInterrupt) -> Void)
+  func stop()
+  /// Apps the system app switcher lists (regular apps running), or nil when unknown.
+  func switcherAppCount() -> Int?
+}
+
+/// No input to watch: a lingering session ends on its timer (or the watchdog).
+final class NoSwitcherInputMonitor: SwitcherInputMonitor {
+  func start(_ handler: @escaping @Sendable (SwitcherInterrupt) -> Void) {}
+  func stop() {}
+  func switcherAppCount() -> Int? { nil }
+}

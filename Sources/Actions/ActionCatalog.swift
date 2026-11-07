@@ -61,18 +61,72 @@ public enum ActionParameterKey {
   public static let path = "path"
   /// `keyboard.hold`: seconds after which a hold that never got its release lets go.
   public static let maxSeconds = "maxSeconds"
+  /// Stepped slides (`apps.switcher`, `keyboard.slideSteps`): travel per step, millimetres.
+  /// Replaces the fraction `step`, which is still read when `stepMM` is absent (converted with the
+  /// zone's length).
+  public static let stepMM = "stepMM"
+  /// Slides: `"on"` (default) / `"off"`, quick flicks go further (`SlideFeel`).
+  public static let speedUp = "speedUp"
+  /// `apps.switcher`: milliseconds the switcher stays open after a stroke ends; 0 = select at once.
+  public static let keepOpenMS = "keepOpenMS"
+  /// Long-press bindings: the press time in milliseconds (`GestureContext.longPressMSByZone`).
+  /// `keyboard.hold` defaults to 300; other long-press bindings fall back to the global setting.
+  public static let holdMS = "holdMS"
+
+  /// `speedUp` values.
+  public static let on = "on"
+  public static let off = "off"
 
   /// `whenFrontmost` values for `app.open`.
   public static let frontmostStay = "stay"
   public static let frontmostHide = "hide"
 }
 
+/// Parameters the settings layer offers on a binding by its gesture rather than its action.
+public enum GestureParameters {
+  /// `holdMS` on a long-press binding of any action but `keyboard.hold` (which lists its own):
+  /// "Press time", 100…1500 ms, falling back to the global long-press time ("Default (500 ms)").
+  public static var pressTime: ActionParameter { ActionCatalog.pressTime }
+}
+
 enum ActionCatalog {
+  /// Legacy `keyboard.slideSteps` `step`: a fraction of the zone's length per press.
   static let stepRange: ClosedRange<Double> = 0.02...0.5
   static let defaultStep = 0.0625
-  /// `apps.switcher`: slide travel per app.
+  /// Legacy `apps.switcher` `step`: a fraction of the zone's length per app.
   static let switcherStepRange: ClosedRange<Double> = 0.04...0.5
   static let defaultSwitcherStep = 0.1
+  /// `stepMM` on both stepped slides.
+  static let stepMMRange: ClosedRange<Double> = 4...20
+  static let defaultStepMM = 8.0
+  /// `apps.switcher` `keepOpenMS`.
+  static let keepOpenRange: ClosedRange<Double> = 0...1000
+  static let defaultKeepOpenMS = 400.0
+  /// `holdMS` on long-press bindings.
+  static let holdMSRange: ClosedRange<Double> = 100...1500
+  static let defaultHoldKeysMS = 300.0
+
+  static func speedUp(_ helpText: String) -> ActionParameter {
+    ActionParameter(
+      key: ActionParameterKey.speedUp, kind: .choice([ActionParameterKey.on, ActionParameterKey.off]),
+      required: false, defaultValue: ActionParameterKey.on, displayName: "Faster when you flick", helpText: helpText)
+  }
+
+  static func stepMM(_ displayName: String, _ helpText: String) -> ActionParameter {
+    ActionParameter(
+      key: ActionParameterKey.stepMM, kind: .number(stepMMRange), required: false,
+      defaultValue: String(Int(defaultStepMM)), displayName: displayName, helpText: helpText, unit: "mm")
+  }
+
+  /// The level slides' one parameter.
+  static let levelSpeedUp = speedUp("A quick flick moves the level further.")
+
+  /// `holdMS` on a long-press binding of any action but `keyboard.hold` (which has its own, with a
+  /// 300 ms default): no default of its own, it falls back to the global long-press time. The
+  /// runtime offers it on long-press bindings (`ConfigValidator.pressTimeParameter` mirrors it).
+  static let pressTime = ActionParameter(
+    key: ActionParameterKey.holdMS, kind: .number(holdMSRange), required: false, displayName: "Press time",
+    helpText: "How long to press before it runs.", unit: "ms", fallback: .longPressMS)
   /// `keyboard.hold`: the stuck-key watchdog, in seconds.
   static let holdMaxSecondsRange: ClosedRange<Double> = 5...600
   static let defaultHoldMaxSeconds = 120.0
@@ -80,10 +134,13 @@ enum ActionCatalog {
   /// Every action, in the order the settings UI lists them within a category.
   static let all: [ActionDescriptor] = [
     // Sound, display, media, Shortcuts (v0.1).
-    ActionDescriptor(id: BuiltInAction.volume, shape: .continuous, displayName: "Volume", category: .sound),
+    ActionDescriptor(
+      id: BuiltInAction.volume, shape: .continuous, displayName: "Volume", category: .sound,
+      parameters: [levelSpeedUp]),
     ActionDescriptor(id: BuiltInAction.mute, shape: .trigger, displayName: "Mute", category: .sound),
     ActionDescriptor(
-      id: BuiltInAction.brightness, shape: .continuous, displayName: "Brightness", category: .display),
+      id: BuiltInAction.brightness, shape: .continuous, displayName: "Brightness", category: .display,
+      parameters: [levelSpeedUp]),
     ActionDescriptor(id: BuiltInAction.micMute, shape: .trigger, displayName: "Microphone Mute", category: .sound),
     ActionDescriptor(id: BuiltInAction.playPause, shape: .trigger, displayName: "Play / Pause", category: .media),
     ActionDescriptor(id: BuiltInAction.next, shape: .trigger, displayName: "Next Track", category: .media),
@@ -99,7 +156,7 @@ enum ActionCatalog {
     // brightness framework. Unavailable on Macs without a backlit keyboard.
     ActionDescriptor(
       id: BuiltInAction.keyboardBacklight, shape: .continuous, displayName: "Keyboard Brightness",
-      category: .display),
+      category: .display, parameters: [levelSpeedUp]),
     // Off, or back to the last non-zero level.
     ActionDescriptor(
       id: BuiltInAction.keyboardBacklightToggle, shape: .trigger, displayName: "Keyboard Backlight On / Off",
@@ -110,8 +167,8 @@ enum ActionCatalog {
       id: BuiltInAction.keyboardShortcut, shape: .trigger, displayName: "Keyboard Shortcut", category: .keyboard,
       parameters: [ActionParameter(key: ActionParameterKey.keys, kind: .keyCombo, required: true, displayName: "Keys")]
     ),
-    // One key press per `step` of slide travel (scaled by the binding's sensitivity): toward
-    // top/right presses `upKeys`, the other way `downKeys`.
+    // One key press per `stepMM` of slide travel (scaled by the binding's sensitivity), with the
+    // shared slide feel (`SlideFeel`): toward top/right presses `upKeys`, the other way `downKeys`.
     ActionDescriptor(
       id: BuiltInAction.keyboardSlideSteps, shape: .continuous, displayName: "Slide to Repeat Keys",
       category: .keyboard,
@@ -120,9 +177,8 @@ enum ActionCatalog {
           key: ActionParameterKey.upKeys, kind: .keyCombo, required: true, displayName: "Up / Right Keys"),
         ActionParameter(
           key: ActionParameterKey.downKeys, kind: .keyCombo, required: true, displayName: "Down / Left Keys"),
-        ActionParameter(
-          key: ActionParameterKey.step, kind: .number(stepRange), required: false,
-          defaultValue: String(defaultStep), displayName: "Step"),
+        stepMM("Distance per press", "Slide this far for one key press."),
+        speedUp("A quick flick sends several presses."),
       ]),
     // Holds the combo down for as long as the finger stays (long-press): the push-to-talk key a
     // dictation app asks the user to hold. The combo may be modifiers alone (`fn`, `ctrl+opt`).
@@ -134,6 +190,10 @@ enum ActionCatalog {
         ActionParameter(
           key: ActionParameterKey.maxSeconds, kind: .number(holdMaxSecondsRange), required: false,
           defaultValue: "120", displayName: "Release after"),
+        ActionParameter(
+          key: ActionParameterKey.holdMS, kind: .number(holdMSRange), required: false,
+          defaultValue: String(Int(defaultHoldKeysMS)), displayName: "Hold before it starts",
+          helpText: "How long to press before the keys go down.", unit: "ms"),
       ]),
 
     // Apps.
@@ -154,14 +214,19 @@ enum ActionCatalog {
       parameters: [
         ActionParameter(key: ActionParameterKey.path, kind: .filePath, required: true, displayName: "File or Folder")
       ]),
-    // The command-tab app switcher, driven by a slide: opens on the next app, one app per `step`
-    // of travel (toward top/right = forward), selects on lift, cancels on a cancelled gesture.
+    // The command-tab app switcher, driven by a slide: opens on the next app, one app per `stepMM`
+    // of travel (toward top/right = forward) with the shared slide feel, stays open `keepOpenMS`
+    // after a stroke so the next stroke continues, then selects. See `ActionRegistry+Keys.swift`.
     ActionDescriptor(
       id: BuiltInAction.appSwitcher, shape: .continuous, displayName: "Switch Apps", category: .apps,
       parameters: [
+        stepMM("Distance per app", "Slide this far to move one app."),
+        speedUp("A quick flick skips several apps."),
         ActionParameter(
-          key: ActionParameterKey.step, kind: .number(switcherStepRange), required: false,
-          defaultValue: String(defaultSwitcherStep), displayName: "Step")
+          key: ActionParameterKey.keepOpenMS, kind: .number(keepOpenRange), required: false,
+          defaultValue: String(Int(defaultKeepOpenMS)), displayName: "Keep open between strokes",
+          helpText: "Lift and slide again to keep going; it picks the app when you stop, click or move the pointer.",
+          unit: "ms", zeroLabel: "Off"),
       ]),
 
     // System. See `LiveSystemOutput` for how each one is done and why.
