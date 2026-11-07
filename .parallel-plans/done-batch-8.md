@@ -2,7 +2,7 @@
 batch: 8
 branch: worktree-edgy-displays
 worktree_path: /Users/gabrielgaravit/Projects/edgy/.claude/worktrees/edgy-displays
-completed_at: 2026-11-06
+completed_at: 2026-11-06 20:49
 verification: pass
 ---
 
@@ -72,4 +72,5 @@ Worth it only as an explicit, opt-in "dim" for monitors that refuse DDC, not as 
 ## Open questions
 - **Unverified on hardware** (each is a single named constant or line): the reply read sub-address (`LiveI2CTransport.readOffset = 0x51`), the reply read length (11 bytes, `DDC.getVCPReplyLength`), the 50 ms reply delay (`DisplayEnvironment.replyDelay`), and that `CGDisplayVendorNumber`/`ModelNumber` equal the registry's `LegacyManufacturerID`/`ProductID`. If the smoke test says "can't reach this monitor's controls" for a cable-connected monitor, matching is the first suspect: the registry dump showed the expected keys on this machine, but nothing compared the values.
 - The registry-order pairing (display attributes listed before their AV service) matches this machine's tree. A different chip may lay it out differently. The fallback (attribute-less services in order) covers a single monitor, not two.
+- **Registry-walk cost (unmeasured):** the first probe and every re-probe walk the whole IOService plane and read a property from each entry, synchronously on the first caller. With the DDC reads, the first `displays()` call from Actions at launch could take around half a second. If it's slow, find the `DCPAVServiceProxy` services first and locate their attributes with `IORegistryEntrySearchCFProperty` on their parents, or warm the probe at app launch off the action thread.
 - For the chief: Actions can now route the built-in panel through `DisplayBrightnessControlling` too (DisplayServices behind the same API), so `LiveBrightnessOutput` could go. That's batch 7's call.
