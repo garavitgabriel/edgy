@@ -29,7 +29,7 @@ public struct OnboardingActions: Sendable {
 /// - **Step 1** watches the permission (`setAccessibility`, fed by a `PermissionMonitor`). Granted
 ///   flips the body to "Access granted." and the primary to Continue; **Skip for now** continues
 ///   without it.
-/// - **Step 2** reads `model.pendingDecisions` without taking them (the overlay owns
+/// - **Step 2** reads `model.recentDecisions` without taking them (the overlay owns
 ///   `takeDecisions()`); Continue enables once a slide is recognized on the right edge, and stays
 ///   enabled.
 /// - **Step 3** applies the chosen preset at once through `SettingsEditor.applyPreset` (which runs
@@ -139,7 +139,7 @@ public final class OnboardingState {
     model.startFeed()
     guard !watching else { return }
     watching = true
-    receive(model.pendingDecisions)
+    receive(model.recentDecisions)
     watchDecisions()
   }
 
@@ -249,11 +249,11 @@ public final class OnboardingState {
   /// Re-reads `pendingDecisions` after every change, without taking them.
   private func watchDecisions() {
     withObservationTracking {
-      _ = model.pendingDecisions
+      _ = model.recentDecisions
     } onChange: { [weak self] in
       Task { @MainActor in
         guard let self else { return }
-        self.receive(self.model.pendingDecisions)
+        self.receive(self.model.recentDecisions)
         self.watchDecisions()
       }
     }

@@ -63,6 +63,10 @@ public final class SettingsModel {
   public private(set) var liveTouches: [LiveTouch] = []
   /// Decisions since the last `takeDecisions()`, newest last (overlay and Test Mode).
   public private(set) var pendingDecisions: [LiveDecision] = []
+  /// The last decisions seen (newest last, at most `recentDecisionLimit`), never drained: for
+  /// readers that must not compete with the overlay's `takeDecisions()` (onboarding's Try it).
+  public private(set) var recentDecisions: [LiveDecision] = []
+  public static let recentDecisionLimit = 32
 
   // MARK: Pickers (data sources for parameter editors)
 
@@ -148,6 +152,9 @@ public final class SettingsModel {
       if frame.deviceID == mirroredDevice?.id { liveTouches = frame.touches }
     }
     pendingDecisions += update.decisions
+    if !update.decisions.isEmpty {
+      recentDecisions = Array((recentDecisions + update.decisions).suffix(Self.recentDecisionLimit))
+    }
   }
 
   private func engineStatusChanged(_ status: EngineStatus) {

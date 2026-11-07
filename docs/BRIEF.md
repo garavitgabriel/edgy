@@ -181,7 +181,7 @@ Use one clause, no slogans, and no two-part oracular lines.
 
 The runtime API is in `SettingsEditor`: `effectiveBindings(forApp:)` with sources, `overrideBinding`, `turnOff`, `revertToDefault`, `addAppProfile(startingAs:)`, `setProfileDisabled`, `convertToInheriting`.
 
-**Tabs.** The order is Default, then app tabs alphabetically (app mark + name), then "+". A tab whose app has Edgy turned off shows its name in `ink2` with a small slashed-circle mark; there's no other colour.
+**Tabs.** The order is Default, then app tabs alphabetically (app mark + name), then "+". **App mark** = the real app icon at 14 pt, desaturated (70% opacity in dark mode). An app with no icon gets Edgy's "Open App" tile icon in `ink2`, never a plain square. The popover chips use the same marks. A tab whose app has Edgy turned off shows its name in `ink2` with a small slashed-circle mark; there's no other colour.
 
 **The top-right switch follows the tab.**
 - On Default it is **Enabled** (global).
@@ -239,7 +239,9 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
 **One rule.**
 - The parameters sit directly under their binding row in the inspector, indented 24 pt.
 - Each takes one 28 pt row: the label on the left (13, `ink2`), the control on the right.
-- **A label never breaks mid-word.** If it doesn't fit beside its control, it goes on its own line above the control, at full width.
+- **A label never breaks mid-word.** If it doesn't fit beside its control, it goes on its own line above the control, at full width. If one label in a binding has to stack, **all** of that binding's labels stack, so the controls stay aligned.
+- **The action name is never cut in the inspector.** If the name plus a caption or Revert doesn't fit, the caption or Revert moves to the sub-line. A name that's still too long wraps at a word boundary (two lines at most).
+- **Selecting a zone opens no binding by itself.** Rows stay collapsed until clicked; the only exception is a binding with an empty required parameter.
 - Validation text sits under its control (13, `ink`, with a small error icon). It is never red or accent.
 - A required parameter that's still empty leaves the binding row reading "Needs keys" / "Needs an app" in `ink2`. The pad tab shows the action name with "…".
 

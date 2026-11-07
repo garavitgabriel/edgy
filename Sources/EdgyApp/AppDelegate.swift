@@ -26,6 +26,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var statusMenu: StatusMenu?
   private var menuBar: MenuBarController?
   private var overlay: OverlayController?
+  private var onboarding: OnboardingController?
+  /// Set when the user finishes onboarding (Done on step 4). Closing it early leaves it unset, so
+  /// it shows again next launch.
+  private static let onboardingDoneKey = "onboardingDone"
   private var frontmostObserver: NSObjectProtocol?
   private var pauseTimer: Timer?
   private var activationObserver: NSObjectProtocol?
@@ -118,6 +122,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     menuBar.state.frontmostBundleID = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
     menuBar.install()
     self.menuBar = menuBar
+
+    if !UserDefaults.standard.bool(forKey: Self.onboardingDoneKey) {
+      let onboarding = OnboardingController(
+        model: settingsModel,
+        actions: OnboardingActions(
+          openAccessibilitySettings: { [weak self] in self?.grantAccessibility() },
+          finish: { [weak self] in
+            UserDefaults.standard.set(true, forKey: Self.onboardingDoneKey)
+            NSApp.setActivationPolicy(.accessory)
+            self?.onboarding = nil
+            self?.menuBar?.showPopover()
+          }),
+        permissions: AccessibilityPermissionChecker())
+      self.onboarding = onboarding
+      // Like Settings, onboarding shows Edgy in the Dock while it's open (BRIEF § Window identity).
+      NSApp.setActivationPolicy(.regular)
+      onboarding.show()
+    }
     frontmostObserver = NSWorkspace.shared.notificationCenter.addObserver(
       forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main
     ) { [weak self] note in
@@ -142,7 +164,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     activationObserver = NotificationCenter.default.addObserver(
       forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
     ) { [weak self] _ in
-      MainActor.assumeIsolated { self?.permissions?.refresh() }
+      MainActor.assumeIsolated {
+        self?.permissions?.refresh()
+        self?.onboarding?.refreshPermission()
+      }
     }
     refreshMenu()
   }
