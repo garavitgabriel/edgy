@@ -396,6 +396,22 @@ Primary: **Continue**. One line in `ink2` under the rows: "You can change any of
   - **Popover:** the top block reads "config.json has an error on line 14: <parser message>. Edgy kept the last working settings." · **Open config file**. There's no Reload button: saving the file reloads it.
   - **Window:** a strip under the tabs with the same sentence, plus **Open config file** and **Replace with current settings** (writes the last working config, after a confirm sheet). **The window is read-only while the file is broken**, so nothing silently overwrites the user's edit.
 
+### Window identity and Advanced (spec, 2026-11-07, from the owner's hardware notes)
+
+**Brand in the window.** The owner said: "I don't see any logo or anything to recognize our app when open." Decision: **(a) + (c)**.
+- **(a) Title bar:** after the traffic lights, at the leading edge, the **app icon at 18 pt** and the wordmark **"Edgy"** (13 semibold, `ink`), 8 pt apart, vertically centred on the traffic lights.
+  - The tabs stay centred in the window, and the Enabled switch stays at the right.
+  - No larger mark, no tagline, no second hue. The icon brings its own rust dot only at ≥128 px, so at 18 pt it's the monochrome-on-stone small drawing.
+- **(c) Dock and app switcher:** while the Settings window (or onboarding) is open, Edgy shows in the Dock and the app switcher with its real icon. When the last window closes, it goes back to menu-bar only.
+- The glyph alone (b) was rejected: it's a status symbol, not an identity, and it still carries the open "CI" question.
+
+**Advanced… is a quiet text button in the footer.**
+- **Keep it in the footer:** it is app-wide like Haptics, Launch at login and HUD, so it belongs in their row, not in the title bar (that's for identity and the global switch) and not as a tab (tabs are profiles).
+- **Style:** a 16 pt sliders icon from the action-icon family, then "Advanced…" (13 regular, `ink2`), no bezel, at the trailing end of the footer on the shared baseline.
+  - On hover, the text and icon go to `ink`, with the 10% `ink` wash behind them (the same hover as the popover rows).
+  - It opens the Advanced sheet as before.
+  - The grey system push button goes.
+
 ### Split control (spec, 2026-11-07, replaces "Split into 1 2 3 4")
 
 The owner found the small numeric segmented control unclear. The split is shown, not counted:
