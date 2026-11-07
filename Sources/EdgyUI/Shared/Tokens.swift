@@ -48,6 +48,11 @@ public enum Tokens {
   /// The title-bar app icon: the profile-tab pill's height, 12 pt after the last traffic light.
   public static let titleIconSize: CGFloat = 26
   public static let titleIconLeading: CGFloat = 12
+  /// The title-bar Edgy mark (V3 pad + lit strip, no tile), tinted `ink`: 26 × 18 pt (16:11),
+  /// `titleIconLeading` after the last traffic light (BRIEF § Window identity (a), supersedes the
+  /// 26 pt app icon; `titleIconSize` and `titleIconOutline*` go once nothing reads them).
+  public static let titleMarkWidth: CGFloat = 26
+  public static let titleMarkHeight: CGFloat = 18
 
   // MARK: Type — one scale, system font only, regular and semibold
 
