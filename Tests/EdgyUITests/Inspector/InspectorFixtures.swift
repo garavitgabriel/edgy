@@ -34,12 +34,14 @@ enum InspectorFixtures {
       config: config, catalog: catalog, store: MemoryStore(config), scheduler: ImmediateScheduler(), actions: fake,
       apply: { _ in })
     return SettingsModel(
-      editor: editor, engine: nil, installedApps: InspectorFakeApps(apps: apps), shortcuts: FakeShortcuts(names: shortcuts),
+      editor: editor, engine: nil, installedApps: InspectorFakeApps(apps: apps),
+      shortcuts: FakeShortcuts(names: shortcuts),
       keyRecorder: recorder, devices: [PreviewFixtures.externalPad])
   }
 
   static let apps = [
-    InstalledApp(name: "Quillpad", bundleID: "com.example.quillpad", path: "/Applications/Quillpad.app", isRunning: true),
+    InstalledApp(
+      name: "Quillpad", bundleID: "com.example.quillpad", path: "/Applications/Quillpad.app", isRunning: true),
     InstalledApp(name: "Wayfare", bundleID: "com.example.wayfare", path: "/Applications/Wayfare.app", isRunning: false),
   ]
 }

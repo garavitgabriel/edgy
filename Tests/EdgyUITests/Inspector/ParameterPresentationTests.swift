@@ -52,7 +52,9 @@ import Testing
     #expect(IssueCopy.note(for: note) == "Something to know here.")
     let warning = ValidationIssue(.warning, .settingOutOfRange, detail: "x")
     #expect(IssueCopy.note(for: warning) == nil)
-    #expect(IssueCopy.slideAndSwipes == "Quick slides can look like swipes here, so swipes need a clearer flick on this edge.")
+    #expect(
+      IssueCopy.slideAndSwipes == "Quick slides can look like swipes here, so swipes need a clearer flick on this edge."
+    )
   }
 
   @Test func rowMenusGreyOutWhatDoesntApply() {

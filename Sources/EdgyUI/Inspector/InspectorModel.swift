@@ -102,7 +102,8 @@ extension SettingsModel {
     var rows: [InspectorRow]
     switch inspectorProfile {
     case .default:
-      rows = editor.bindingsByZone(in: .default).first { $0.zone == zone }?.bindings
+      rows =
+        editor.bindingsByZone(in: .default).first { $0.zone == zone }?.bindings
         .filter { $0.action != .doNothing }
         .map { InspectorRow(binding: $0, source: nil) } ?? []
     case .app(let bundleID):
@@ -267,7 +268,9 @@ extension SettingsModel {
     switch inspectorProfile {
     case .default: try? editor.removeBinding(row.id, from: .default)
     case .app(let id):
-      if row.defaultBinding != nil { try? editor.turnOff(row.id, forApp: id) } else {
+      if row.defaultBinding != nil {
+        try? editor.turnOff(row.id, forApp: id)
+      } else {
         try? editor.revertToDefault(row.id, forApp: id)
       }
     }

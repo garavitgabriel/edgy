@@ -16,7 +16,9 @@ struct GestureIcon: View {
       let dot: CGFloat = s * 0.14
       var strokes = Path()
       var fill = Path()
-      func dotAt(_ p: CGPoint) { fill.addEllipse(in: CGRect(x: p.x - dot, y: p.y - dot, width: dot * 2, height: dot * 2)) }
+      func dotAt(_ p: CGPoint) {
+        fill.addEllipse(in: CGRect(x: p.x - dot, y: p.y - dot, width: dot * 2, height: dot * 2))
+      }
       func ring(_ r: CGFloat) { strokes.addEllipse(in: CGRect(x: c.x - r, y: c.y - r, width: r * 2, height: r * 2)) }
       func chevron(at p: CGPoint, toward angle: Double) {
         let len = s * 0.2
@@ -66,7 +68,8 @@ struct GestureIcon: View {
         chevron(at: head, toward: angle)
       }
       context.stroke(
-        strokes, with: .color(Tokens.ink), style: StrokeStyle(lineWidth: Self.stroke, lineCap: .round, lineJoin: .round))
+        strokes, with: .color(Tokens.ink), style: StrokeStyle(lineWidth: Self.stroke, lineCap: .round, lineJoin: .round)
+      )
       context.fill(fill, with: .color(Tokens.ink))
     }
     .frame(width: Self.size, height: Self.size)

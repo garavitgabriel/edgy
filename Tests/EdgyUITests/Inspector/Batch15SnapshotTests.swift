@@ -35,7 +35,8 @@ import Testing
   @Test func inspectorBottomEdgeWithTheNote() throws {
     let model = InspectorFixtures.model(config: InspectorFixtures.configWithBottomTap)
     model.selectedZone = .edge(.bottom)
-    try write(inspector(model, size: CGSize(width: 460, height: 760)), "inspector-bottom-edge-note",
+    try write(
+      inspector(model, size: CGSize(width: 460, height: 760)), "inspector-bottom-edge-note",
       size: CGSize(width: 460, height: 760))
   }
 
@@ -43,7 +44,8 @@ import Testing
     let model = InspectorFixtures.model(config: InspectorFixtures.configWithBottomTap)
     model.selectedZone = .edge(.bottom)
     model.picking = PickerTarget(zone: .edge(.bottom), gesture: .tap)
-    try write(inspector(model, size: CGSize(width: 460, height: 760)), "inspector-bottom-edge-picking",
+    try write(
+      inspector(model, size: CGSize(width: 460, height: 760)), "inspector-bottom-edge-picking",
       size: CGSize(width: 460, height: 760))
   }
 
@@ -65,7 +67,8 @@ import Testing
     model.selectedZone = .corner(.bottomRight)
     model.choose("keyboard.hold", zone: .corner(.bottomRight), gesture: .longPress)
     try model.editor.setBinding(
-      Binding(zone: .corner(.bottomRight), gesture: .doubleTap, action: "app.open",
+      Binding(
+        zone: .corner(.bottomRight), gesture: .doubleTap, action: "app.open",
         parameters: ["bundleID": "com.example.quillpad"]), in: .default)
     model.inspectorDrafts.focus = nil
     try write(inspector(model), "inspector-corner-needs-keys", size: Self.inspectorSize)
@@ -138,7 +141,8 @@ import Testing
       let model = InspectorFixtures.model(config: InspectorFixtures.configWithBottomTap)
       model.picking = target
       let size = CGSize(width: 860, height: 560)
-      try write(PlaceholderMirror().actionPickerHost(model: model).frame(width: size.width, height: size.height), name,
+      try write(
+        PlaceholderMirror().actionPickerHost(model: model).frame(width: size.width, height: size.height), name,
         size: size)
     }
   }
@@ -148,7 +152,7 @@ import Testing
   private func recorder(_ name: String, stored: String?, hold: Bool, state: [KeyRecorderState]) throws {
     let fake = FakeRecorder()
     let clock = TestClock()
-    let controller = KeyRecorderController(recorder: fake, isHold: hold, now: { clock.now }) { _ in }
+    let controller = KeyRecorderController(recorder: fake, isHold: hold, now: { clock.now }, commit: { _ in })
     if !state.isEmpty { controller.start() }
     for s in state {
       clock.advance(0.3)
@@ -204,26 +208,32 @@ import Testing
     try write(
       panel(
         LabeledParameter(label: "File or Folder") {
-          TextParameterField(text: "~/Documents/Notes", placeholder: "~/Documents", choosesPath: true,
-            issueFor: { _ in nil }) { _ in nil }
+          TextParameterField(
+            text: "~/Documents/Notes", placeholder: "~/Documents", choosesPath: true,
+            issueFor: { _ in nil }
+          ) { _ in nil }
         }), "param-path")
     try write(
       panel(
         LabeledParameter(label: "Shortcut Name") {
-          ShortcutNameField(name: "Start Focus", listing: nil, names: ["Start Focus", "Log Water"],
-            issueFor: { _ in nil }) { _ in nil }
+          ShortcutNameField(
+            name: "Start Focus", listing: nil, names: ["Start Focus", "Log Water"],
+            issueFor: { _ in nil }
+          ) { _ in nil }
         }), "param-shortcut")
   }
 
   @Test func parameterNumberChoiceHaptics() throws {
     let model = InspectorFixtures.model()
     let row = InspectorRow(
-      binding: Binding(zone: .edge(.right), gesture: .slide, action: "keyboard.slideSteps",
+      binding: Binding(
+        zone: .edge(.right), gesture: .slide, action: "keyboard.slideSteps",
         parameters: ["upKeys": "up", "downKeys": "down", "step": "0.125"]), source: nil)
     try write(
       panel(
         LabeledParameter(label: "Step") {
-          NumberParameterField(model: model, row: row, key: "step", range: 0.02...0.5, fallback: 0.0625,
+          NumberParameterField(
+            model: model, row: row, key: "step", range: 0.02...0.5, fallback: 0.0625,
             format: .percent)
         }), "param-number")
     try write(
@@ -314,7 +324,9 @@ private struct PlaceholderMirror: View {
     ZStack(alignment: .topLeading) {
       Tokens.windowTint
       RoundedRectangle(cornerRadius: Tokens.radiusPlate)
-        .fill(LinearGradient(colors: [Tokens.padTop, Tokens.padBottom], startPoint: .topLeading, endPoint: .bottomTrailing))
+        .fill(
+          LinearGradient(colors: [Tokens.padTop, Tokens.padBottom], startPoint: .topLeading, endPoint: .bottomTrailing)
+        )
         .frame(width: pad.width, height: pad.height)
         .pickerMirrorBounds()
         .position(x: pad.midX, y: pad.midY)

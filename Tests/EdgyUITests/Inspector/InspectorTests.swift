@@ -64,7 +64,9 @@ import Testing
     model.picking = PickerTarget(zone: .edge(.bottom), gesture: .tap)
     model.choose("audio.mute", zone: .edge(.bottom), gesture: .tap)
     #expect(model.picking == nil)
-    #expect(model.editor.config.defaultProfile.bindings.contains(Binding(zone: .edge(.bottom), gesture: .tap, action: "audio.mute")))
+    #expect(
+      model.editor.config.defaultProfile.bindings.contains(
+        Binding(zone: .edge(.bottom), gesture: .tap, action: "audio.mute")))
   }
 
   @Test func choosingOnAnAppTabCreatesAnOverride() {
@@ -180,8 +182,9 @@ import Testing
     #expect(IssueCopy.Style(.warning).symbol == "exclamationmark.triangle")
     #expect(IssueCopy.Style(.info).symbol == "info.circle")
     let unavailable = ValidationIssue(.warning, .actionUnavailable)
-    #expect(IssueCopy.message(for: unavailable, availability: .unavailable(reason: "Needs a backlit keyboard"))
-      == "Needs a backlit keyboard")
+    #expect(
+      IssueCopy.message(for: unavailable, availability: .unavailable(reason: "Needs a backlit keyboard"))
+        == "Needs a backlit keyboard")
     #expect(
       IssueCopy.overlap(.edge(.right), .edge(.right, segment: 1, segments: 2), gesture: .swipe(.up))
         == "The whole edge and the upper half both use Swipe up.")
@@ -220,10 +223,12 @@ import Testing
       Binding(zone: .edge(.left, segment: 1, segments: 2), gesture: .slide, action: "display.brightness"),
     ]
     #expect(SplitPlan.remap(bindings, edge: .left, to: 1).map(\.action) == ["display.brightness"])
-    #expect(SplitPlan.remap(bindings, edge: .left, to: 4).map(\.action)
-      == ["audio.volume", "audio.volume", "display.brightness", "display.brightness"])
-    #expect(SplitPlan.selection(after: .edge(.left, segment: 1, segments: 2), segments: 4)
-      == .edge(.left, segment: 3, segments: 4))
+    #expect(
+      SplitPlan.remap(bindings, edge: .left, to: 4).map(\.action)
+        == ["audio.volume", "audio.volume", "display.brightness", "display.brightness"])
+    #expect(
+      SplitPlan.selection(after: .edge(.left, segment: 1, segments: 2), segments: 4)
+        == .edge(.left, segment: 3, segments: 4))
   }
 
   @Test func tapWaitsNoteUsesTheRealWindowAndItsFixMovesTheTap() throws {
@@ -244,7 +249,7 @@ import Testing
     -> (KeyRecorderController, Box)
   {
     let box = Box()
-    let c = KeyRecorderController(recorder: recorder, isHold: hold, now: { clock.now }) { box.combo = $0 }
+    let c = KeyRecorderController(recorder: recorder, isHold: hold, now: { clock.now }, commit: { box.combo = $0 })
     return (c, box)
   }
 

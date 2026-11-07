@@ -195,8 +195,10 @@ struct KeyRecorderField: View {
       Button {
         controller.isRecording ? controller.cancel() : controller.start()
       } label: {
-        label.frame(width: Self.width, alignment: .leading).fieldChrome(active: controller.isRecording, ring: Tokens.accent)
-          .contentShape(Rectangle())
+        label.frame(width: Self.width, alignment: .leading).fieldChrome(
+          active: controller.isRecording, ring: Tokens.accent
+        )
+        .contentShape(Rectangle())
       }
       .buttonStyle(.plain)
       .focusable()

@@ -30,7 +30,8 @@ enum ZoneNaming {
     let isSide = edge == .left || edge == .right
     let reading = isSide ? segments - 1 - segment : segment
     switch segments {
-    case 2: return isSide ? ["upper half", "lower half"][clamp(reading, 2)] : ["left half", "right half"][clamp(reading, 2)]
+    case 2:
+      return isSide ? ["upper half", "lower half"][clamp(reading, 2)] : ["left half", "right half"][clamp(reading, 2)]
     case 3:
       return isSide
         ? ["upper third", "middle third", "lower third"][clamp(reading, 3)]
