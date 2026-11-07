@@ -55,6 +55,10 @@ enum RecordedTraces {
     "inward-swipe-from-right-one-finger": .nothing,
     "long-press-drift-top-left": .noHold,
     "push-to-talk-hold-bottom-left": .hold(.corner(.bottomLeft)),
+    // Batch 20 (slide feel and holds; see scripts/record-traces.md 30–34).
+    "short-strokes-right-edge": .slide(.right, sign: 1),
+    "rest-at-top-end-right": .slide(.right, sign: 1),
+    "hold-corner-while-pointing": .hold(.corner(.bottomLeft)),
     // v0.4 additions (batch 10: physical clicks, taps that wait for a double-tap).
     "click-drag-right-edge": .nothing,
     "click-drag-left-edge": .nothing,

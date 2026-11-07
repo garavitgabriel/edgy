@@ -34,6 +34,34 @@ private func travelMM(_ run: Replay) -> Double {
   run.slideEvents.reduce(0) { $0 + $1.delta * $1.zoneLengthMM }
 }
 
+// MARK: - Trace replays
+
+/// Every recorded trace (none yet: see scripts/record-traces.md 30–34) and every committed
+/// synthetic fixture, replayed with the batch 20 context (a 300 ms hold in the hold zones): every
+/// event knows its zone's length, `atEnd` appears only on resting slide reports, and holds pair.
+@Test func traceReplaysKeepTheBatchTwentyInvariants() throws {
+  let recorded = try RecordedTraces.files().map {
+    try JSONDecoder().decode(TraceFile.self, from: Data(contentsOf: $0))
+  }
+  var holdTimes: [Zone: Double] = [:]
+  for zone in RecordedTraces.holdZones { holdTimes[zone] = 300 }
+  for trace in recorded + Fixtures.all() {
+    let context = GestureContext(
+      settings: .test, enabledZones: Preset.zones.union(RecordedTraces.holdZones), secondsSinceLastKeyPress: nil,
+      slideZones: Preset.slideZones, longPressZones: RecordedTraces.holdZones, longPressMSByZone: holdTimes)
+    let recognizer = makeGestureRecognizer()
+    let run = Replay(
+      frames: trace.frames,
+      outputs: trace.frames.map { recognizer.process($0, device: trace.device, context: context) })
+    #expect(run.events.allSatisfy { $0.zoneLengthMM > 0 }, "\(trace.label)")
+    #expect(
+      run.events.filter { $0.atEnd != 0 }.allSatisfy { $0.kind == .slide && $0.phase == .changed && $0.delta == 0 },
+      "\(trace.label)")
+    expectHoldsArePaired(run)
+    #expect(run.endsUnclaimed, "\(trace.label)")
+  }
+}
+
 // MARK: - zoneLengthMM
 
 @Test func slideEventsCarryTheZoneLength() {
