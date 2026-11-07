@@ -32,11 +32,10 @@ extension ActionRegistry {
       let step = try number(
         ActionParameterKey.step, for: id, in: context, range: ActionCatalog.switcherStepRange,
         default: ActionCatalog.defaultSwitcherStep)
+      // The session (and so the release) exists only once command is really down.
+      try unavailable(id) { try keyboard.setModifiers([Self.switcherModifier], down: true) }
       switcher = SwitcherSession(step: step, carry: 0)
-      try releasingSwitcherOnError(id) {
-        try keyboard.setModifiers([Self.switcherModifier], down: true)
-        try tapSwitcher(forward: true)
-      }
+      try releasingSwitcherOnError(id) { try tapSwitcher(forward: true) }
       try switcherTravel(id, delta: delta, context: context)
     case .changed:
       try switcherTravel(id, delta: delta, context: context)

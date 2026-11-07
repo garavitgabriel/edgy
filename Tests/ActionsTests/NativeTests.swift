@@ -424,6 +424,18 @@ private let panel = DisplayInfo(id: 1, name: "Built-in Display", kind: .builtIn,
     #expect(h.keyboard.events == ["cmd down", "cmd+escape down", "cmd+escape up", "cmd up"])
   }
 
+  @Test func commandFailingToGoDownLeavesNoSession() throws {
+    let h = Harness()
+    h.keyboard.failOnEvent = "cmd down"
+    #expect(throws: ActionError.unavailable(Self.id, reason: "key event failed")) {
+      try h.slide(Self.id, 0, phase: .began)
+    }
+    try h.slide(Self.id, 0.3)
+    try h.slide(Self.id, 0, phase: .cancelled)
+    #expect(h.keyboard.events.isEmpty)
+    #expect(h.keyboard.allReleased)
+  }
+
   @Test func badStepPressesNothing() {
     let h = Harness()
     #expect(throws: ActionError.missingParameter(Self.id, name: "step")) {
