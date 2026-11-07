@@ -170,3 +170,6 @@ git grep -niE -f ~/.config/edgy-names-denylist           → no output (exit 1)
 1. **BRIEF line 372** says "steps 1–3 may use a fitted scale, but one scale for all of them", but step 3's minis are specced at 120 pt. I followed the batch brief (steps 1–2 share a scale; the step 3 minis stay at 120 pt). The BRIEF wording may need "steps 1–2".
 2. **The rim on the rejected mark:** ruling 3 says "with its cream rim". If that means a rim on the struck circle too, it's a change in `Overlay/PlateView` (not my glob), and it would apply to the overlay as well.
 3. **An exact decision baseline:** `recentDecisions` has no serial number, so the overlap match can, in theory, miss a new decision that exactly repeats a full window of 32 old ones. It never over-counts. A monotonic `decisionSerial` on `SettingsModel` (frozen) would make the baseline exact.
+4. **What step 2's ✓ means:** I read ruling 2 as "✓ only for a landed slide", so continuing without one leaves "2" unchecked (Decisions 2). BRIEF's generic "done steps take a ✓" (line 363) can be read as "✓ once passed". Which do you want?
+
+Items 2 and 3 are also in `.parallel-plans/blockers-batch-24.md`, since they need files outside my glob.
