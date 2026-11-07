@@ -1,3 +1,4 @@
+import Displays
 import EdgyCore
 
 /// Batch EDGY-ACTIONS owns this module.
@@ -18,5 +19,7 @@ public func makeLiveActionRegistry(settings: AppSettings) -> ActionPerforming {
     settings: settings, audio: LiveAudioOutput(), display: LiveBrightnessOutput(),
     media: LiveMediaKeyOutput(), hud: LiveHUDOutput(), haptics: LiveHapticOutput(),
     shortcuts: LiveShortcutRunner(), keyboard: keyboard, workspace: LiveWorkspaceOutput(),
-    windows: LiveWindowOutput(), system: LiveSystemOutput(keyboard: keyboard))
+    windows: LiveWindowOutput(), system: LiveSystemOutput(keyboard: keyboard), levelKeys: LiveLevelKeyOutput(),
+    displays: makeLiveDisplayBrightness(), backlight: LiveKeyboardBacklightOutput(),
+    dictation: LiveDictationOutput(), waiter: LiveTransitionWaiter())
 }

@@ -15,20 +15,27 @@ import Testing
       ids == [
         "audio.volume", "audio.mute", "display.brightness", "mic.mute", "media.playPause", "media.next",
         "media.previous", "shortcut.run",
-        "keyboard.shortcut", "keyboard.slideSteps",
-        "app.open", "url.open", "file.open",
+        "keyboard.backlight", "keyboard.backlightToggle",
+        "keyboard.shortcut", "keyboard.slideSteps", "keyboard.hold",
+        "app.open", "url.open", "file.open", "apps.switcher",
         "system.missionControl", "system.appWindows", "system.showDesktop", "spaces.left", "spaces.right",
-        "system.lockScreen", "system.sleepDisplay",
+        "system.lockScreen", "system.sleepDisplay", "system.dictation",
         "window.leftHalf", "window.rightHalf", "window.topHalf", "window.bottomHalf", "window.maximize",
         "window.center", "window.minimize", "window.restore",
       ])
     #expect(Set(ids).count == ids.count)
+    #expect(ids.count == 33)
   }
 
   @Test func shapesAndCategories() {
     let byID = Dictionary(uniqueKeysWithValues: Harness().registry.available.map { ($0.id.rawValue, $0) })
     let continuous = Set(byID.values.filter { $0.shape == .continuous }.map(\.id.rawValue))
-    #expect(continuous == ["audio.volume", "display.brightness", "keyboard.slideSteps"])
+    #expect(
+      continuous == [
+        "audio.volume", "display.brightness", "keyboard.slideSteps", "apps.switcher", "keyboard.backlight",
+      ])
+    let hold = Set(byID.values.filter { $0.shape == .hold }.map(\.id.rawValue))
+    #expect(hold == ["keyboard.hold"])
     let expected: [String: ActionCategory] = [
       "audio.volume": .sound, "audio.mute": .sound, "mic.mute": .sound, "display.brightness": .display,
       "media.playPause": .media, "media.next": .media, "media.previous": .media, "shortcut.run": .shortcuts,
@@ -38,7 +45,8 @@ import Testing
       "system.lockScreen": .system, "system.sleepDisplay": .system, "window.leftHalf": .windows,
       "window.rightHalf": .windows, "window.topHalf": .windows, "window.bottomHalf": .windows,
       "window.maximize": .windows, "window.center": .windows, "window.minimize": .windows,
-      "window.restore": .windows,
+      "window.restore": .windows, "apps.switcher": .apps, "keyboard.hold": .keyboard,
+      "system.dictation": .system, "keyboard.backlight": .display, "keyboard.backlightToggle": .display,
     ]
     #expect(byID.mapValues(\.category) == expected)
   }
@@ -67,9 +75,21 @@ import Testing
     #expect(byID["url.open"]?.parameters.map(\.key) == ["url"])
     #expect(byID["file.open"]?.parameters.map(\.kind) == [.filePath])
     #expect(byID["file.open"]?.parameters.map(\.key) == ["path"])
+    #expect(
+      byID["keyboard.hold"]?.parameters == [
+        ActionParameter(key: "keys", kind: .keyCombo, required: true, displayName: "Keys")
+      ])
+    #expect(
+      byID["apps.switcher"]?.parameters == [
+        ActionParameter(
+          key: "step", kind: .number(0.04...0.5), required: false, defaultValue: "0.1", displayName: "Step")
+      ])
     let parameterless = byID.values.filter {
-      !["shortcut.run", "keyboard.shortcut", "keyboard.slideSteps", "app.open", "url.open", "file.open"]
-        .contains($0.id.rawValue)
+      ![
+        "shortcut.run", "keyboard.shortcut", "keyboard.slideSteps", "app.open", "url.open", "file.open",
+        "keyboard.hold", "apps.switcher",
+      ]
+      .contains($0.id.rawValue)
     }
     #expect(parameterless.allSatisfy { $0.parameters.isEmpty })
   }

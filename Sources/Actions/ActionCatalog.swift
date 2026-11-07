@@ -34,6 +34,13 @@ public enum BuiltInAction {
   public static let windowCenter: ActionID = "window.center"
   public static let windowMinimize: ActionID = "window.minimize"
   public static let windowRestore: ActionID = "window.restore"
+
+  // v0.3
+  public static let appSwitcher: ActionID = "apps.switcher"
+  public static let keyboardHold: ActionID = "keyboard.hold"
+  public static let dictation: ActionID = "system.dictation"
+  public static let keyboardBacklight: ActionID = "keyboard.backlight"
+  public static let keyboardBacklightToggle: ActionID = "keyboard.backlightToggle"
 }
 
 /// Parameter keys and values the built-in actions read from `Binding.parameters`.
@@ -56,6 +63,9 @@ public enum ActionParameterKey {
 enum ActionCatalog {
   static let stepRange: ClosedRange<Double> = 0.02...0.5
   static let defaultStep = 0.0625
+  /// `apps.switcher`: slide travel per app.
+  static let switcherStepRange: ClosedRange<Double> = 0.04...0.5
+  static let defaultSwitcherStep = 0.1
 
   /// Every action, in the order the settings UI lists them within a category.
   static let all: [ActionDescriptor] = [
@@ -74,6 +84,16 @@ enum ActionCatalog {
         ActionParameter(
           key: ActionParameterKey.shortcutName, kind: .text, required: true, displayName: "Shortcut Name")
       ]),
+
+    // Display, continued (v0.3): the built-in keyboard's backlight, through the private
+    // brightness framework. Unavailable on Macs without a backlit keyboard.
+    ActionDescriptor(
+      id: BuiltInAction.keyboardBacklight, shape: .continuous, displayName: "Keyboard Brightness",
+      category: .display),
+    // Off, or back to the last non-zero level.
+    ActionDescriptor(
+      id: BuiltInAction.keyboardBacklightToggle, shape: .trigger, displayName: "Keyboard Backlight On / Off",
+      category: .display),
 
     // Keyboard.
     ActionDescriptor(
@@ -94,6 +114,12 @@ enum ActionCatalog {
           key: ActionParameterKey.step, kind: .number(stepRange), required: false,
           defaultValue: String(defaultStep), displayName: "Step"),
       ]),
+    // Holds the combo down for as long as the finger stays (long-press): the push-to-talk key a
+    // dictation app asks the user to hold.
+    ActionDescriptor(
+      id: BuiltInAction.keyboardHold, shape: .hold, displayName: "Hold Keys", category: .keyboard,
+      parameters: [ActionParameter(key: ActionParameterKey.keys, kind: .keyCombo, required: true, displayName: "Keys")]
+    ),
 
     // Apps.
     ActionDescriptor(
@@ -113,6 +139,15 @@ enum ActionCatalog {
       parameters: [
         ActionParameter(key: ActionParameterKey.path, kind: .filePath, required: true, displayName: "File or Folder")
       ]),
+    // The command-tab app switcher, driven by a slide: opens on the next app, one app per `step`
+    // of travel (toward top/right = forward), selects on lift, cancels on a cancelled gesture.
+    ActionDescriptor(
+      id: BuiltInAction.appSwitcher, shape: .continuous, displayName: "Switch Apps", category: .apps,
+      parameters: [
+        ActionParameter(
+          key: ActionParameterKey.step, kind: .number(switcherStepRange), required: false,
+          defaultValue: String(defaultSwitcherStep), displayName: "Step")
+      ]),
 
     // System. See `LiveSystemOutput` for how each one is done and why.
     ActionDescriptor(
@@ -131,6 +166,8 @@ enum ActionCatalog {
     ActionDescriptor(id: BuiltInAction.lockScreen, shape: .trigger, displayName: "Lock Screen", category: .system),
     ActionDescriptor(
       id: BuiltInAction.sleepDisplay, shape: .trigger, displayName: "Sleep Display", category: .system),
+    // Starts / stops macOS Dictation. See `LiveDictationOutput` for what it depends on.
+    ActionDescriptor(id: BuiltInAction.dictation, shape: .trigger, displayName: "Dictation", category: .system),
 
     // Windows (the frontmost app's focused window).
     ActionDescriptor(

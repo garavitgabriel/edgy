@@ -1,3 +1,4 @@
+import Displays
 import EdgyCore
 import Foundation
 
@@ -17,14 +18,35 @@ struct LevelStep: Equatable {
   static func apply(delta: Double, sensitivity: Double, to old: Double) -> LevelStep {
     let start = min(max(old, 0), 1)
     let new = min(max(start + delta * sensitivity, 0), 1)
-    // Boundaries k/16 passed or landed on, not counting the one the move started from.
-    var crossed =
-      new >= start
-      ? Int((new * steps).rounded(.down) - (start * steps).rounded(.down))
-      : Int((start * steps).rounded(.up) - (new * steps).rounded(.up))
+    var crossed = crossings(from: start, to: new, steps: steps)
     let hitEnd = new != start && (new == 0 || new == 1)
     if hitEnd { crossed -= 1 }
     return LevelStep(level: new, ticks: max(crossed, 0), strongTick: hitEnd)
+  }
+
+  /// Boundaries k/`steps` passed or landed on between `start` and `new` (either direction), not
+  /// counting the one the move started from.
+  static func crossings(from start: Double, to new: Double, steps: Double) -> Int {
+    new >= start
+      ? Int((new * steps).rounded(.down) - (start * steps).rounded(.down))
+      : Int((start * steps).rounded(.up) - (new * steps).rounded(.up))
+  }
+}
+
+/// The system's fine level steps: with the fine-step modifiers held, each volume or brightness
+/// key press moves the level 1/64 of its range (four presses per normal 1/16 step).
+enum FineSteps {
+  static let perRange = 64.0
+  /// One `slideSteps` haptic per this many fine steps, i.e. one per 1/16: the grid
+  /// `HapticEvent.slideSteps` promises, the one the system HUD draws, and the one the
+  /// CoreAudio / external-display paths already tick on. A tick per fine step (64 per full
+  /// slide) reads as a buzz, not as steps.
+  static let perTick = 4
+
+  /// Signed key presses that move a level from `old` to `new`: every 1/64 boundary crossed.
+  static func presses(from old: Double, to new: Double) -> Int {
+    let count = LevelStep.crossings(from: old, to: new, steps: perRange)
+    return new >= old ? count : -count
   }
 }
 
@@ -52,10 +74,23 @@ struct KeySteps: Equatable {
   }
 }
 
+/// What a level slide drives. Chosen when the slide starts and kept until it ends, so moving the
+/// pointer to another display mid-slide doesn't switch targets.
+enum LevelTarget: Equatable {
+  case volume
+  case builtInBrightness
+  /// A display controlled through `Displays` (an external monitor, or a built-in panel the
+  /// built-in brightness output can't reach).
+  case displayBrightness(UInt32)
+  case keyboardBacklight
+}
+
 /// The action registry: turns `(ActionID, ActionInput)` into calls on system outputs.
 ///
-/// Not thread-safe; call it from one thread (the router's).
-public final class ActionRegistry: ActionPerforming {
+/// Call `perform` from one thread (the router's). The one exception is window work that waits
+/// for a full-screen exit: it finishes on the `TransitionWaiter`'s queue, so the window memory
+/// it shares is behind `windowLock`. `availability(of:)` may be called from any thread.
+public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
   /// HUD and haptics follow these live; the app may replace them at any time.
   public var settings: AppSettings
 
@@ -79,25 +114,59 @@ public final class ActionRegistry: ActionPerforming {
   let workspace: WorkspaceOutput
   let windows: WindowOutput
   let system: SystemOutput
+  let levelKeys: LevelKeyOutput
+  let displays: DisplayBrightnessControlling
+  let backlight: KeyboardBacklightOutput
+  let dictation: DictationOutput
+  let waiter: TransitionWaiter
 
-  /// Level of the slide in progress, per action. Avoids re-reading (and re-quantizing) the
-  /// system value on every frame.
-  private var sessionLevels: [ActionID: Double] = [:]
+  /// The level slide in progress, per action. Keeps its own level rather than re-reading (and
+  /// re-quantizing) the system value on every frame.
+  struct LevelSession {
+    var target: LevelTarget
+    var level: Double
+  }
+  private var levelSessions: [ActionID: LevelSession] = [:]
 
   /// Travel toward the next key press of the `keyboard.slideSteps` slide in progress.
   private var keyStepCarry: Double = 0
 
+  /// Last non-zero keyboard backlight level, for `keyboard.backlightToggle`.
+  var backlightMemory: Double?
+  /// Toggling the backlight on with nothing remembered goes to this level.
+  static let defaultBacklightLevel = 0.5
+
+  /// Logged once: level keys couldn't be posted and the registry fell back to setting levels.
+  private var loggedLevelKeyFallback = false
+
+  // App switcher and hold-a-key sessions (see `ActionRegistry+Keys.swift`).
+  var switcher: SwitcherSession?
+  var heldCombo: KeyCombo?
+
+  // Window memory (see `ActionRegistry+Windows.swift`). Guarded by `windowLock`.
+  let windowLock = NSRecursiveLock()
   /// Each snapped window's frame from before Edgy first snapped it, for `window.restore`. A
   /// chain of snaps (left, then maximize…) keeps the frame from before the chain.
-  private(set) var snapMemory: [WindowID: CGRect] = [:]
+  var snapMemory: [WindowID: CGRect] = [:]
   /// Windows come and go; forget the oldest memories past this many.
   static let snapMemoryLimit = 32
-  private var snapOrder: [WindowID] = []
+  var snapOrder: [WindowID] = []
+  /// Where Edgy last put each remembered window.
+  var lastPlaced: [WindowID: CGRect] = [:]
+  /// Windows asked to leave full screen, and what to do once they have. A newer request for the
+  /// same window replaces the older one.
+  var pendingFullScreenExits: [WindowID: WindowCommand] = [:]
+
+  // Availability cache (see `ActionRegistry+Availability.swift`). Guarded by `availabilityLock`.
+  let availabilityLock = NSLock()
+  var availabilityCache: (facts: HardwareFacts, table: [ActionID: ActionAvailability])?
 
   init(
     settings: AppSettings, audio: AudioOutput, display: BrightnessOutput, media: MediaKeyOutput,
     hud: HUDOutput, haptics: HapticOutput, shortcuts: ShortcutRunner, keyboard: KeyboardOutput,
-    workspace: WorkspaceOutput, windows: WindowOutput, system: SystemOutput
+    workspace: WorkspaceOutput, windows: WindowOutput, system: SystemOutput, levelKeys: LevelKeyOutput,
+    displays: DisplayBrightnessControlling, backlight: KeyboardBacklightOutput, dictation: DictationOutput,
+    waiter: TransitionWaiter
   ) {
     self.settings = settings
     self.audio = audio
@@ -110,6 +179,11 @@ public final class ActionRegistry: ActionPerforming {
     self.workspace = workspace
     self.windows = windows
     self.system = system
+    self.levelKeys = levelKeys
+    self.displays = displays
+    self.backlight = backlight
+    self.dictation = dictation
+    self.waiter = waiter
   }
 
   public let available: [ActionDescriptor] = ActionCatalog.all
@@ -120,32 +194,39 @@ public final class ActionRegistry: ActionPerforming {
     }
     switch (descriptor.shape, input) {
     case (.continuous, .delta(let delta, let phase)):
-      if id == BuiltInAction.keyboardSlideSteps {
+      switch id {
+      case BuiltInAction.keyboardSlideSteps:
         try performKeySteps(id, delta: delta, phase: phase, context: context)
-      } else {
-        try performContinuous(id, delta: delta, phase: phase, context: context)
+      case BuiltInAction.appSwitcher:
+        try performSwitcher(id, delta: delta, phase: phase, context: context)
+      default:
+        try performLevel(id, delta: delta, phase: phase, context: context)
       }
     case (.trigger, .trigger):
       try performTrigger(id, context: context)
+    case (.hold, .press(let down)):
+      try performHold(id, down: down, context: context)
     default:
       throw ActionError.wrongInputShape(id)
     }
   }
 
-  // MARK: - Continuous
+  // MARK: - Levels
 
-  private func performContinuous(
+  /// Volume, brightness and keyboard backlight slides.
+  private func performLevel(
     _ id: ActionID, delta: Double, phase: GestureEvent.Phase, context: ActionContext
   ) throws {
-    if phase == .began { sessionLevels[id] = nil }
-    defer { if phase == .ended || phase == .cancelled { sessionLevels[id] = nil } }
+    if phase == .began { levelSessions[id] = nil }
+    defer { if phase == .ended || phase == .cancelled { levelSessions[id] = nil } }
 
-    let old = try sessionLevels[id] ?? currentLevel(id)
+    let session = try levelSessions[id] ?? startLevelSession(id)
+    let old = session.level
     let step = LevelStep.apply(delta: delta, sensitivity: Self.sensitivity(context), to: old)
-    sessionLevels[id] = step.level
+    levelSessions[id] = LevelSession(target: session.target, level: step.level)
     guard step.level != old else { return }
 
-    try setLevel(id, step.level, rising: step.level > old)
+    try unavailable(id) { try setLevel(session.target, from: old, to: step.level) }
     if step.strongTick && settings.allowsHaptic(.slideLimits, parameters: context.parameters) {
       haptics.strongTick(strength: settings.hapticClickStrength)
     }
@@ -161,30 +242,108 @@ public final class ActionRegistry: ActionPerforming {
     return value
   }
 
-  private func currentLevel(_ id: ActionID) throws -> Double {
+  /// Picks the target and reads its current level. The start level always comes from the system
+  /// (CoreAudio, the display, the backlight), so slides begin where the keys left off.
+  private func startLevelSession(_ id: ActionID) throws -> LevelSession {
     try unavailable(id) {
-      if id == BuiltInAction.volume { return try audio.outputVolume() }
-      guard display.isAvailable else { throw OutputError("no built-in display") }
-      return try display.brightness()
+      let target = try levelTarget(id)
+      let level: Double
+      switch target {
+      case .volume: level = try audio.outputVolume()
+      case .builtInBrightness: level = try display.brightness()
+      case .displayBrightness(let display): level = try displays.brightness(of: display)
+      case .keyboardBacklight:
+        level = try backlight.level()
+        if level > 0 { backlightMemory = level }
+      }
+      return LevelSession(target: target, level: level)
     }
   }
 
-  private func setLevel(_ id: ActionID, _ level: Double, rising: Bool) throws {
-    try unavailable(id) {
-      if id == BuiltInAction.volume {
-        try audio.setOutputVolume(level)
-        // Raising the volume while muted unmutes, as the hardware keys do.
-        var muted = (try? audio.isOutputMuted()) ?? false
-        if muted, rising {
-          try audio.setOutputMuted(false)
-          muted = false
+  private func levelTarget(_ id: ActionID) throws -> LevelTarget {
+    switch id {
+    case BuiltInAction.volume: return .volume
+    case BuiltInAction.brightness: return try brightnessTarget()
+    case BuiltInAction.keyboardBacklight:
+      guard backlight.isAvailable else { throw OutputError(Self.noBacklightReason) }
+      return .keyboardBacklight
+    default: throw ActionError.unknownAction(id)
+    }
+  }
+
+  /// The display under the pointer: the built-in panel goes through the brightness keys (or the
+  /// built-in output); a controllable external display through `Displays`; any other display is
+  /// unavailable with its own reason. When `Displays` doesn't know the active display, the
+  /// built-in panel, if there is one.
+  // HUD for external displays: design sprint. External displays show no system HUD today.
+  func brightnessTarget() throws -> LevelTarget {
+    if let active = displays.activeDisplayID(), let info = displays.displays().first(where: { $0.id == active }) {
+      switch info.kind {
+      case .builtIn where display.isAvailable:
+        return .builtInBrightness
+      default:
+        guard info.brightnessControllable else {
+          throw OutputError(info.reason ?? "\(info.name) doesn't accept brightness control")
         }
-        showHUD(.volume(muted: muted, headphones: audio.outputIsHeadphones()), level: level)
-      } else {
-        guard display.isAvailable else { throw OutputError("no built-in display") }
-        try display.setBrightness(level)
-        showHUD(.brightness, level: level)
+        return .displayBrightness(info.id)
       }
+    }
+    guard display.isAvailable else { throw OutputError("no built-in display") }
+    return .builtInBrightness
+  }
+
+  /// Moves `target` from `old` to `new`.
+  ///
+  /// Volume and built-in brightness, HUD `.native`: the system's own keys with fine steps, so
+  /// macOS changes the level and shows its current HUD. If the keys can't be posted, the level
+  /// is set directly and the legacy HUD shown instead. HUD `.none`: set directly, silently.
+  private func setLevel(_ target: LevelTarget, from old: Double, to new: Double) throws {
+    let rising = new > old
+    switch target {
+    case .volume:
+      if settings.hud == .native, try pressLevelKeys(rising ? .volumeUp : .volumeDown, from: old, to: new) {
+        return
+      }
+      try audio.setOutputVolume(new)
+      // Raising the volume while muted unmutes, as the hardware keys do.
+      var muted = (try? audio.isOutputMuted()) ?? false
+      if muted, rising {
+        try audio.setOutputMuted(false)
+        muted = false
+      }
+      showHUD(.volume(muted: muted, headphones: audio.outputIsHeadphones()), level: new)
+    case .builtInBrightness:
+      if settings.hud == .native,
+        try pressLevelKeys(rising ? .brightnessUp : .brightnessDown, from: old, to: new)
+      {
+        return
+      }
+      try display.setBrightness(new)
+      showHUD(.brightness, level: new)
+    case .displayBrightness(let id):
+      try displays.setBrightness(new, of: id)
+    case .keyboardBacklight:
+      try backlight.setLevel(new)
+      if new > 0 { backlightMemory = new }
+    }
+  }
+
+  /// Posts the fine-step presses between `old` and `new`. True when the keys took care of it
+  /// (including "no whole step crossed yet"); false when posting failed and the caller should
+  /// set the level itself.
+  private func pressLevelKeys(_ key: LevelKey, from old: Double, to new: Double) throws -> Bool {
+    let presses = abs(FineSteps.presses(from: old, to: new))
+    guard presses > 0 else { return true }
+    do {
+      try levelKeys.press(key, count: presses, fine: true)
+      return true
+    } catch {
+      if !loggedLevelKeyFallback {
+        loggedLevelKeyFallback = true
+        actionsLog.notice(
+          "level keys unavailable (\(String(describing: error), privacy: .public)); setting levels directly")
+      }
+      return false
     }
   }
 
@@ -221,16 +380,11 @@ public final class ActionRegistry: ActionPerforming {
       return try unavailable(id) { try system.perform(command) }
     }
     if let snap = ActionCatalog.windowSnaps[id] {
-      return try unavailable(id) { try snapWindow(snap) }
+      return try unavailable(id) { try windowCommand(.snap(snap)) }
     }
     switch id {
     case BuiltInAction.mute:
-      try unavailable(id) {
-        let muted = try !audio.isOutputMuted()
-        try audio.setOutputMuted(muted)
-        let level = (try? audio.outputVolume()) ?? 0
-        showHUD(.volume(muted: muted, headphones: audio.outputIsHeadphones()), level: muted ? 0 : level)
-      }
+      try unavailable(id) { try toggleMute() }
     case BuiltInAction.micMute:
       try unavailable(id) { try audio.setInputMuted(!audio.isInputMuted()) }
     case BuiltInAction.playPause: media.playPause()
@@ -255,13 +409,48 @@ public final class ActionRegistry: ActionPerforming {
       guard path.hasPrefix("/") else { throw ActionError.missingParameter(id, name: ActionParameterKey.path) }
       try unavailable(id) { try workspace.open(file: URL(fileURLWithPath: path)) }
     case BuiltInAction.windowMinimize:
-      try unavailable(id) { try windows.minimize(windows.focusedWindow().id) }
+      try unavailable(id) { try windowCommand(.minimize) }
     case BuiltInAction.windowRestore:
       try unavailable(id) { try restoreWindow() }
+    case BuiltInAction.dictation:
+      try unavailable(id) { try dictation.toggle() }
+    case BuiltInAction.keyboardBacklightToggle:
+      try unavailable(id) { try toggleBacklight() }
     default:
       throw ActionError.unknownAction(id)
     }
   }
+
+  /// HUD `.native`: the system mute key (system HUD). Otherwise, or if the key can't be posted,
+  /// CoreAudio, plus the legacy HUD when it is on.
+  private func toggleMute() throws {
+    if settings.hud == .native {
+      do {
+        try levelKeys.press(.mute, count: 1, fine: false)
+        return
+      } catch {
+        actionsLog.notice("mute key unavailable (\(String(describing: error), privacy: .public)); muting directly")
+      }
+    }
+    let muted = try !audio.isOutputMuted()
+    try audio.setOutputMuted(muted)
+    let level = (try? audio.outputVolume()) ?? 0
+    showHUD(.volume(muted: muted, headphones: audio.outputIsHeadphones()), level: muted ? 0 : level)
+  }
+
+  /// Off if lit (remembering the level), else back to the last non-zero level.
+  private func toggleBacklight() throws {
+    guard backlight.isAvailable else { throw OutputError(Self.noBacklightReason) }
+    let current = try backlight.level()
+    if current > 0 {
+      backlightMemory = current
+      try backlight.setLevel(0)
+    } else {
+      try backlight.setLevel(backlightMemory ?? Self.defaultBacklightLevel)
+    }
+  }
+
+  static let noBacklightReason = "This Mac's keyboard has no backlight."
 
   /// `app.open`: brings the app forward (launching it if needed). If it is already frontmost,
   /// `whenFrontmost` decides: `hide` (default) hides it, `stay` brings it forward again.
@@ -278,58 +467,10 @@ public final class ActionRegistry: ActionPerforming {
     }
   }
 
-  // MARK: - Windows
-
-  private func snapWindow(_ snap: WindowSnap) throws {
-    let window = try windows.focusedWindow()
-    let target = WindowGeometry.target(for: snap, window: window.frame, visible: window.visibleFrame)
-    // Remember the frame from before this chain of snaps. A window the user has moved or resized
-    // since Edgy last placed it starts a new chain.
-    let chained =
-      snapMemory[window.id] != nil
-      && lastPlaced[window.id].map { Self.roughlyEqual($0, window.frame) } == true
-    if !chained { remember(window.frame, for: window.id) }
-    try windows.setFrame(target, of: window.id)
-    lastPlaced[window.id] = target
-  }
-
-  /// Where Edgy last put each remembered window.
-  private var lastPlaced: [WindowID: CGRect] = [:]
-
-  /// Apps may round a requested frame (to a text grid, a minimum size), so "still where Edgy put
-  /// it" allows this much slack per edge, in points.
-  static let placementSlack: CGFloat = 32
-
-  static func roughlyEqual(_ a: CGRect, _ b: CGRect) -> Bool {
-    abs(a.minX - b.minX) <= placementSlack && abs(a.minY - b.minY) <= placementSlack
-      && abs(a.maxX - b.maxX) <= placementSlack && abs(a.maxY - b.maxY) <= placementSlack
-  }
-
-  private func restoreWindow() throws {
-    guard !snapMemory.isEmpty else { return }
-    let window = try windows.focusedWindow()
-    guard let frame = snapMemory[window.id] else { return }
-    try windows.setFrame(frame, of: window.id)
-    forget(window.id)
-  }
-
-  private func remember(_ frame: CGRect, for window: WindowID) {
-    snapOrder.removeAll { $0 == window }
-    snapOrder.append(window)
-    snapMemory[window] = frame
-    while snapOrder.count > Self.snapMemoryLimit { forget(snapOrder[0]) }
-  }
-
-  private func forget(_ window: WindowID) {
-    snapOrder.removeAll { $0 == window }
-    snapMemory[window] = nil
-    lastPlaced[window] = nil
-  }
-
   // MARK: - Parameters
 
   /// A required, non-empty text parameter.
-  private func text(_ key: String, for id: ActionID, in context: ActionContext) throws -> String {
+  func text(_ key: String, for id: ActionID, in context: ActionContext) throws -> String {
     guard let value = context.parameters[key]?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty
     else { throw ActionError.missingParameter(id, name: key) }
     return value
@@ -337,7 +478,7 @@ public final class ActionRegistry: ActionPerforming {
 
   /// A required key combination. Absent → `missingParameter`; present but not a valid combo →
   /// `unavailable` naming the parameter and the text.
-  private func combo(_ key: String, for id: ActionID, in context: ActionContext) throws -> KeyCombo {
+  func combo(_ key: String, for id: ActionID, in context: ActionContext) throws -> KeyCombo {
     let raw = try text(key, for: id, in: context)
     guard let combo = KeyCombo(raw) else {
       throw ActionError.unavailable(id, reason: "\(key): \"\(raw)\" is not a key combination")
@@ -347,7 +488,7 @@ public final class ActionRegistry: ActionPerforming {
 
   /// An optional number. Absent → `defaultValue`; unparseable or outside `range` →
   /// `missingParameter` (there is no usable value).
-  private func number(
+  func number(
     _ key: String, for id: ActionID, in context: ActionContext, range: ClosedRange<Double>,
     default defaultValue: Double
   ) throws -> Double {
@@ -379,15 +520,24 @@ public final class ActionRegistry: ActionPerforming {
   }
 
   /// Runs `body`, turning output failures into `ActionError.unavailable`.
-  private func unavailable<T>(_ id: ActionID, _ body: () throws -> T) throws -> T {
+  func unavailable<T>(_ id: ActionID, _ body: () throws -> T) throws -> T {
     do {
       return try body()
     } catch let error as OutputError {
       throw ActionError.unavailable(id, reason: error.reason)
     } catch let error as ActionError {
       throw error
+    } catch let error as DisplayBrightnessError {
+      throw ActionError.unavailable(id, reason: Self.reason(error))
     } catch {
       throw ActionError.unavailable(id, reason: String(describing: error))
+    }
+  }
+
+  static func reason(_ error: DisplayBrightnessError) -> String {
+    switch error {
+    case .noSuchDisplay: return "the display is no longer connected"
+    case .notControllable(_, let reason), .failed(_, let reason): return reason
     }
   }
 }

@@ -64,6 +64,12 @@ protocol ShortcutRunner: AnyObject {
 protocol KeyboardOutput: AnyObject {
   /// Presses and releases `combo` (modifiers down, key down/up, modifiers up).
   func post(_ combo: KeyCombo) throws
+  /// Presses (`down: true`) or releases each modifier key, in the order given, and leaves it in
+  /// that state. For keys held across calls (app switcher, hold-a-key). Implementations track
+  /// which modifiers are down so every event carries the right flags.
+  func setModifiers(_ modifiers: [KeyCombo.Modifier], down: Bool) throws
+  /// One key-down or key-up of `key`, flagged with `modifiers` (their own keys are not pressed).
+  func key(_ key: String, down: Bool, modifiers: Set<KeyCombo.Modifier>) throws
 }
 
 /// Apps, URLs and files.
@@ -95,15 +101,66 @@ struct WindowSnapshot: Equatable, Sendable {
   var frame: CGRect
   /// The visible frame (minus menu bar and Dock) of the screen containing the window.
   var visibleFrame: CGRect
+  /// The window is in macOS full screen (its own Space); it can't be moved or resized until it
+  /// leaves.
+  var isFullScreen = false
 }
 
 /// The frontmost app's focused window. Needs Accessibility.
+///
+/// `isFullScreen(_:)` and `snapshot(of:)` may be called from a `TransitionWaiter`'s queue while
+/// the action thread uses the other methods; implementations must allow that.
 protocol WindowOutput: AnyObject {
   /// No focused window → `OutputError`.
   func focusedWindow() throws -> WindowSnapshot
+  /// A fresh snapshot of a window handed out earlier by `focusedWindow`.
+  func snapshot(of window: WindowID) throws -> WindowSnapshot
   /// Moves and resizes the window. `frame` is in top-left-origin global coordinates.
   func setFrame(_ frame: CGRect, of window: WindowID) throws
   func minimize(_ window: WindowID) throws
+  /// Asks the window to leave full screen. Returns at once; the transition animates afterwards.
+  func exitFullScreen(_ window: WindowID) throws
+}
+
+// MARK: - v0.3 outputs
+
+/// The keyboard's system level keys. They reach macOS as system-defined events, so the system
+/// changes the level itself and draws its own current HUD (including per-device variants).
+enum LevelKey: String, CaseIterable, Equatable, Sendable {
+  case volumeUp, volumeDown, mute, brightnessUp, brightnessDown
+}
+
+/// Posts system level keys. Must fail synchronously (throw `OutputError`) when the events can't
+/// be built or posted, so the registry can fall back to setting the level itself.
+protocol LevelKeyOutput: AnyObject {
+  /// Presses and releases `key` `count` times. `fine`: with the system's fine-step modifiers, so
+  /// each press moves the level 1/64 of its range instead of 1/16.
+  func press(_ key: LevelKey, count: Int, fine: Bool) throws
+}
+
+/// The built-in keyboard's backlight.
+protocol KeyboardBacklightOutput: AnyObject {
+  /// False when this Mac has no backlit keyboard (or its control can't be loaded).
+  var isAvailable: Bool { get }
+  /// Backlight level, 0...1.
+  func level() throws -> Double
+  func setLevel(_ level: Double) throws
+}
+
+/// macOS Dictation.
+protocol DictationOutput: AnyObject {
+  /// Starts Dictation, or stops it if it is listening.
+  func toggle() throws
+}
+
+/// Polls a condition off the caller's thread. Used to wait for a window to leave full screen.
+protocol TransitionWaiter: AnyObject, Sendable {
+  /// Returns immediately. Checks `condition` every `interval` seconds on the waiter's own queue
+  /// and calls `done(true)` once it holds, or `done(false)` after `timeout` seconds. `done` runs on
+  /// the waiter's queue, exactly once.
+  func wait(
+    timeout: TimeInterval, interval: TimeInterval, until condition: @escaping @Sendable () -> Bool,
+    then done: @escaping @Sendable (Bool) -> Void)
 }
 
 /// System-wide views and power commands.

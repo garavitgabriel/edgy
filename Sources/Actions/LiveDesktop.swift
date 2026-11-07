@@ -43,6 +43,43 @@ final class LiveKeyboardOutput: KeyboardOutput {
     }
     for event in events { event.post(tap: .cghidEventTap) }
   }
+
+  /// Modifiers currently held down by `setModifiers`; their flags go on every later event.
+  private var held = Set<KeyCombo.Modifier>()
+
+  func setModifiers(_ modifiers: [KeyCombo.Modifier], down: Bool) throws {
+    let source = try Self.source()
+    for modifier in modifiers {
+      guard let (code, _) = KeyCodes.modifiers[modifier] else { continue }
+      if down { held.insert(modifier) } else { held.remove(modifier) }
+      guard let event = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: down) else {
+        throw OutputError("cannot create a key event")
+      }
+      event.flags = Self.flags(held)
+      event.post(tap: .cghidEventTap)
+    }
+  }
+
+  func key(_ key: String, down: Bool, modifiers: Set<KeyCombo.Modifier>) throws {
+    guard let code = KeyCodes.byName[key] else { throw OutputError("no key code for \"\(key)\"") }
+    let source = try Self.source()
+    guard let event = CGEvent(keyboardEventSource: source, virtualKey: code, keyDown: down) else {
+      throw OutputError("cannot create a key event")
+    }
+    event.flags = Self.flags(modifiers.union(held)).union(KeyCodes.implicitFlags(for: key))
+    event.post(tap: .cghidEventTap)
+  }
+
+  private static func source() throws -> CGEventSource {
+    guard let source = CGEventSource(stateID: .hidSystemState) else {
+      throw OutputError("cannot create a keyboard event source")
+    }
+    return source
+  }
+
+  private static func flags(_ modifiers: Set<KeyCombo.Modifier>) -> CGEventFlags {
+    modifiers.reduce(into: CGEventFlags()) { $0.insert(KeyCodes.modifiers[$1]?.flag ?? []) }
+  }
 }
 
 // MARK: - Workspace
@@ -101,9 +138,39 @@ final class LiveWorkspaceOutput: WorkspaceOutput {
 /// The frontmost app's focused window through the Accessibility API. AX positions are already
 /// top-left-origin global coordinates; the screen's visible frame comes from `NSScreen`
 /// (bottom-left origin) and is flipped with `WindowGeometry.flip`. Needs Accessibility.
-final class LiveWindowOutput: WindowOutput {
-  /// Windows handed out by `focusedWindow`, so later calls act on the same element.
+final class LiveWindowOutput: WindowOutput, @unchecked Sendable {
+  /// Windows handed out by `focusedWindow`, so later calls act on the same element. Locked: a
+  /// full-screen wait reads it from the waiter's queue.
   private var elements: [WindowID: AXUIElement] = [:]
+  private let lock = NSLock()
+
+  /// The window's full-screen state. Not in the SDK's constants, but a long-standing standard
+  /// window attribute.
+  static let fullScreenAttribute = "AXFullScreen"
+
+  func snapshot(of window: WindowID) throws -> WindowSnapshot {
+    let element = try element(window)
+    let frame = try Self.frame(of: element)
+    return WindowSnapshot(
+      id: window, frame: frame, visibleFrame: try Self.visibleFrame(containing: frame),
+      isFullScreen: Self.isFullScreen(element))
+  }
+
+  func exitFullScreen(_ window: WindowID) throws {
+    let status = AXUIElementSetAttributeValue(
+      try element(window), Self.fullScreenAttribute as CFString, kCFBooleanFalse)
+    guard status == .success else {
+      throw OutputError("cannot take the window out of full screen (\(status.rawValue))")
+    }
+  }
+
+  private static func isFullScreen(_ element: AXUIElement) -> Bool {
+    var value: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(element, fullScreenAttribute as CFString, &value) == .success,
+      let flag = value as? Bool
+    else { return false }
+    return flag
+  }
 
   func focusedWindow() throws -> WindowSnapshot {
     guard AXIsProcessTrusted() else { throw OutputError("Accessibility permission not granted") }
@@ -116,9 +183,13 @@ final class LiveWindowOutput: WindowOutput {
     let window = value as! AXUIElement
     let frame = try Self.frame(of: window)
     let id = WindowID(pid: app.processIdentifier, token: Int(bitPattern: UInt(CFHash(window))))
-    elements = elements.filter { $0.key.pid == id.pid }
-    elements[id] = window
-    return WindowSnapshot(id: id, frame: frame, visibleFrame: try Self.visibleFrame(containing: frame))
+    lock.withLock {
+      elements = elements.filter { $0.key.pid == id.pid }
+      elements[id] = window
+    }
+    return WindowSnapshot(
+      id: id, frame: frame, visibleFrame: try Self.visibleFrame(containing: frame),
+      isFullScreen: Self.isFullScreen(window))
   }
 
   func setFrame(_ frame: CGRect, of window: WindowID) throws {
@@ -137,7 +208,7 @@ final class LiveWindowOutput: WindowOutput {
   }
 
   private func element(_ window: WindowID) throws -> AXUIElement {
-    guard let element = elements[window] else { throw OutputError("the window is gone") }
+    guard let element = lock.withLock({ elements[window] }) else { throw OutputError("the window is gone") }
     return element
   }
 
