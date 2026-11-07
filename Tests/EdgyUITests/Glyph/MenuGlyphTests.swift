@@ -100,7 +100,8 @@ private struct Facts {
     let dimmed = inkAlpha(MenuGlyph.image(for: state))
     #expect(abs(dimmed / normal - 0.4) < 0.03, "\(state): \(dimmed / normal)")
   }
-  #expect(inkAlpha(MenuGlyph.image(for: .testMode)) > normal, "Test Mode adds the dot")
+  // V3 "Lit strip": Test Mode is a hole cut through the solid pad, so it carries less ink.
+  #expect(inkAlpha(MenuGlyph.image(for: .testMode)) < normal, "Test Mode cuts the hole")
 }
 
 /// Sum of alpha over a 4× render (the ink coverage).
