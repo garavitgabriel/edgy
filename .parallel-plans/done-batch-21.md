@@ -170,6 +170,24 @@ Shots: `docs/design/build-shots/batch-21/` (new, integrated), plus re-shot `batc
   - Broken config is the one-line strip with two buttons, and the window is read-only.
 - **Long labels** (`inspector-long-labels`): Switch Apps' labels each take their own line above the control. There are no mid-word breaks, and every slider track ends at the same x.
 
+## Visual pass (each shot opened and checked in the transcript)
+- Opened and checked:
+  - B21 `window-default` (dark), `window-picker-bottom` (light, the batch-14 copy), `inspector-long-labels`
+  - `tab-wayfare` (light and dark), `state-paused` (dark), `tab-huddle-off`
+  - `state-no-trackpad`, `issue-broken-config`
+  - `popover-unavailable-unmapped`, `popover-no-access-broken-config` (dark)
+- The pass found and fixed two problems (follow-up commit after the first merge):
+  - **`popover-unavailable-unmapped` showed "No trackpad connected"**: the fixture model never reported a pad, so the case wasn't shown. It now does, and the bottom-left corner draws as a dashed, unmapped tile.
+  - **On Wayfare, the overridden row's "Keyboard Shortcut…" wrapped to two lines.** Rows are now one line: the gesture name stays whole and a long action name shortens.
+- Confirmed by eye:
+  - The slab's soft edge is below the slab, with no lighter ring in dark.
+  - Corner tabs hang flush under their tiles; "Off here" is a hairline tab joined to its strip.
+  - The selection ring and the live border trace the joined tab.
+  - Paused and Huddle-off keep the mirror at 40% with the centred line and no plate.
+  - No trackpad is dashed with the exact copy.
+  - The broken-config strip has two buttons, and the split, "+", HUD, Advanced… and Add gesture… are disabled. The headless shots draw switches the same whether disabled or not; check the switches on the device.
+  - The popover block keeps Enabled and Test Mode under it, and the list is Pause / Settings… / About / Quit.
+
 ## Diff summary
 - **Mirror:**
   - `MirrorPad.swift`: union tabs, ring, manual shadow, fitting, touch filter, corner radius cap.

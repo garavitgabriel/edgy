@@ -170,10 +170,12 @@ struct BindingRowView: View {
     VStack(alignment: .leading, spacing: 4) {
       HStack(spacing: 10) {
         GestureIcon(gesture: row.gesture)
-        Text(GestureNaming.name(row.gesture)).foregroundStyle(Tokens.ink)
+        Text(GestureNaming.name(row.gesture)).foregroundStyle(Tokens.ink).lineLimit(1).fixedSize()
         Spacer(minLength: 8)
         // While the picker is open the value is blank: its header already says it (bone 6).
-        if !isPicking { value }
+        // One line: the gesture name stays whole; a long action name shortens (the inspector's
+        // "…" for a cut is the system's; the pad never uses one).
+        if !isPicking { value.lineLimit(1) }
         RowMenu(model: model, row: row)
       }
       .font(Tokens.font(Tokens.typeBody))
