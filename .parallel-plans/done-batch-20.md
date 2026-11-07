@@ -89,6 +89,10 @@ verification: pass
 - **The carry survives between strokes.** Short strokes shorter than a step still add up, the way the volume level does.
 - **Slide-back cancel:** the app the switcher opened on is position 0, and one step back from there cancels (escape). The old "back from the start wraps to the last app" is gone; that is what the brief asks for.
 - **Esc while lingering releases command without sending another escape.** The system switcher closes itself on Esc while command is down.
+- **A physical click during a switcher stroke selects at `keepOpenMS`, not at once.**
+  - The click cancels the gesture (`physicalClick` → `.cancelled`), and an interruption lingers like an end.
+  - The input monitor is installed only then, so it never sees the click that caused it. The app is picked when the window passes (400 ms) instead of immediately.
+  - Consistent with the brief; not a bug.
 - **Pointer movement needs 40 pt.** The next stroke's finger moves the pointer a little before the recognizer claims it. Selecting on that would break short strokes.
 - **Stricter swipes apply on every explicit slide zone**, not only slide + swipe edges. The recognizer can't see swipe bindings (see `blockers-batch-20.md`). On a slide-only edge it's what we want anyway.
 - **Consequence to know:** a flick whose *initial* speed is ≥ 260 mm/s on a slide zone is still a swipe candidate. If the finger then stays down past 350 ms it is rejected (`tooFast`), not slid.
@@ -99,7 +103,7 @@ verification: pass
 - **`holdMS` on other long-presses is offered by the gesture, not the action.** Adding it to every trigger descriptor would show it on taps too. `GestureParameters.pressTime` (Actions) and `ConfigValidator.pressTimeParameter` (EdgyRuntime, which can't import Actions) carry the same spec.
 
 ## Needs Gabriel
-- Run `scripts/smoke-actions.sh` steps 29–33 (and 19, which now runs the one-stroke switcher).
+- Run `scripts/smoke-actions.sh` steps 29–33 (and 19, which now runs the one-stroke switcher). Its Swift typechecks against the built modules (`swiftc -typecheck`), but it has never been run.
 - **Feel on the Magic Trackpad and the MacBook:**
   - short strokes (does 400 ms feel right between strokes?);
   - flicks (is 3× too much or too little? is the 60 → 300 mm/s curve smooth?);
@@ -112,6 +116,11 @@ verification: pass
 - Record scenarios 30–34 on both pads so the numbers can be tuned against traces.
 
 ## Open questions / for the chief
+0. **The `speedUp` checkbox is a visible BRIEF deviation until someone acts on it.**
+   - BRIEF wants a checkbox. `ActionParameter.Kind` has no boolean, so `speedUp` is `.choice(["on","off"])`.
+   - BRIEF's generic rule ("a segmented control for ≤3 options") would draw it as an on|off segmented control.
+   - Either the inspector special-cases exactly `.choice(["on","off"])` as a checkbox, or the chief adds a boolean kind to the frozen `ActionParameter.Kind` on `main`. One of the two must happen.
+   - The runtime has no "parameter rows for a binding" query (`SettingsQueries` / `SettingsEditor` have none), so the inspector also has to add `ConfigValidator.pressTimeParameter` itself, on long-press bindings whose action has no `holdMS`.
 1. **`GestureContext.swipeZones`** (`blockers-batch-20.md`): lets slide-only edges never swipe and keeps the stricter threshold for slide + swipe edges only.
 2. **Inspector (batch 15):**
    - draw `.choice(["on","off"])` as a checkbox;
