@@ -4,7 +4,7 @@ tag: EDGY-ICONS
 branch: worktree-edgy-icons
 worktree_path: ~/Projects/edgy/.claude/worktrees/edgy-icons
 completed_at: 2026-11-07
-verification: swift build ✔ · swift test ✔ (all suites, 0 failures, after `swift package clean`) · swift format lint --strict ✔ · swift build -c release: no warnings in Inspector/Picker/Icons/Window/Mirror/Popover · denylist ✔ (empty) · token greps ✔ (empty)
+verification: final single pass after the last edit (72dfa85) — `swift package clean && swift build && swift test` ✔ (all runs pass, 0 failures) then `swift format lint --strict -r Sources Tests Package.swift` ✔ · swift format lint --strict ✔ · swift build -c release: no warnings in Inspector/Picker/Icons/Window/Mirror/Popover · denylist ✔ (empty) · token greps ✔ (empty)
 ---
 
 # Done: batch 22 (icons, picker clarity, split control, window identity, critique 21)
@@ -42,7 +42,7 @@ verification: swift build ✔ · swift test ✔ (all suites, 0 failures, after `
 | Should-fix 1: whole label column stacks | n/a | Ruled correct (design answer 2) |
 | Should-fix 2: helper crowding | FIXED | 8 pt after each helper line. `batch-21/inspector-long-labels` |
 | Should-fix 3: Huddle chip drops mark | FIXED | `batch-21/popover-normal`: [mark] Huddle ⊘, like the tab |
-| Should-fix 4: strip buttons centred on two lines | NOT DONE | Ran out of turns; `WindowParts.WindowStripView` needs `alignment: .firstTextBaseline`/top on its HStack |
+| Should-fix 4: strip buttons centred on two lines | FIXED | `WindowStripView` aligns on the first text baseline, so the buttons sit on the sentence's first line. `batch-22/strip-broken-config-wrapped`, `batch-21/issue-broken-config` |
 | Should-fix 5: pointer-touch-hidden idle | FIXED | `batch-21/pad-pointer-touch-hidden`: one frame with a mid-pad pointer touch (not drawn) and a right-edge claim (drawn) |
 | Design answer 4: selection opens nothing | FIXED | `batch-21/window-default` re-shot collapsed; the test asserts `openBinding == nil` |
 | 14 S4 long label (a)(b)(c) | SHOT | `batch-14/pad-split-bottom4-long-label` (re-shot) |
@@ -53,7 +53,7 @@ verification: swift build ✔ · swift test ✔ (all suites, 0 failures, after `
 | 15 S6 recorder error | SHOT | `batch-15/param-recorder-error` |
 | 15 S7 chevron while searching | SHOT | `batch-22/picker-searched-disclosure` |
 | 16 M5 overlap line | SHOT | `batch-16/issue-overlapping-zones`, `batch-15/inspector-overlap-warning` |
-| 17 A1 hover wash | PARTIAL | `batch-22/advanced-button` shows the same 10% `ink` wash; no forced-hover shot of a popover menu row |
+| 17 A1 hover wash | SHOT | `batch-22/popover-menu-hover-wash` (a forced-hover menu row: the 10% `ink` wash), `batch-22/advanced-button` |
 | G1 shots | SHOT | No Accessibility popover `batch-17/popover-no-accessibility`; No trackpad `batch-17/popover-no-trackpad`; faded mini with Huddle `batch-14/mini-huddle-off`; window strip `batch-16/state-no-accessibility`; live border on an unselected zone `batch-21/popover-last-touch` and `batch-21/pad-pointer-touch-hidden` |
 
 ## Batch-20 shots (chief)
@@ -107,8 +107,11 @@ New: `Sources/EdgyUI/Icons/{IconData,IconDrawing,ActionIcon}.swift`, `Sources/Ed
 - The 18 pt title-bar icon at real size next to the traffic lights (vertical centring on the real title bar).
 - Hover behaviour (Split preview, the mini hover line, the Advanced and picker washes) with a real pointer.
 
+## Late items (done after the first report)
+
+- **Slide gesture icon follows the edge** (chief): `GestureIcon(gesture:zone:)` turns the slide glyph 90° on top and bottom edges (the same glyph turned, as the chief allowed) in inspector rows, the pending row and the picker's "Add gesture…" list. Test `slideIconFollowsTheEdge`; shot `batch-22/inspector-top-edge-slide`.
+- Should-fix 4 and 17 A1: see the critique table above.
+
 ## Open / remaining
 
-1. **Slide gesture icon follows the edge orientation** (chief, arrived at turn ~108): ↔ on top/bottom, ↕ on left/right, everywhere `GestureIcon` shows, plus a top-edge slide row shot. Not started.
-2. Should-fix 4: top-align the broken-config strip's buttons when the text wraps (`WindowStripView`).
-3. 17 A1: a forced-hover shot of a popover menu row.
+None. Every item from the brief, critique 21 and the chief's additions is done. The only items left are the device checks under Needs Gabriel.
