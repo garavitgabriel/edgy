@@ -136,6 +136,16 @@ struct MirrorSnapshotTests {
     try shoot(PadMirrorView(model: model), "pad-switched-to-built-in")
   }
 
+  /// Render C's state (onboarding step 2, "Try it"): only the right edge is mapped, a finger
+  /// slides on it.
+  @Test func tryItRightSlide() throws {
+    var config = EdgyConfig.defaults
+    config.defaultProfile.bindings = [Binding(zone: .edge(.right), gesture: .slide, action: "audio.volume")]
+    let model = PreviewFixtures.model(config: config)
+    model.simulate(MirrorFixtures.touch(0.975, 0.42, .claimed))
+    try shoot(PadMirrorView(model: model), "pad-try-it-right-slide")
+  }
+
   @Test func miniNoTrackpad() throws {
     let model = PreviewFixtures.model()
     MirrorFixtures.noTrackpad(model)
