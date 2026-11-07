@@ -222,6 +222,15 @@ let volumeRan = LiveDecision.actionRan(
 // MARK: Timeline and fades (injected clock)
 
 @MainActor @Suite struct TimelineTests {
+  /// Critique 18 must-fix 3: BRIEF's timing numbers, stated once. The tests below prove each on the
+  /// injected clock (level 1.2 s, hold 0.6 s + 200 ms, display check 15 s, at most 3 asks).
+  @Test func timingsAreBRIEFs() {
+    #expect(OverlayTimeline.slideLinger == 1.2)  // § Level plate: "fades 1.2 s after the slide ends"
+    #expect(OverlayTimeline.releaseLinger == 0.6)  // § Hold: "'Released fn' for 0.6 s"
+    #expect(OverlayTimeline.fade == 0.2)  // § Hold: "fades out over 200 ms"
+    #expect(OverlayTimeline.displayCheckLinger == 15)  // § Display check: "fades after 15 s"
+  }
+
   @Test func testModePlatesFadeOnTime() {
     let (controller, presenter, clock, model) = overlayRig()
     feed(model, .actionRan(BuiltInAction.playPause, zone: .edge(.bottom), kind: .doubleTap))
