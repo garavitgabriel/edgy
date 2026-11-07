@@ -41,7 +41,7 @@ Shots: `docs/design/build-shots/batch-21/` (new, integrated), plus re-shot `batc
 | M4 | Params under every binding | One open binding (see 15 M1) | B21 `window-picker-bottom` |
 | S1 | Per-layer fade | `.compositingGroup()` before the 0.4 | `pad-disabled`, `pad-huddle-off` |
 | S2 | 33 pt picker rows / 1.5 pt to top bar | 24 pt rows; 8 pt clearance from other zones in `PickerPlacement` | B21 `window-picker-bottom` |
-| S3 | Name spellings | The UI uses catalog names verbatim. The catalog fix is a blocker (it lives in Actions). | all |
+| S3 | Name spellings | ✔ by the governing rule: BRIEF bone 3 ("Action names are the catalog's display names, spelled the same everywhere") and ruling 6 ("Pick one in the catalog, and the UI never re-spells it"). The UI's re-spelling map is removed, so the pad, picker and inspector now show one spelling, the catalog's. **Done:** the chief fixed the catalog on main (345fb9e: "Play/Pause", "Keyboard Backlight On/Off"). Merged here, and the UI follows with no change. | B21 `window-picker-bottom`, `tab-wayfare`, re-shot after the merge |
 | S4 | Truncated tab "…" | Rule (a) short value → (b) short name → clip with a 12 pt fade. A cut never adds "…". | `pad-split-bottom4-long-label` |
 | S5 | Preset corners as dots, shoot Windows | Corner radius capped at 30% of the tile | B21 `preset-windows`, `preset-minimal` |
 | S6 | Mini at real size, mini-disabled | Shot inside the popover at its 1.8 pt/mm width | B21 `popover-normal`, `popover-disabled` |
@@ -57,7 +57,7 @@ Shots: `docs/design/build-shots/batch-21/` (new, integrated), plus re-shot `batc
 | M3 | Do nothing here not shown | App-tab picker shot with an empty search and the full list: disclosure, separator, "Do nothing here" | `picker-app-tab-do-nothing` |
 | S1 | Keep-open helper | Helper always shown, from the catalog | B21 `inspector-long-labels` |
 | S2 | Hold Keys timing | "Hold before it starts" row; "Let go after" moved last, with the spec's label and helper; default in `ink2` | `inspector-corner-needs-keys` |
-| S3 | Spaced slashes | Catalog blocker (UI follows catalog) | — |
+| S3 | Spaced slashes | ✔ by the same rule (bone 3 + ruling 6): the UI shows one spelling everywhere, the catalog's. **Done:** the catalog is fixed on main (345fb9e) and merged here. | B21 `window-picker-bottom`, `tab-wayfare` |
 | S4 | Title-case labels | `sentenceCase` ("Shortcut name", "File or folder") | `param-shortcut`, `param-path` |
 | S5 | Label sits low in two-line rows | Custom `.parameterRow` alignment: the label lines up with the field; the message hangs below | `param-url-error`, `param-recorder-error` |
 | S6 | Recorder error demo | Field shows "⌘" alone | `param-recorder-error` |
@@ -187,6 +187,30 @@ Shots: `docs/design/build-shots/batch-21/` (new, integrated), plus re-shot `batc
   - No trackpad is dashed with the exact copy.
   - The broken-config strip has two buttons, and the split, "+", HUD, Advanced… and Add gesture… are disabled. The headless shots draw switches the same whether disabled or not; check the switches on the device.
   - The popover block keeps Enabled and Test Mode under it, and the list is Pause / Settings… / About / Quit.
+
+### Second visual pass (after merging main, every shot below opened in the transcript)
+- Batch 21:
+  - `state-disabled`: faded once, editing on.
+  - `window-live-right`: the Volume tab takes the lit fill, and the accent traces bar and tab.
+  - `popover-disabled` (dark, the mini-disabled check): faded once.
+  - `popover-paused-test-mode`: faded, Pause row hidden, Don’t run actions shown.
+  - `popover-last-touch`: contact on the lit right edge. Keeping it after the lift is tested in `miniMirrorKeepsTheLastTouchAfterTheLift`.
+  - `popover-app-chip-live`: Wayfare's chip first and filled; the mirror draws Wayfare's left edge as a hairline and its Hold Keys corner as a tile.
+  - `preset-windows`: square tiles, not dots.
+  - `advanced`: defaults in `ink2`.
+  - `add-app-step2`: icon before the name, and ’ in "what’s".
+- Batch 14:
+  - `pad-default-idle-dark`: no lighter ring around the slab, so no dark halo.
+  - `pad-split-bottom4-long-label`: "⌘ Left Arrow, Nex" clipped with a fade, no "…".
+- Batch 15:
+  - `param-path`: "File or folder", plus a bordered Choose… button.
+  - `param-recorder-error`: "⌘" alone, label aligned with the field, message below.
+  - `param-app-list`: no empty row, 13 pt semibold headers.
+  - `inspector-corner-needs-keys`: only Long-press open; "Hold before it starts", then "Let go after" last.
+  - `inspector-wayfare-sources`: each source row form.
+  - `inspector-overlap-warning`: "Whole edge and upper half both use Slide." under the split control.
+  - `param-presentation-fields`: helper lines, values right-aligned.
+- Device-only checks are under Needs Gabriel. No tick above depends on them.
 
 ## Diff summary
 - **Mirror:**

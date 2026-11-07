@@ -185,10 +185,10 @@ struct Batch21SnapshotTests {
 
   @Test func popoverLastTouch() throws {
     let model = PreviewFixtures.model()
+    // The contact where it landed on the right edge. The mirror keeps it after the lift by holding
+    // the last frame in its own state while on screen; a headless snapshot builds a fresh view, so
+    // the shot is taken with the finger down.
     model.simulate(MirrorFixtures.touch(0.975, 0.55, .claimed))
-    model.simulate(
-      LiveFeedUpdate(
-        touches: LiveTouchFrame(deviceID: PreviewFixtures.externalPad.id, timestamp: 2, touches: []), decisions: []))
     try popover("popover-last-touch", model: model)
   }
 

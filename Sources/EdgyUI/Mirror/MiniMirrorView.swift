@@ -45,6 +45,16 @@ public struct MiniMirrorView: View {
     pinnedApp = .some(frontmostApp)
   }
 
+  /// The last touch where it landed (bone 10): the frame kept after a lift is the last non-empty one.
+  static func remembered(after frame: [LiveTouch], previous: [LiveTouch]) -> [LiveTouch] {
+    frame.isEmpty ? previous : frame
+  }
+
+  /// What the mirror draws: the live fingers, or, once they lift, the last frame where they landed.
+  static func shown(live: [LiveTouch], last: [LiveTouch]) -> [LiveTouch] {
+    live.isEmpty ? last : live
+  }
+
   /// The app whose profile the mirror draws.
   /// Unpinned, it is `model.frontmostBundleID` (set by the app on activation, never Edgy itself), the
   /// same source the popover chips read, so the mirror and the chips always agree.
@@ -71,7 +81,7 @@ public struct MiniMirrorView: View {
     ZStack {
       MirrorPad(
         geometry: geometry, zones: model.mirrorZones(forApp: frontmostApp, unavailableAsUnmapped: true), selected: nil,
-        touches: device == nil ? [] : (model.liveTouches.isEmpty ? lastTouches : model.liveTouches),
+        touches: device == nil ? [] : Self.shown(live: model.liveTouches, last: lastTouches),
         faded: state.faded && !hostFades, dashedOutline: state == .noTrackpad, showsLabels: false,
         message: state == .noTrackpad ? MirrorMessage(text: MirrorCopy.noTrackpadMini) : nil
       )
@@ -80,7 +90,7 @@ public struct MiniMirrorView: View {
     }
     .animation(MirrorMotion.padSwitch, value: device?.id)
     .onChange(of: model.liveTouches, initial: true) { _, new in
-      if !new.isEmpty { lastTouches = new }
+      lastTouches = Self.remembered(after: new, previous: lastTouches)
     }
     .onChange(of: device, initial: true) { old, new in
       if let new { lastKnownSize = new.sensorSizeMM }

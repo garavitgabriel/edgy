@@ -210,7 +210,7 @@ import Testing
         }), "param-url-error")
     try write(
       panel(
-        LabeledParameter(label: "File or Folder") {
+        LabeledParameter(label: ActionNaming.sentenceCase("File or Folder")) {
           TextParameterField(
             text: "~/Documents/Notes", placeholder: "~/Documents", choosesPath: true,
             issueFor: { _ in nil }
@@ -218,7 +218,7 @@ import Testing
         }), "param-path")
     try write(
       panel(
-        LabeledParameter(label: "Shortcut Name") {
+        LabeledParameter(label: ActionNaming.sentenceCase("Shortcut Name")) {
           ShortcutNameField(
             name: "Start Focus", listing: nil, names: ["Start Focus", "Log Water"],
             issueFor: { _ in nil }
