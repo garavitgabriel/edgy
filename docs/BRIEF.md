@@ -122,7 +122,7 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
 - **Glyph: "Lit edge" (01a, with 01b's wider gap).**
   - A rounded-rectangle outline of the pad, open on the right, with a separate heavy vertical bar standing for the lit right edge.
   - It's a monochrome template image, about 16 × 11 pt.
-  - In Test Mode it adds a small solid dot inside the outline. **Make that dot ≥2 pt at 1×**, because the render's ~1.5 pt dot disappears.
+  - In Test Mode it adds a small solid dot inside the outline. **The dot must be ≥2 pt at 1×.** The exported asset is 3.2 pt (`docs/design/assets/`).
   - Note for the G1 device check: one critic read it as the letters "CI" before reading it as a pad. Judge it at real size in the real menu bar before freezing it.
 - **App icon: "Exact".**
   - A pale-stone rounded tile with a gentle light-to-shade gradient.
