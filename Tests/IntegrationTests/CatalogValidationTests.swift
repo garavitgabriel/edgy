@@ -27,7 +27,11 @@ private func sample(_ parameter: ActionParameter) -> String {
 
 /// A zone + gesture this descriptor's shape can run on.
 private func placement(for descriptor: ActionDescriptor) -> (Zone, GestureKind) {
-  descriptor.shape == .continuous ? (.edge(.right), .slide) : (.corner(.topRight), .doubleTap)
+  switch descriptor.shape {
+  case .continuous: (.edge(.right), .slide)
+  case .trigger: (.corner(.topRight), .doubleTap)
+  case .hold: (.corner(.topRight), .longPress)
+  }
 }
 
 @Test func catalogIdsAreUnique() {
