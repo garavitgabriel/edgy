@@ -73,7 +73,9 @@ struct PerformedAction: Equatable {
 }
 
 final class FakeActions: ActionPerforming {
-  var available: [ActionDescriptor] { [] }
+  /// The catalog the router reads shapes from. Empty by default (every action is then a trigger
+  /// or continuous one by gesture, as before holds existed).
+  var available: [ActionDescriptor] = []
   private(set) var performed: [PerformedAction] = []
   var errorToThrow: Error?
   private(set) var appliedSettings: [AppSettings] = []

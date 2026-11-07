@@ -17,7 +17,8 @@ final class EngineHarness {
   let engine: Engine
   private var frameNumber: Int32 = 0
 
-  init(config: EdgyConfig = .defaults) throws {
+  init(config: EdgyConfig = .defaults, catalog: [ActionDescriptor] = []) throws {
+    actions.available = catalog
     engine = Engine(
       touchSource: touch, recognizer: recognizer, actions: actions, pointerGuard: pointerGuard, typing: typing,
       frontmost: frontmost, config: config, logger: logger, queue: queue)

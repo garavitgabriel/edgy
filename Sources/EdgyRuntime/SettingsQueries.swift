@@ -44,12 +44,13 @@ extension ConfigValidator {
     }
   }
 
-  /// Actions that can be bound to `gesture` on `zone`: continuous ones for a slide, triggers for
-  /// everything else, none when the zone can't produce the gesture. Sorted by display name.
+  /// Actions that can be bound to `gesture` on `zone`: continuous ones for a slide, triggers and
+  /// holds for a long-press, triggers for everything else, none when the zone can't produce the
+  /// gesture. Sorted by display name. Unavailable actions are included (the UI greys them out
+  /// with `availability(of:)`).
   public func compatibleActions(zone: Zone, gesture: GestureKind) -> [ActionDescriptor] {
     guard zone.supports(gesture) else { return [] }
-    let shape: ActionDescriptor.Shape = gesture == .slide ? .continuous : .trigger
-    return catalog.filter { $0.shape == shape }.sorted(by: Self.byName)
+    return catalog.filter { Self.shape($0.shape, fits: gesture) }.sorted(by: Self.byName)
   }
 
   /// Gestures `zone` can produce, in display order.

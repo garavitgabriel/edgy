@@ -145,10 +145,15 @@ private let rightEdge: Set<Zone> = [.edge(.right)]
   stroke.jitterMM = 0.2
   let builder = TraceBuilder([stroke])
   let run = replay(builder.frames(), zones: [.corner(.topLeft)])
-  #expect(run.events.map(\.kind) == [.longPress])
+  // `.began` at recognition (finger still down), `.ended` when it lifts.
+  #expect(run.events.map(\.kind) == [.longPress, .longPress])
+  #expect(run.events.map(\.phase) == [.began, .ended])
   let press = try #require(run.events.first)
   #expect(press.zone == .corner(.topLeft))
   #expect(run.relative(press) >= 0.5 && run.relative(press) < 0.52)
+  let release = try #require(run.events.last)
+  #expect(release.zone == .corner(.topLeft))
+  #expect(run.relative(release) > 0.8 && run.relative(release) < 0.82)
   #expect(run.rejections.isEmpty)
   // Claimed from the long-press frame until the finger lifts, and not before.
   let pressFrame = try #require(run.outputs.firstIndex { !$0.events.isEmpty })
@@ -157,6 +162,7 @@ private let rightEdge: Set<Zone> = [.edge(.right)]
     let shouldClaim = index >= pressFrame && index <= lastDownFrame
     #expect(output.claimedContactIDs == (shouldClaim ? [1] : []), "frame \(index)")
   }
+  expectHoldsArePaired(run)
 }
 
 @Test func bottomEdgeSwipeLeftAndRight() {
@@ -202,7 +208,9 @@ private let rightEdge: Set<Zone> = [.edge(.right)]
 @Test func longPressFiresOnlyWhereBound() {
   let frames = TraceBuilder([Stroke(id: 1, [(0, 60, 3), (0.7, 60, 3)])]).frames()
   let bound = replay(frames, zones: [.edge(.bottom)], slideZones: [], longPressZones: [.edge(.bottom)])
-  #expect(bound.events.map(\.kind) == [.longPress])
+  #expect(bound.events.map(\.kind) == [.longPress, .longPress])
+  #expect(bound.events.map(\.phase) == [.began, .ended])
+  expectHoldsArePaired(bound)
 }
 
 @Test func segmentedEdgeRoutesToCorrectSegment() {

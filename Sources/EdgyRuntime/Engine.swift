@@ -67,6 +67,8 @@ public final class Engine: @unchecked Sendable {
   private var lastStartError: String?
   private var lastStatus: EngineStatus?
   private var statusHandler: (@Sendable (EngineStatus) -> Void)?
+  /// Frontmost app of the last processed frame (`.none` before the first one).
+  private var lastFrontmost: String?? = .none
 
   public init(
     touchSource: TouchSource, recognizer: GestureRecognizing, actions: ActionPerforming,
@@ -179,6 +181,11 @@ public final class Engine: @unchecked Sendable {
     guard running, !paused, config.app.enabled else { return }
     guard let device = devices[frame.deviceID] else { return }
     let bundleID = frontmost.frontmostBundleID
+    if case .some(let previous) = lastFrontmost, previous != bundleID {
+      // The profile may have changed under a held key: let go now rather than at lift.
+      router.releaseHolds(reason: "frontmost app changed")
+    }
+    lastFrontmost = .some(bundleID)
     let profile = config.profile(for: bundleID)
     let context = GestureContext(
       settings: config.gestures,

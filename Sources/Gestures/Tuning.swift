@@ -27,8 +27,9 @@ struct Tuning: Hashable, Sendable {
   var tapMaxDurationS = 0.25
   /// Most a tap may travel.
   var tapMaxTravelMM = 1.5
-  /// Most a long-press may travel before it fires.
-  var longPressMaxTravelMM = 1.5
+  /// Most a long-press may travel before it fires. Same stillness as a dwell claim
+  /// (`stillRadiusMM`): at 1.5 mm a finger drifting ~2.7 mm/s still fired at 500 ms (v0.3).
+  var longPressMaxTravelMM = 1.0
   /// A corner touch that travels farther than this (before a long-press fires) is rejected.
   var cornerMaxTravelMM = 3.0
   /// A resting slide must move this far before it emits output again (hysteresis).
@@ -37,6 +38,10 @@ struct Tuning: Hashable, Sendable {
   var restEpsilonMM = 0.6
   /// See `restEpsilonMM`.
   var restDurationS = 0.1
+  /// A claim (slide or hold) is revoked when another, non-palm contact travels this far from
+  /// where it landed: a second finger moving the pointer means the hand isn't on the edge for us,
+  /// and the claim would freeze the pointer under it. A late finger that only rests is left alone.
+  var foreignMotionMM = 3.0
   /// Contacts landing within this window of each other belong to one multi-finger touch.
   var multiFingerWindowS = 0.12
   /// Palm gate: a minor axis this wide is a flat, round blob (palm or knuckle), whatever the major axis.
