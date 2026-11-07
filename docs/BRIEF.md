@@ -262,6 +262,7 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
   - Modifiers you're holding appear live in `ink2` as you press them, and turn `ink` when the combo commits.
   - Esc cancels. ⌫ while idle clears. Recording swallows the keys, so nothing reaches the app.
 - **Right-hand modifiers** show as "Right ⌘" or "Right ⌥" when the runtime distinguishes them.
+- **Hold Keys with no keys yet:** under the recorder, an `ink2` line (13): **"Press the shortcut your app uses while held. For a key like fn alone, hold it a second, then let go."** No suggestion chip. The line disappears once a combo is recorded.
 - **Modifiers alone:**
   - On a **hold** action (push-to-talk), releasing all held modifiers after holding them ≥0.6 s commits them ("fn", "⌃⌥").
   - On a trigger action, the same gesture shows: "Add a key. Modifiers alone work only on Hold Keys."
@@ -492,6 +493,10 @@ The owner found the picker cluttered and asked for more order, "maybe adding ico
 **Scrolling and placement:**
 - Under the interior cap, long lists scroll. On open, the list scrolls so the checked (currently bound) action is visible; with nothing bound, it starts at the top.
 - When the picker is anchored to a side edge, it centres vertically on the anchor but is clamped so it clears the corner tiles **and their tabs**. If it can't, it gets shorter.
+
+**Hold Keys is findable as push-to-talk** (owner, 2026-11-07; generic, for any app that acts while a key is held):
+- Its picker sub-line (13, `ink2`) reads **"Hold any app's shortcut while your finger rests"**. It's the only available action whose sub-line describes a use.
+- Search also matches it on **hold, push to talk, talk, dictation, voice**.
 
 **Search:** filtering keeps the group headers of groups that still have matches. With no matches at all: "No actions match "xyz"." (13, `ink2`).
 
