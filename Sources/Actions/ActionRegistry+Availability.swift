@@ -10,6 +10,10 @@ struct HardwareFacts: Hashable {
   var builtInPanel: Bool
   var displays: [DisplayInfo]
   var backlitKeyboard: Bool
+  /// `AppSettings.unresponsiveDisplays`: display keys the user turned brightness off for.
+  var unresponsive: Set<String> = []
+  /// `AppSettings.confirmedDisplays`: display keys the user confirmed respond.
+  var confirmed: Set<String> = []
 }
 
 extension ActionRegistry {
@@ -30,6 +34,12 @@ extension ActionRegistry {
     static let noBrightnessMonitors =
       "This Mac has no built-in display, and the connected monitors don't accept brightness control."
     static let unknownAction = "Edgy doesn't know this action."
+    /// A DDC monitor the user hasn't confirmed yet.
+    static let mayNotRespond =
+      "May not respond: some monitors accept brightness commands without applying them."
+    /// The display the brightness slide would drive was turned off by the user ("No, turn off
+    /// for this display"); also the availability when every brightness-capable display is.
+    static let turnedOffForDisplay = "Turned off for this display."
 
     /// "Works on A and B; C doesn't accept brightness control."
     static func someMonitors(working: [String], notWorking: [String]) -> String {
@@ -48,7 +58,8 @@ extension ActionRegistry {
 
   public func availability(of id: ActionID) -> ActionAvailability {
     let facts = HardwareFacts(
-      builtInPanel: display.isAvailable, displays: displays.displays(), backlitKeyboard: backlight.isAvailable)
+      builtInPanel: display.isAvailable, displays: displays.displays(), backlitKeyboard: backlight.isAvailable,
+      unresponsive: settings.unresponsiveDisplays, confirmed: settings.confirmedDisplays)
     availabilityLock.lock()
     defer { availabilityLock.unlock() }
     if let cache = availabilityCache, cache.facts == facts {
@@ -78,7 +89,32 @@ extension ActionRegistry {
 
   /// Same facts `brightnessTarget()` routes on: the built-in panel (through the built-in output
   /// or `Displays`) or any external display that accepts brightness control.
+  ///
+  /// Displays the user turned off (`unresponsive`) are left out, as if unplugged; when nothing else
+  /// can take brightness, the action is unavailable with `turnedOffForDisplay`. A result that
+  /// would be `.available` becomes `.limited(mayNotRespond)` while any working third-party (DDC)
+  /// monitor is unconfirmed.
   static func brightnessAvailability(_ facts: HardwareFacts) -> ActionAvailability {
+    let turnedOff = facts.displays.filter {
+      $0.kind != .builtIn && $0.brightnessControllable && facts.unresponsive.contains($0.key)
+    }
+    var remaining = facts
+    remaining.displays.removeAll { turnedOff.contains($0) }
+    let result = brightnessAvailabilityIgnoringAnswers(remaining)
+    switch result {
+    case .unavailable where !turnedOff.isEmpty:
+      return .unavailable(reason: AvailabilityCopy.turnedOffForDisplay)
+    case .available:
+      let unconfirmed = remaining.displays.contains {
+        $0.kind == .thirdParty && $0.brightnessControllable && !facts.confirmed.contains($0.key)
+      }
+      return unconfirmed ? .limited(reason: AvailabilityCopy.mayNotRespond) : .available
+    default:
+      return result
+    }
+  }
+
+  private static func brightnessAvailabilityIgnoringAnswers(_ facts: HardwareFacts) -> ActionAvailability {
     let builtIn =
       facts.builtInPanel || facts.displays.contains { $0.kind == .builtIn && $0.brightnessControllable }
     let external = facts.displays.filter { $0.kind != .builtIn }

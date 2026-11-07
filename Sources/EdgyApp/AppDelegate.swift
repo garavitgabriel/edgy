@@ -79,11 +79,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       commands: WindowCommands(
         openAccessibilitySettings: { [weak self] in self?.grantAccessibility() },
         openConfigFile: { [weak self] in self?.openConfigFile() },
-        reloadConfig: { [weak self] in self?.reloadConfig() }))
+        reloadConfig: { [weak self] in self?.reloadConfig() },
+        replaceWithCurrentSettings: { [weak self] in self?.replaceFileWithCurrentSettings() }))
 
-    store.startWatching { [weak self] newConfig in
-      Task { @MainActor in self?.editor?.adoptExternal(newConfig) }
-    }
+    store.startWatching(
+      onChange: { [weak self] newConfig in
+        Task { @MainActor in self?.editor?.adoptExternal(newConfig) }
+      },
+      onFailure: { [weak self] error in
+        let message = String(describing: error)
+        Task { @MainActor in
+          self?.logger.log(.error, "Config file didn't load: \(message)")
+          self?.editor?.reportConfigProblem(error)
+        }
+      })
     LaunchAtLogin.sync(wanted: config.app.launchAtLogin, logger: logger)
 
     statusMenu = StatusMenu(handler: self)
@@ -135,6 +144,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
   private func refreshMenu() {
     settingsWindow?.state.conditions.accessibility = permissions?.accessibility ?? .unknown
+    settingsWindow?.state.conditions.configProblem = editor?.configProblem.map {
+      EdgyUI.ConfigProblem(fileName: store.fileURL.lastPathComponent, line: $0.line, message: $0.message)
+    }
     statusMenu?.update(
       StatusMenu.State(
         enabled: editor?.config.app.enabled ?? applied.app.enabled, pausedUntil: engineStatus.pausedUntil,
@@ -150,6 +162,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 }
 
 extension AppDelegate: StatusMenuHandler {
+  func replaceFileWithCurrentSettings() {
+    do {
+      try editor?.replaceFileWithCurrentSettings()
+    } catch {
+      logger.log(.error, "Could not replace the config file: \(error)")
+    }
+    refreshMenu()
+  }
+
   func showSettings() {
     settingsWindow?.show()
   }

@@ -49,6 +49,7 @@ public struct SettingsWindowView: View {
         inspectorColumn(status)
       }
       .disabled(status.isReadOnly)
+      .actionPickerHost(model: model)
       footer.disabled(status.isReadOnly)
     }
     .font(Tokens.font(Tokens.typeBody))
@@ -203,9 +204,6 @@ public struct SettingsWindowView: View {
       if !status.hidesInspector {
         if case .app(let id) = model.selectedProfile, model.isLegacyProfile(model.selectedProfile) {
           LegacyNoteView { model.followDefault(bundleID: id) }
-        }
-        if let overlap = model.selectedZoneOverlap {
-          OverlapNoteView(note: overlap) { model.selectedZone = overlap.other }
         }
         InspectorView(model: model)
       }
