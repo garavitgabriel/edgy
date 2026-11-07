@@ -2,6 +2,7 @@ import AppKit
 
 @MainActor
 protocol StatusMenuHandler: AnyObject {
+  func showSettings()
   func toggleEnabled()
   func toggleTestMode()
   func pauseForOneHour()
@@ -73,6 +74,7 @@ final class StatusMenu: NSObject {
     }
 
     menu.addItem(.separator())
+    menu.addItem(entry("Settings…", #selector(showSettings), key: ","))
     let open = entry("Open Config File", #selector(openConfigFile))
     open.toolTip = state.configPath
     menu.addItem(open)
@@ -91,6 +93,7 @@ final class StatusMenu: NSObject {
     return menuItem
   }
 
+  @objc private func showSettings() { handler?.showSettings() }
   @objc private func toggleEnabled() { handler?.toggleEnabled() }
   @objc private func toggleTestMode() { handler?.toggleTestMode() }
   @objc private func pauseForOneHour() { handler?.pauseForOneHour() }
