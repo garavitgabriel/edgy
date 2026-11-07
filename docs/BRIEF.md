@@ -306,11 +306,10 @@ The same 640 × 520 glass window, with a step row at the top ("1 Accessibility �
 
 **Step 1: Accessibility.**
 - Headline: "Let Edgy run your actions".
-- Body (one sentence): "Window moves, shortcuts and keys need it; volume and media work without it."
+- Body (one sentence): "Edgy uses it to keep the pointer still while you slide and to send the keys most actions need." *(Checked against the code on 2026-11-07: media, volume with the native HUD, shortcuts, holds, window moves, Spaces and the pointer hold all need it; only opening apps, URLs and files doesn't.)*
 - Primary: **Open Settings**, which opens the system privacy pane.
 - The window watches the permission live. When it turns granted, the step row shows ✓, the body becomes "Access granted.", and the primary becomes **Continue**.
 - A quiet text button, **Skip for now**, continues without access; the No Accessibility state above then applies.
-- *(Before shipping, check the body sentence against the runtime: which actions really need access.)*
 
 **Step 3: Pick a preset.** The headline is "Pick a starting point". Three radio rows, each with a 120 pt mini mirror showing that preset's zones (normal zone shapes), the name, and one line:
 
