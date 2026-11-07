@@ -187,7 +187,7 @@ import Testing
         == "Needs a backlit keyboard")
     #expect(
       IssueCopy.overlap(.edge(.right), .edge(.right, segment: 1, segments: 2), gesture: .swipe(.up))
-        == "The whole edge and the upper half both use Swipe up.")
+        == "Whole edge and upper half both use Swipe up.")
   }
 
   @Test func overlapsAreFoundOnTheEdge() {

@@ -53,10 +53,14 @@ extension SettingsModel {
   }
 
   /// The zones a mirror draws for `app` (`nil` = Default): its effective bindings.
-  func mirrorZones(forApp app: String?) -> [MirrorZone] {
+  /// `unavailableAsUnmapped`: the popover's mini mirror draws a zone whose action is unavailable
+  /// on this Mac as unmapped (§ Issue states); the settings mirror marks its tab instead.
+  func mirrorZones(forApp app: String?, unavailableAsUnmapped: Bool = false) -> [MirrorZone] {
     _ = revision
     let off = app.flatMap { editor.config.appProfiles[$0]?.disabled } ?? false
-    return MirrorContent.zones(rows: editor.effectiveBindings(forApp: app), catalog: mirrorCatalog, allHairline: off)
+    return MirrorContent.zones(
+      rows: editor.effectiveBindings(forApp: app), catalog: mirrorCatalog, allHairline: off,
+      availability: { self.editor.availability(of: $0) }, unavailableAsUnmapped: unavailableAsUnmapped)
   }
 
   /// The pad state for `app` (`nil` = Default). `includesPaused: false` for the settings window,

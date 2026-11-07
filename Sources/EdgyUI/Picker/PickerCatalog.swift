@@ -105,6 +105,8 @@ enum PickerPlacement {
   /// Gap between the arrow tip and the zone, and from the window edge.
   static let gap: CGFloat = 6
   static let margin: CGFloat = 8
+  /// Space kept between the panel and any other zone's bar.
+  static let zoneClearance: CGFloat = 8
   static let arrowSize: CGFloat = 8
 
   enum Side: Equatable {
@@ -142,9 +144,11 @@ enum PickerPlacement {
     anchor: CGRect, zone: Zone, avoiding others: [CGRect], size: CGSize, in container: CGRect
   ) -> Result {
     let bounds = container.insetBy(dx: margin, dy: margin)
+    // Other zones keep an 8 pt clearance (the panel never sits right against a bar).
+    let cleared = others.map { $0.insetBy(dx: -zoneClearance, dy: -zoneClearance) }
     func overlap(_ result: Result) -> CGFloat {
       var total = area(result.frame.intersection(anchor)) * 4
-      for other in others { total += area(result.frame.intersection(other)) }
+      for other in cleared { total += area(result.frame.intersection(other)) }
       if !bounds.contains(result.frame.integral.insetBy(dx: 1, dy: 1)) { total += area(result.frame.size) }
       return total
     }

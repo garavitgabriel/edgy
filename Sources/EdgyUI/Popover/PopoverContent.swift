@@ -116,7 +116,9 @@ public enum PopoverTop: Equatable, Sendable {
 public struct PopoverMirror: Equatable, Sendable {
   /// No trackpad: a dashed pad outline at the default proportion with "No trackpad connected".
   public var noTrackpad: Bool
-  /// Faded to 40%: Enabled is off, or Edgy is off in the frontmost app (§ App profiles).
+  /// Faded to 40%: Enabled is off, Paused (batch-17 design answer 3: one value everywhere), or Edgy
+  /// is off in the frontmost app (§ App profiles). The popover applies it once; the mini mirror
+  /// doesn't fade again.
   public var faded: Bool
   /// The paused line under the mini mirror, with **Resume**.
   public var pausedUntil: Date?
@@ -129,7 +131,8 @@ public struct PopoverMirror: Equatable, Sendable {
     let config = model.editor.config
     let offInFront = state.frontmostBundleID.map { config.appProfiles[$0]?.disabled == true } ?? false
     return PopoverMirror(
-      noTrackpad: !engine.hasTrackpad, faded: !config.app.enabled || offInFront, pausedUntil: engine.pausedUntil,
+      noTrackpad: !engine.hasTrackpad, faded: !config.app.enabled || offInFront || engine.paused,
+      pausedUntil: engine.pausedUntil,
       paused: engine.paused)
   }
 }
@@ -139,7 +142,7 @@ public enum PopoverCopy {
   public static let noAccessibility = WindowCopy.noAccessibility
   public static let noAccessibilityDetail = "Touches still show in Test Mode."
   public static let noTrackpad = "No trackpad connected"
-  public static let dontRunActions = "Don't run actions"
+  public static let dontRunActions = "Don’t run actions"
 
   /// "Paused, 47 min left"; whole minutes; "less than a minute left" under one. The same rule as
   /// the window (`WindowCopy.paused`), so both say the same thing.

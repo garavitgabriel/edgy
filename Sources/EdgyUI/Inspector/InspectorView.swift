@@ -14,7 +14,8 @@ public struct InspectorView: View {
     self.model = model
   }
 
-  static let inset: CGFloat = 32
+  /// Leading and trailing inset (render A: about 22 pt from the column's edge).
+  static let inset: CGFloat = 22
 
   public var body: some View {
     let _ = model.revision
@@ -56,8 +57,11 @@ private struct ZoneInspector: View {
         .foregroundStyle(Tokens.ink)
         .accessibilityAddTraits(.isHeader)
       if let count = model.splitCount(for: zone) {
-        SplitControl(count: count, enabled: model.canSplit) { model.split(zone, into: $0) }
-          .padding(.top, 12)
+        // No "Split into" on app tabs: hidden, not greyed out (§ App profiles, chief ruling).
+        if model.selectedProfile == .default {
+          SplitControl(count: count, enabled: model.canSplit) { model.split(zone, into: $0) }
+            .padding(.top, 12)
+        }
         ForEach(Array(model.overlaps(onEdgeOf: zone).enumerated()), id: \.offset) { _, overlap in
           IssueLine(style: .warning, text: IssueCopy.overlap(overlap.0, overlap.1, gesture: overlap.2)) {
             TextAction(title: "Show") { model.selectedZone = overlap.1 == zone ? overlap.0 : overlap.1 }
@@ -66,18 +70,23 @@ private struct ZoneInspector: View {
         }
       }
       InspectorRule().padding(.top, 14).padding(.bottom, 10)
+      let open = model.openBinding(in: zone, rows: rows)
+      let pending = pendingGesture(rows: rows)
       VStack(alignment: .leading, spacing: 12) {
         ForEach(rows) { row in
           let key = InspectorDrafts.Key(profile: model.selectedProfile, binding: row.id)
           BindingRowView(
             model: model, row: row,
             isPicking: model.picking == PickerTarget(zone: zone, gesture: row.gesture),
+            isOpen: open == row.id,
             autofocus: drafts.focus == key)
         }
+        if let pending { PendingRowView(gesture: pending) }
       }
-      if !rows.isEmpty { InspectorRule().padding(.vertical, 10) }
+      if !rows.isEmpty || pending != nil { InspectorRule().padding(.vertical, 10) }
       if !model.unmappedGestures(for: zone).isEmpty {
         Button {
+          drafts.open = nil
           model.picking = PickerTarget(zone: zone, gesture: nil)
         } label: {
           HStack(spacing: 10) {
@@ -96,6 +105,32 @@ private struct ZoneInspector: View {
       guard focus != nil else { return }
       DispatchQueue.main.async { drafts.focus = nil }
     }
+  }
+
+  /// While the picker is open for a gesture this zone doesn't have yet, that gesture's row shows
+  /// with a blank value (bone 6; batch-14 design answer 4). It goes away if the picker closes
+  /// without a choice.
+  private func pendingGesture(rows: [InspectorRow]) -> GestureKind? {
+    guard let target = model.picking, target.zone == zone, let gesture = target.gesture else { return nil }
+    return rows.contains { $0.gesture == gesture } ? nil : gesture
+  }
+}
+
+/// The row of a gesture being chosen in the picker: gesture icon and name, value blank.
+struct PendingRowView: View {
+  var gesture: GestureKind
+
+  var body: some View {
+    HStack(spacing: 10) {
+      GestureIcon(gesture: gesture)
+      Text(GestureNaming.name(gesture)).foregroundStyle(Tokens.ink)
+      Spacer(minLength: 8)
+    }
+    .font(Tokens.font(Tokens.typeBody))
+    .frame(minHeight: 28)
+    .padding(.horizontal, 6)
+    .background(RoundedRectangle(cornerRadius: Tokens.radiusControl).fill(Tokens.bar.opacity(0.35)))
+    .padding(.horizontal, -6)
   }
 }
 
@@ -125,6 +160,8 @@ struct BindingRowView: View {
   @Bindable var model: SettingsModel
   var row: InspectorRow
   var isPicking: Bool
+  /// The one open binding: only it shows its parameter rows (§ Binding parameters).
+  var isOpen = false
   var autofocus: Bool
 
   private static let textInset = GestureIcon.size + 10
@@ -146,7 +183,7 @@ struct BindingRowView: View {
         RoundedRectangle(cornerRadius: Tokens.radiusControl).fill(isPicking ? Tokens.bar.opacity(0.35) : .clear)
       )
       .contentShape(Rectangle())
-      .onTapGesture { model.picking = PickerTarget(zone: row.binding.zone, gesture: row.gesture) }
+      .onTapGesture { model.openRow(row.id) }
       .padding(.horizontal, -6)
       .accessibilityElement(children: .combine)
       .accessibilityAddTraits(.isButton)
@@ -162,9 +199,9 @@ struct BindingRowView: View {
       .font(Tokens.font(Tokens.typeBody))
       .padding(.leading, Self.textInset)
 
-      if row.showsParameters {
+      if row.showsParameters, isOpen {
+        // Indented 24 pt under the binding row (§ Binding parameters → One rule).
         ParameterRowsView(model: model, row: row, autofocus: autofocus)
-          .padding(.leading, Self.textInset - ParameterRowsView.indent + 4)
           .padding(.top, 2)
       }
     }
@@ -272,7 +309,7 @@ struct RowMenu: View {
 
   private func perform(_ title: String) {
     switch title {
-    case "Change action…": model.picking = PickerTarget(zone: row.binding.zone, gesture: row.gesture)
+    case "Change action…": model.openRow(row.id)
     case "Remove gesture": model.remove(row)
     case "Turn off here": model.turnOff(row)
     default: model.revert(row)

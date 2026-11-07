@@ -48,7 +48,7 @@ final class KeyRecorderController {
     error = nil
     heldSince = nil
     guard let recorder else {
-      error = "Keys can't be recorded right now."
+      error = "Keys can’t be recorded right now."
       return
     }
     phase = .recording(held: [])

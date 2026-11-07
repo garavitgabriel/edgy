@@ -90,7 +90,9 @@ public struct AdvancedSettingsView: View {
           onEditingChanged: { model.continuousEdit(field.rawValue, began: $0) }
         )
         .labelsHidden()
+        // A value at its default reads `ink2`, a changed one `ink` (batch-16 design answer 2).
         Text(field.format(shown)).frame(width: Self.valueWidth, alignment: .trailing)
+          .foregroundStyle(value == GestureSettings.defaults[keyPath: field.keyPath] ? Tokens.ink2 : Tokens.ink)
       }
       if let note = model.outOfRangeNote(field) {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
@@ -103,6 +105,10 @@ public struct AdvancedSettingsView: View {
     }
   }
 
+  static func defaultStrength(_ key: String) -> Int {
+    key == "hapticTickStrength" ? AppSettings.defaults.hapticTickStrength : AppSettings.defaults.hapticClickStrength
+  }
+
   private func strengthRow(_ label: String, key: String, value: Int, set: @escaping (Int) -> Void) -> some View {
     let range = AppSettings.hapticStrengthRange
     return row(label) {
@@ -113,6 +119,7 @@ public struct AdvancedSettingsView: View {
       )
       .labelsHidden()
       Text("\(value) of \(range.upperBound)").frame(width: Self.valueWidth, alignment: .trailing)
+        .foregroundStyle(value == Self.defaultStrength(key) ? Tokens.ink2 : Tokens.ink)
     }
     .disabled(!model.editor.config.app.haptics)
   }

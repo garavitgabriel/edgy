@@ -33,7 +33,9 @@ enum WindowMetrics {
   /// The largest pad the mirror must show to scale (an external trackpad's sensor).
   static let largestPadMM = CGSize(width: 160, height: 115)
   static let mirrorMargin: CGFloat = 40
-  static let inspectorWidth: CGFloat = 340
+  /// Wide enough for the longest parameter label ("Keep open between strokes") on one line beside
+  /// its slider and value, at the inspector's 22 pt inset.
+  static let inspectorWidth: CGFloat = 360
   static let tabBarHeight: CGFloat = 52
   static let footerHeight: CGFloat = 56
   static let stripHeight: CGFloat = 36
@@ -99,7 +101,8 @@ struct WindowStripView<Buttons: View>: View {
   }
 }
 
-/// One line centred on the pad with its text button ("Paused, 47 min left · Resume").
+/// One line centred on the pad with its text button ("Paused, 47 min left · Resume"). No
+/// container: the faded pad behind it gives the contrast (batch-16 should-fix 5).
 struct PadLineView: View {
   let text: String
   let button: String
@@ -110,9 +113,6 @@ struct PadLineView: View {
       Text(text).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink)
       Button(button, action: action).buttonStyle(TextButtonStyle())
     }
-    .padding(.horizontal, 14)
-    .padding(.vertical, 8)
-    .background(Tokens.windowTint, in: RoundedRectangle(cornerRadius: Tokens.radiusControl))
   }
 }
 

@@ -106,7 +106,7 @@ public final class MenuBarState {
   public func configProblem(model: SettingsModel) -> ConfigProblem? {
     _ = model.revision
     if let configProblem { return configProblem }
-    return model.editor.configProblem.map { ConfigProblem(line: $0.line, message: $0.message) }
+    return model.editor.configProblem.map { ConfigProblem($0) }
   }
 
   /// The glyph for the current facts (see `MenuGlyph.state(engine:editor:testMode:accessibility:configProblem:)`).

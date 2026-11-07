@@ -43,14 +43,24 @@ public struct MenuPopoverView: View {
 
   @ViewBuilder private var top: some View {
     switch PopoverTop.resolve(state: state, model: model) {
+    // The block replaces the mini mirror and chips only; Enabled and Test Mode stay under it, so
+    // "Touches still show in Test Mode." points at a real switch (batch-17 design answer 2).
     case .brokenConfig(let problem):
-      IssueBlock(symbol: "exclamationmark.circle", text: problem.sentence, detail: nil) {
-        Button("Open config file") { actions.openConfigFile() }
-        Button("Reload") { actions.reloadConfig() }
+      VStack(alignment: .leading, spacing: 0) {
+        IssueBlock(symbol: "exclamationmark.circle", text: problem.sentence, detail: nil) {
+          Button("Open config file") { actions.openConfigFile() }
+          Button("Reload") { actions.reloadConfig() }
+        }
+        switches
       }
     case .needsAccessibility:
-      IssueBlock(symbol: "info.circle", text: PopoverCopy.noAccessibility, detail: PopoverCopy.noAccessibilityDetail) {
-        Button("Open Settings") { actions.openAccessibilitySettings() }
+      VStack(alignment: .leading, spacing: 0) {
+        IssueBlock(
+          symbol: "info.circle", text: PopoverCopy.noAccessibility, detail: PopoverCopy.noAccessibilityDetail
+        ) {
+          Button("Open Settings") { actions.openAccessibilitySettings() }
+        }
+        switches
       }
     case .normal(let mirror):
       VStack(alignment: .leading, spacing: PopoverMetrics.rowGap) {
@@ -69,7 +79,10 @@ public struct MenuPopoverView: View {
       NoTrackpadPad()
     } else {
       let size = PopoverMetrics.padSize(model.mirroredDevice)
-      MiniMirrorView(model: model)
+      // The chips and the mirror share one source for the app in front; the popover owns the one
+      // 40% fade (Disabled, Paused, off in the app in front).
+      MiniMirrorView(model: model, frontmostApp: state.frontmostBundleID)
+        .fadedByHost()
         .frame(width: size.width, height: size.height)
         .opacity(mirror.faded ? PopoverMetrics.fadedOpacity : 1)
         .frame(maxWidth: .infinity)
@@ -204,7 +217,7 @@ struct SwitchRow: View {
 
   var body: some View {
     HStack {
-      Text(title).font(Tokens.font(Tokens.typeBody, semibold: true))
+      Text(title).font(Tokens.font(Tokens.typeBody))
       Spacer(minLength: 12)
       Toggle(title, isOn: $isOn).toggleStyle(.switch).labelsHidden().tint(Tokens.accent)
     }

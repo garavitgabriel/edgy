@@ -23,6 +23,16 @@ public struct MiniMirrorView: View {
   @State private var observedApp: String?
   @State private var lastTouches: [LiveTouch] = []
   @State private var lastKnownSize: Size2D?
+  /// The host already fades the mirror for these states (the popover applies its one 40%), so
+  /// the mirror doesn't fade again (one fade only).
+  var hostFades = false
+
+  /// The same mirror, leaving the 40% fade to the host (the popover).
+  func fadedByHost() -> MiniMirrorView {
+    var copy = self
+    copy.hostFades = true
+    return copy
+  }
 
   /// Follows the frontmost app: the mirror shows the profile in effect right now.
   public init(model: SettingsModel) {
@@ -57,9 +67,9 @@ public struct MiniMirrorView: View {
       sensorSizeMM: sizeMM, settings: model.editor.config.gestures, pointsPerMM: Tokens.miniMirrorPointsPerMM)
     ZStack {
       MirrorPad(
-        geometry: geometry, zones: model.mirrorZones(forApp: frontmostApp), selected: nil,
+        geometry: geometry, zones: model.mirrorZones(forApp: frontmostApp, unavailableAsUnmapped: true), selected: nil,
         touches: device == nil ? [] : (model.liveTouches.isEmpty ? lastTouches : model.liveTouches),
-        faded: state.faded, dashedOutline: state == .noTrackpad, showsLabels: false,
+        faded: state.faded && !hostFades, dashedOutline: state == .noTrackpad, showsLabels: false,
         message: state == .noTrackpad ? MirrorMessage(text: MirrorCopy.noTrackpadMini) : nil
       )
       .id(device?.id)

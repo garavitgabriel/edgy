@@ -76,7 +76,7 @@ public struct WindowStatus: Equatable, Sendable {
 /// Copy the window writes (BRIEF § Copy voice: plain, specific, measured).
 public enum WindowCopy {
   public static let noAccessibility = "Edgy needs Accessibility access to run actions."
-  public static let legacyNote = "This profile doesn't follow Default."
+  public static let legacyNote = "This profile doesn’t follow Default."
   public static let legacyDetail = "It keeps working exactly as it does now."
 
   /// "Paused, 47 min left"; whole minutes, "less than a minute left" under one. No clock time.

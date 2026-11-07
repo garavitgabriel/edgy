@@ -27,6 +27,12 @@ public struct SettingsWindowView: View {
     self.model = model
   }
 
+  /// With the installed apps already known (snapshots, previews): tab marks draw on first frame.
+  init(model: SettingsModel, apps: [InstalledApp]) {
+    self.model = model
+    _apps = State(initialValue: apps)
+  }
+
   /// Fits the larger (external) pad to scale beside the inspector, with room for a strip.
   public static var minimumSize: CGSize {
     let mirror = WindowMetrics.mirrorRegion(for: WindowMetrics.largestPadMM)
@@ -57,7 +63,7 @@ public struct SettingsWindowView: View {
     .frame(minWidth: Self.minimumSize.width, minHeight: Self.minimumSize.height)
     .background(WindowMaterial())
     .task {
-      guard let source = model.installedApps else { return }
+      guard apps.isEmpty, let source = model.installedApps else { return }
       apps = await source.installedApps()
     }
     .sheet(isPresented: $showingAdvanced) {
@@ -163,8 +169,8 @@ public struct SettingsWindowView: View {
       }
     case .brokenConfig(let problem):
       WindowStripView(symbol: "exclamationmark.circle", text: problem.sentence) {
+        // Reload is the popover's alone (§ Issue states); the window offers these two.
         Button("Open config file") { commands.openConfigFile() }
-        Button("Reload") { commands.reloadConfig() }
         Button("Replace with current settings…") { confirmingReplace = true }
       }
     }
@@ -204,12 +210,14 @@ public struct SettingsWindowView: View {
       if !status.hidesInspector {
         if case .app(let id) = model.selectedProfile, model.isLegacyProfile(model.selectedProfile) {
           LegacyNoteView { model.followDefault(bundleID: id) }
+            .padding(.horizontal, InspectorView.inset)
         }
         InspectorView(model: model)
       }
       Spacer(minLength: 0)
     }
-    .padding(WindowMetrics.gutter)
+    // The inspector keeps its own leading inset (≈22 pt, render A); the column adds none.
+    .padding(.vertical, WindowMetrics.gutter)
     .frame(width: WindowMetrics.inspectorWidth, alignment: .topLeading)
     .frame(maxHeight: .infinity, alignment: .top)
     .background(Tokens.padTop.opacity(0.35))

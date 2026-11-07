@@ -86,18 +86,45 @@ enum GestureNaming {
 
 /// Names for actions as rows and picker items show them.
 enum ActionNaming {
-  /// "Open App…" for an action with parameters (BRIEF § Picker at catalog scale), else its name.
+  /// "Open App…" for an action with a **required** parameter (BRIEF § Picker at catalog scale:
+  /// the "…" means "it will ask for something"); optional tuning parameters (`speedUp`, `stepMM`,
+  /// `keepOpenMS`, `holdMS`) don't count, so Volume stays "Volume". Else the catalog name.
   static func pickerName(_ descriptor: ActionDescriptor) -> String {
-    descriptor.parameters.isEmpty ? descriptor.displayName : "\(descriptor.displayName)…"
+    descriptor.parameters.contains(where: \.required) ? "\(descriptor.displayName)…" : descriptor.displayName
   }
 
-  /// The row's label for a parameter: catalog name, with a few clearer ones from the specs.
+  /// The row's label for a parameter: the catalog name in sentence case ("Shortcut name", "File or
+  /// folder"), with the labels the specs give where they differ.
   static func parameterLabel(_ parameter: ActionParameter, action: ActionID) -> String {
     switch (action.rawValue, parameter.key) {
     case ("keyboard.hold", "keys"): return "Keys to hold"
     case ("app.open", "whenFrontmost"): return "If already in front"
-    default: return parameter.displayName
+    case (_, "maxSeconds"): return "Let go after"  // batch-15 design answer 2
+    default: return sentenceCase(parameter.displayName)
     }
+  }
+
+  /// The helper line under a parameter row: the catalog's, or the spec's where the catalog has none.
+  static func parameterHelp(_ parameter: ActionParameter) -> String? {
+    if let help = parameter.helpText { return help }
+    if parameter.key == "maxSeconds" { return "If a lift is missed, the keys come back up after this long." }
+    return nil
+  }
+
+  /// "Shortcut Name" → "Shortcut name"; words in capitals ("URL") stay as they are.
+  static func sentenceCase(_ text: String) -> String {
+    let words = text.split(separator: " ", omittingEmptySubsequences: false)
+    return words.enumerated().map { index, word in
+      guard index > 0, word.count > 1, word != word.uppercased() else { return String(word) }
+      return word.lowercased()
+    }.joined(separator: " ")
+  }
+
+  /// An on/off choice (`speedUp`): drawn as a checkbox (BRIEF § Slide feel; the catalog has no
+  /// boolean kind, so on/off is a two-value choice).
+  static func isOnOff(_ parameter: ActionParameter) -> Bool {
+    if case .choice(let choices) = parameter.kind { return Set(choices) == ["on", "off"] }
+    return false
   }
 
   /// "Needs keys" / "Needs an app" (BRIEF § Binding parameters) for a missing required parameter.
@@ -171,19 +198,19 @@ enum IssueCopy {
     switch issue.code {
     case .missingParameter: return parameter.map(ActionNaming.needs) ?? "Needs a value"
     case .invalidKeyCombo:
-      return issue.detail == ValidationIssue.modifierOnlyNeedsHold ? modifiersAlone : "Edgy can't press that key."
+      return issue.detail == ValidationIssue.modifierOnlyNeedsHold ? modifiersAlone : "Edgy can’t press that key."
     case .invalidURL: return urlScheme
     case .invalidFilePath: return filePath
     case .invalidBundleID: return "Choose an app."
     case .notANumber: return "Needs a number."
-    case .numberOutOfRange: return "That's outside the range this setting takes."
+    case .numberOutOfRange: return "That’s outside the range this setting takes."
     case .invalidChoice: return "Choose one of the options."
-    case .unknownAction: return "Edgy doesn't know this action."
-    case .shapeMismatch: return "This action doesn't fit this gesture."
-    case .gestureNotSupported: return "This zone can't take this gesture."
+    case .unknownAction: return "Edgy doesn’t know this action."
+    case .shapeMismatch: return "This action doesn’t fit this gesture."
+    case .gestureNotSupported: return "This zone can’t take this gesture."
     case .segmentOutOfRange: return "The config file splits this edge into more than 4 parts."
     case .duplicateBinding: return "The config file maps this gesture twice."
-    case .unknownParameter: return issue.parameter.map { "This action doesn't read “\($0)”." }
+    case .unknownParameter: return issue.parameter.map { "This action doesn’t read “\($0)”." }
     case .actionUnavailable:
       if case .unavailable(let reason) = availability { return reason }
       return "Not available on this Mac."
@@ -210,11 +237,12 @@ enum IssueCopy {
     }
   }
 
-  /// "The whole edge and the upper half both use Swipe up." (BRIEF § Issue states).
+  /// "Whole edge and upper half both use Swipe up." (BRIEF § Issue states; the pattern "<part> and
+  /// <part> both use <gesture>.").
   static func overlap(_ a: Zone, _ b: Zone, gesture: GestureKind) -> String {
     func part(_ zone: Zone) -> String {
       guard case .edge(let edge, let segment, let segments) = zone else { return ZoneNaming.lowercased(zone) }
-      return "the " + ZoneNaming.part(edge: edge, segment: segment, segments: segments)
+      return ZoneNaming.part(edge: edge, segment: segment, segments: segments)
     }
     let text = "\(part(a)) and \(part(b)) both use \(GestureNaming.name(gesture))."
     return text.prefix(1).uppercased() + text.dropFirst()

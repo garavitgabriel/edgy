@@ -17,7 +17,7 @@ public enum AppProfileStart: CaseIterable, Sendable {
 
   public var detail: String {
     switch self {
-    case .defaultWithChanges: return "Follows Default; change only what's different."
+    case .defaultWithChanges: return "Follows Default; change only what’s different."
     case .copyOfDefault: return "Starts the same, then goes its own way."
     case .empty: return "Nothing mapped until you add it."
     }
