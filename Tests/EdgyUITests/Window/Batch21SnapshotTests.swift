@@ -62,6 +62,19 @@ struct Batch21SnapshotTests {
     try window(model, "window-default")
   }
 
+  /// The original batch-21 fixture, kept: render A's state with the right edge's slide opened as
+  /// if clicked (a click opens it; selecting alone doesn't, which `windowDefault` asserts).
+  @Test func windowDefaultWithTheSlideClickedOpen() throws {
+    let model = PreviewFixtures.model()
+    model.selectedZone = .edge(.right)
+    model.inspectorDrafts.open = InspectorDrafts.Key(
+      profile: .default, binding: BindingKey(zone: .edge(.right), gesture: .slide))
+    #expect(
+      model.openBinding(in: .edge(.right), rows: model.inspectorRows(for: .edge(.right)))
+        == BindingKey(zone: .edge(.right), gesture: .slide))
+    try window(model, "window-default-slide-open")
+  }
+
   @Test func windowLiveTouchOnTheRightEdge() throws {
     let model = PreviewFixtures.model()
     model.selectedZone = .edge(.right)

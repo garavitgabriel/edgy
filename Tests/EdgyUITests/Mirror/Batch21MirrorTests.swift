@@ -84,7 +84,13 @@ struct Batch21MirrorTests {
       // The tab's start is inside the tile's x span, past its rounded corner.
       #expect(placement.point.x > tile.minX + mirror.tileRadius(tile) - 0.01)
       #expect(placement.point.x < tile.maxX - mirror.tileRadius(tile) + 0.01)
-      // The tab tucks under the tile by its own corner radius (critique 14 M2): no gap, no notch.
+      // Original intent, kept: the tab's edge overlaps the tile's edge (no gap, no corner-only touch).
+      switch corner {
+      case .topLeft, .topRight: #expect(placement.point.y < tile.maxY && placement.point.y > tile.minY)
+      case .bottomLeft, .bottomRight: #expect(placement.point.y > tile.minY && placement.point.y < tile.maxY)
+      }
+      // And the ruling on top of it: the tab tucks under the tile by its own corner radius
+      // (critique 14 M2), so no notch shows.
       switch corner {
       case .topLeft, .topRight: #expect(abs(tile.maxY - placement.point.y - Tokens.radiusControl) < 0.01)
       case .bottomLeft, .bottomRight: #expect(abs(placement.point.y - tile.minY - Tokens.radiusControl) < 0.01)
