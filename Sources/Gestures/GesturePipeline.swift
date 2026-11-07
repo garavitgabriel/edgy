@@ -171,6 +171,8 @@ struct FrameStep {
   var state: DeviceState
   var events: [GestureEvent] = []
   var rejections: [(contactID: Int32, reason: RejectionReason)] = []
+  /// The number behind each rejection in `rejections`, when one means something.
+  var measures: [Int32: RejectionMeasure] = [:]
 
   var now: Double { frame.timestamp }
 
@@ -211,7 +213,8 @@ struct FrameStep {
     reportDriftIntoZones()
     releasePendingTaps()
     let claimed = Set(state.candidates.filter(\.claims).flatMap(\.members))
-    return GestureOutput(events: events, claimedContactIDs: claimed, rejections: rejections)
+    return GestureOutput(
+      events: events, claimedContactIDs: claimed, rejections: rejections, rejectionMeasures: measures)
   }
 
   static func isDown(_ state: TouchContact.State) -> Bool {
@@ -260,10 +263,11 @@ struct FrameStep {
     if becamePalm { track.isPalm = true }
     state.tracks[contact.id] = track
     guard becamePalm else { return }
+    let measure = palmMeasure(contact)
     if track.role == .member, let key = candidateKey(containing: contact.id) {
-      rejectCandidate(key, .palm)
+      rejectCandidate(key, .palm, measure: measure)
     } else {
-      rejectTrack(contact.id, .palm)
+      rejectTrack(contact.id, .palm, measure: measure)
     }
   }
 
@@ -272,7 +276,7 @@ struct FrameStep {
       id: contact.id, birthTime: now, origin: position, position: position, role: .outside)
     if isPalm(contact) {
       state.tracks[contact.id]?.isPalm = true
-      rejectTrack(contact.id, .palm)
+      rejectTrack(contact.id, .palm, measure: palmMeasure(contact))
       return
     }
     guard let resolved = geometry.resolve(at: position, enabled: context.enabledZones) else { return }
@@ -282,7 +286,7 @@ struct FrameStep {
       return
     }
     if typingNow {
-      rejectTrack(contact.id, .typing)
+      rejectTrack(contact.id, .typing, measure: typingMeasure)
       return
     }
     state.tracks[contact.id]?.role = .member
@@ -327,8 +331,9 @@ struct FrameStep {
     guard active.count > fingerLimit else { return }
     for key in state.candidates.map(\.key) {
       guard let candidate = candidate(key) else { continue }
+      let measure = RejectionMeasure(measured: Double(active.count), limit: Double(fingerLimit), unit: .fingers)
       if !candidate.claims {
-        rejectCandidate(key, .tooManyContacts)
+        rejectCandidate(key, .tooManyContacts, measure: measure)
         continue
       }
       let landedTogether = active.contains {
@@ -338,7 +343,7 @@ struct FrameStep {
         !candidate.members.contains($0.id) && distance($0.position, $0.origin) > tuning.foreignMotionMM
       }
       if active.count >= 3 || landedTogether || othersMoving {
-        rejectCandidate(key, .tooManyContacts)
+        rejectCandidate(key, .tooManyContacts, measure: measure)
       }
     }
   }
@@ -349,7 +354,7 @@ struct FrameStep {
       guard let track = state.tracks[id], track.role == .outside, !track.isPalm,
         geometry.resolve(at: track.position, enabled: context.enabledZones)?.zone != nil
       else { continue }
-      rejectTrack(id, .startedOutsideZone)
+      rejectTrack(id, .startedOutsideZone, measure: outsideMeasure(track))
     }
   }
 
@@ -364,7 +369,7 @@ struct FrameStep {
     state.candidates[index] = candidate
 
     if !candidate.claims && typingNow {
-      rejectCandidate(key, .typing)
+      rejectCandidate(key, .typing, measure: typingMeasure)
       return
     }
     switch candidate.region {
@@ -377,7 +382,9 @@ struct FrameStep {
   mutating func advanceCorner(_ candidate: Candidate) {
     guard !candidate.longPressFired else { return }
     if candidate.maxTravel > tuning.cornerMaxTravelMM {
-      rejectCandidate(candidate.key, .offAxisMotion)
+      rejectCandidate(
+        candidate.key, .offAxisMotion,
+        measure: RejectionMeasure(measured: candidate.maxTravel, limit: tuning.cornerMaxTravelMM, unit: .mm))
       return
     }
     if now - candidate.birthTime >= timing.longPress && candidate.maxTravel <= tuning.longPressMaxTravelMM {
@@ -400,7 +407,7 @@ struct FrameStep {
       }
     case .swipe:
       if elapsed > swipeLimit(candidate) {
-        rejectCandidate(candidate.key, .tooFast)
+        rejectCandidate(candidate.key, .tooFast, measure: swipeTimeMeasure(candidate, elapsed: elapsed))
       }
     case .pending:
       advancePendingEdge(candidate, edge: edge, travel: travel, elapsed: elapsed)
@@ -426,11 +433,19 @@ struct FrameStep {
       return
     }
     if abs(inward) >= tuning.perpendicularDecideMM && abs(inward) > abs(along) {
-      rejectCandidate(candidate.key, inward > 0 ? .systemGestureHandoff : .offAxisMotion)
+      if inward > 0 {
+        rejectCandidate(candidate.key, .systemGestureHandoff)
+      } else {
+        rejectCandidate(
+          candidate.key, .offAxisMotion,
+          measure: RejectionMeasure(measured: abs(inward), limit: tuning.perpendicularDecideMM, unit: .mm))
+      }
       return
     }
     if travel >= tuning.diagonalDecideMM {
-      rejectCandidate(candidate.key, .offAxisMotion)
+      rejectCandidate(
+        candidate.key, .offAxisMotion,
+        measure: RejectionMeasure(measured: travel, limit: tuning.diagonalDecideMM, unit: .mm))
       return
     }
     if slideFingersMatch && candidate.maxTravel <= tuning.stillRadiusMM && elapsed >= timing.dwell {
@@ -520,8 +535,8 @@ struct FrameStep {
       if let direction = swipeDirection(candidate, elapsed: elapsed) {
         emit(candidate, .swipe(direction), phase: .ended, deltaMM: 0)
       } else {
-        let reason: RejectionReason = isPerpendicularDominant(candidate) ? .offAxisMotion : .tooFast
-        for member in candidate.members { rejectLifted(member, reason) }
+        let (reason, measure) = failedSwipe(candidate, elapsed: elapsed)
+        for member in candidate.members { rejectLifted(member, reason, measure: measure) }
       }
     case .pending:
       if let direction = swipeDirection(candidate, elapsed: elapsed),
@@ -579,17 +594,88 @@ struct FrameStep {
     return abs(along) / max(elapsed, tuning.minimumIntervalS) >= tuning.flickSpeedMMPerS
   }
 
-  func isPerpendicularDominant(_ candidate: Candidate) -> Bool {
-    guard case .edge(let edge) = candidate.region else { return false }
-    let along = geometry.along(edge, candidate.current) - geometry.along(edge, candidate.origin)
-    let inward = geometry.inward(edge, from: candidate.origin, to: candidate.current)
-    return abs(inward) > abs(along)
+  /// Why a swipe candidate that lifted didn't make a swipe, and the number behind it:
+  /// - more travel across the edge than along it → `offAxisMotion` (across vs along, mm);
+  /// - it took longer than the swipe time limit → `tooFast` (elapsed vs limit, ms; the reason's
+  ///   name is historical: the touch was fast enough to be a swipe candidate, then too slow to lift);
+  /// - it didn't travel far enough along the edge → `tooFast` (along vs `swipeMinTravelMM`, mm);
+  /// - otherwise (along won, but not by `axisDominance`) → `tooFast` with no measure.
+  func failedSwipe(_ candidate: Candidate, elapsed: Double) -> (RejectionReason, RejectionMeasure?) {
+    guard case .edge(let edge) = candidate.region else { return (.tooFast, nil) }
+    let along = abs(geometry.along(edge, candidate.current) - geometry.along(edge, candidate.origin))
+    let inward = abs(geometry.inward(edge, from: candidate.origin, to: candidate.current))
+    if inward > along {
+      return (.offAxisMotion, RejectionMeasure(measured: inward, limit: along, unit: .mm))
+    }
+    if elapsed > swipeLimit(candidate) {
+      return (.tooFast, swipeTimeMeasure(candidate, elapsed: elapsed))
+    }
+    if along < tuning.swipeMinTravelMM {
+      return (.tooFast, RejectionMeasure(measured: along, limit: tuning.swipeMinTravelMM, unit: .mm))
+    }
+    return (.tooFast, nil)
+  }
+
+  // MARK: - Measures
+
+  /// How long a swipe candidate stayed down against the swipe time limit.
+  func swipeTimeMeasure(_ candidate: Candidate, elapsed: Double) -> RejectionMeasure {
+    RejectionMeasure(measured: elapsed * 1000, limit: swipeLimit(candidate) * 1000, unit: .ms)
+  }
+
+  /// Time since the last key press against `typingSuppressionMS`.
+  var typingMeasure: RejectionMeasure? {
+    guard let seconds = context.secondsSinceLastKeyPress else { return nil }
+    return RejectionMeasure(measured: seconds * 1000, limit: context.settings.typingSuppressionMS, unit: .ms)
+  }
+
+  /// The axis that crossed its palm limit: the major axis against `palmMajorAxisMM`, else the minor
+  /// axis against the fixed round-blob limit. A contact judged by size or density alone (unitless
+  /// device readings) gets no measure.
+  func palmMeasure(_ contact: TouchContact) -> RejectionMeasure? {
+    if contact.majorAxisMM > context.settings.palmMajorAxisMM {
+      return RejectionMeasure(measured: contact.majorAxisMM, limit: context.settings.palmMajorAxisMM, unit: .mm)
+    }
+    if contact.minorAxisMM > tuning.palmMinorAxisMM {
+      return RejectionMeasure(measured: contact.minorAxisMM, limit: tuning.palmMinorAxisMM, unit: .mm)
+    }
+    return nil
+  }
+
+  /// How far in from the physical edge the touch landed, against the region it drifted into: the
+  /// edge strip's depth (`edgeWidthMM`) or the corner square's side (`cornerSizeMM`).
+  func outsideMeasure(_ track: Track) -> RejectionMeasure? {
+    guard let region = geometry.resolve(at: track.position, enabled: context.enabledZones)?.region else { return nil }
+    let fromLeft = track.origin.x
+    let fromRight = geometry.width - track.origin.x
+    let fromBottom = track.origin.y
+    let fromTop = geometry.height - track.origin.y
+    switch region {
+    case .edge(let edge):
+      let depth: Double
+      switch edge {
+      case .left: depth = fromLeft
+      case .right: depth = fromRight
+      case .bottom: depth = fromBottom
+      case .top: depth = fromTop
+      }
+      return RejectionMeasure(measured: depth, limit: geometry.edgeWidth, unit: .mm)
+    case .corner(let corner):
+      let across: Double
+      switch corner {
+      case .topLeft: across = max(fromLeft, fromTop)
+      case .topRight: across = max(fromRight, fromTop)
+      case .bottomLeft: across = max(fromLeft, fromBottom)
+      case .bottomRight: across = max(fromRight, fromBottom)
+      }
+      return RejectionMeasure(measured: across, limit: geometry.cornerSize, unit: .mm)
+    }
   }
 
   // MARK: - Rejection + output
 
   /// Revoke a candidate: cancel its slide if one is live, and reject each of its fingers.
-  mutating func rejectCandidate(_ key: Int, _ reason: RejectionReason) {
+  mutating func rejectCandidate(_ key: Int, _ reason: RejectionReason, measure: RejectionMeasure? = nil) {
     guard let index = index(of: key) else { return }
     let candidate = state.candidates.remove(at: index)
     if candidate.phase == .sliding {
@@ -599,25 +685,30 @@ struct FrameStep {
       emit(candidate, .longPress, phase: .cancelled, deltaMM: 0)
     }
     for member in candidate.members {
-      rejectTrack(member, reason)
+      rejectTrack(member, reason, measure: measure)
     }
   }
 
   /// Reject a contact at most once; it stops participating but still counts until it lifts.
-  mutating func rejectTrack(_ id: Int32, _ reason: RejectionReason) {
+  mutating func rejectTrack(_ id: Int32, _ reason: RejectionReason, measure: RejectionMeasure? = nil) {
     guard var track = state.tracks[id], !track.rejected else { return }
     track.rejected = true
     track.role = .finished
     state.tracks[id] = track
+    record(id, reason, measure)
+  }
+
+  mutating func record(_ id: Int32, _ reason: RejectionReason, _ measure: RejectionMeasure?) {
     rejections.append((contactID: id, reason: reason))
+    if let measure { measures[id] = measure }
   }
 
   /// Reject a member of a candidate that just ended because a finger lifted.
-  mutating func rejectLifted(_ id: Int32, _ reason: RejectionReason) {
+  mutating func rejectLifted(_ id: Int32, _ reason: RejectionReason, measure: RejectionMeasure? = nil) {
     if state.tracks[id] != nil {
-      rejectTrack(id, reason)
+      rejectTrack(id, reason, measure: measure)
     } else {
-      rejections.append((contactID: id, reason: reason))
+      record(id, reason, measure)
     }
   }
 
