@@ -51,6 +51,8 @@ struct Track: Sendable {
 
   let id: Int32
   let birthTime: Double
+  /// Where it landed, millimetres.
+  let origin: Point2D
   /// Last position, millimetres.
   var position: Point2D
   var role: Role
@@ -187,7 +189,8 @@ struct FrameStep {
   }
 
   mutating func birth(_ contact: TouchContact, at position: Point2D) {
-    state.tracks[contact.id] = Track(id: contact.id, birthTime: now, position: position, role: .outside)
+    state.tracks[contact.id] = Track(
+      id: contact.id, birthTime: now, origin: position, position: position, role: .outside)
     if isPalm(contact) {
       state.tracks[contact.id]?.isPalm = true
       rejectTrack(contact.id, .palm)
@@ -238,7 +241,8 @@ struct FrameStep {
   }
 
   /// More contacts than the gesture allows → reject. A gesture that already owns its fingers is
-  /// revoked only by a contact that landed together with it (a multi-finger touch) or by 3+ contacts.
+  /// revoked only by a contact that landed together with it (a multi-finger touch), by 3+
+  /// contacts, or by another contact that moves (`foreignMotionMM`: someone is using the pointer).
   mutating func enforceContactCount() {
     let active = state.tracks.values.filter { !$0.isPalm }
     guard active.count > fingerLimit else { return }
@@ -251,7 +255,10 @@ struct FrameStep {
       let landedTogether = active.contains {
         !candidate.members.contains($0.id) && abs($0.birthTime - candidate.birthTime) <= tuning.multiFingerWindowS
       }
-      if active.count >= 3 || landedTogether {
+      let othersMoving = active.contains {
+        !candidate.members.contains($0.id) && distance($0.position, $0.origin) > tuning.foreignMotionMM
+      }
+      if active.count >= 3 || landedTogether || othersMoving {
         rejectCandidate(key, .tooManyContacts)
       }
     }
