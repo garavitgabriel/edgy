@@ -280,10 +280,10 @@ enum HoldSetup {
     h.engine.setTestMode(false)
     h.step(GestureOutput(events: [HoldSetup.event(.ended)]))
     // No down was sent in Test Mode, so no up may follow; the recognizer was reset and the
-    // pointer guard let go.
+    // pointer guard is not held (batch 20: a begun hold never holds it; was ["engage", "release"]).
     #expect(h.actions.performed.isEmpty)
     #expect(h.recognizer.resetCount == 2)
-    #expect(h.guardCalls == ["engage", "release"])
+    #expect(h.guardCalls == [])
   }
 
   @Test func turningTestModeOffMidSlideDoesNotResumeIt() throws {

@@ -150,11 +150,11 @@ A parameter with no default is required.
 
 | id | Name | Shape | Category | Parameters (key: kind, default, label) |
 |---|---|---|---|---|
-| `audio.volume` | Volume | continuous | sound | — |
+| `audio.volume` | Volume | continuous | sound | `speedUp` (see Slide feel) |
 | `audio.mute` | Mute | trigger | sound | — |
 | `mic.mute` | Microphone Mute | trigger | sound | — |
-| `display.brightness` | Brightness | continuous | display | — (availability depends on the displays) |
-| `keyboard.backlight` | Keyboard Brightness | continuous | display | — (unavailable without a backlit keyboard) |
+| `display.brightness` | Brightness | continuous | display | `speedUp` (availability depends on the displays) |
+| `keyboard.backlight` | Keyboard Brightness | continuous | display | `speedUp` (unavailable without a backlit keyboard) |
 | `keyboard.backlightToggle` | Keyboard Backlight On / Off | trigger | display | — (unavailable without a backlit keyboard) |
 | `media.playPause` | Play / Pause | trigger | media | — |
 | `media.next` | Next Track | trigger | media | — |
@@ -178,15 +178,62 @@ A parameter with no default is required.
 | `app.open` | Open App | trigger | apps | `bundleID`: app bundle ID, required, "App"; `whenFrontmost`: choice `stay` / `hide`, default `hide`, "When Already in Front" |
 | `url.open` | Open URL | trigger | apps | `url`: URL with a scheme, required, "URL" |
 | `file.open` | Open File or Folder | trigger | apps | `path`: absolute or `~` path, required, "File or Folder" |
-| `apps.switcher` | Switch Apps | continuous | apps | `step`: number 0.04…0.5, default 0.1, "Step" |
+| `apps.switcher` | Switch Apps | continuous | apps | `stepMM`, `speedUp`, `keepOpenMS` (see Slide feel); legacy `step` still read |
 | `keyboard.shortcut` | Keyboard Shortcut | trigger | keyboard | `keys`: key combo, required, "Keys" |
-| `keyboard.slideSteps` | Slide to Repeat Keys | continuous | keyboard | `upKeys`: key combo, required, "Up / Right Keys"; `downKeys`: key combo, required, "Down / Left Keys"; `step`: number 0.02…0.5, default 0.0625, "Step" |
-| `keyboard.hold` | Hold Keys | hold | keyboard | `keys`: key combo, required, "Keys". Modifiers alone (`fn`, `ctrl+opt`) are allowed, for push-to-talk. |
+| `keyboard.slideSteps` | Slide to Repeat Keys | continuous | keyboard | `upKeys`: key combo, required, "Up / Right Keys"; `downKeys`: key combo, required, "Down / Left Keys"; `stepMM`, `speedUp` (see Slide feel); legacy `step` still read |
+| `keyboard.hold` | Hold Keys | hold | keyboard | `keys`: key combo, required, "Keys". Modifiers alone (`fn`, `ctrl+opt`) are allowed, for push-to-talk. `maxSeconds`: number 5…600, default 120, "Release after". `holdMS`: number 100…1500, default 300, "Hold before it starts" (see Slide feel and hold timing). |
 | `shortcut.run` | Run Shortcut | trigger | shortcuts | `name`: text, required, "Shortcut Name" |
 | `edgy.none` | Do nothing | any | — | — (only meaningful in an inheriting app profile; never performed) |
 
 The catalog is defined in `Sources/Actions/ActionCatalog.swift`. Add new actions there first, then
 list them here.
+
+### Slide feel and hold timing (batch 20)
+
+Every new parameter is optional. Labels, helper lines and units are BRIEF's (§ Binding parameters).
+On/off parameters are a two-value choice, `"on"` / `"off"`; the inspector draws them as a checkbox.
+
+| Key | Applies to | Kind, default | Label · unit | Helper line |
+|---|---|---|---|---|
+| `stepMM` | `apps.switcher` | number 4…20, default 8 | "Distance per app" · mm | "Slide this far to move one app." |
+| `stepMM` | `keyboard.slideSteps` | number 4…20, default 8 | "Distance per press" · mm | "Slide this far for one key press." |
+| `speedUp` | `apps.switcher` | choice `on` / `off`, default `on` | "Faster when you flick" | "A quick flick skips several apps." |
+| `speedUp` | `keyboard.slideSteps` | choice `on` / `off`, default `on` | "Faster when you flick" | "A quick flick sends several presses." |
+| `speedUp` | `audio.volume`, `display.brightness`, `keyboard.backlight` | choice `on` / `off`, default `on` (gentle) | "Faster when you flick" | "A quick flick moves the level further." |
+| `keepOpenMS` | `apps.switcher` | number 0…1000, default 400, `zeroLabel` "Off" | "Keep open between strokes" · ms | "Lift and slide again to keep going; it picks the app when you stop, click or move the pointer." |
+| `holdMS` | `keyboard.hold` | number 100…1500, default 300 | "Hold before it starts" · ms | "How long to press before the keys go down." |
+| `holdMS` | any other long-press binding | number 100…1500, no default, `fallback: .longPressMS` | "Press time" · ms | "How long to press before it runs." |
+
+- **`holdMS` on other long-press bindings.** No action lists it; the settings layer offers
+  `ConfigValidator.pressTimeParameter` (the same spec as `GestureParameters.pressTime` in Actions) on
+  every long-press binding whose action has no `holdMS` of its own. Validation range-checks it there
+  and flags it as `unknownParameter` on any other gesture. Absent, the zone uses `longPressMS`
+  ("Default (500 ms)").
+- **How the engine uses `holdMS`.** Each long-press binding's `holdMS` (or its action's default:
+  300 for `keyboard.hold`) goes to the recognizer as `GestureContext.longPressMSByZone`.
+- **Legacy `step`.** `ConfigValidator.legacyParameters` lists `step` on `apps.switcher` and
+  `keyboard.slideSteps`: never flagged as unknown. When `stepMM` is absent, `step` (a fraction of
+  the zone's length) is converted to millimetres with the zone's length, so an old config feels
+  the same on the pad it was made on. `stepMM` wins when both are set.
+
+Both lists are public on `ConfigValidator`: `legacyParameters` and `pressTimeParameter`.
+
+**The feel** (`Sources/Actions/SlideFeel.swift`; every number a named constant there):
+- Stepped slides move one step per `stepMM` of travel, the same on every pad and segment size.
+  Travel is carried between updates (and, for the app switcher, between strokes).
+- Speed-up multiplies travel by a gain on the finger's smoothed speed: 1 up to 60 mm/s, rising
+  smoothly (smoothstep) to 3× at 300 mm/s for stepped slides, 1.6× for levels. Off = the plain
+  distance (levels: exactly the old behaviour).
+- Resting at an end of the zone (the recognizer's `atEnd`, a 6 mm end band) keeps a stepped slide
+  stepping toward that end: 2 steps/s easing to 6 steps/s over 0.6 s, until the finger moves or
+  lifts. A tick per step; a stronger click when end stepping starts. Levels don't end-step.
+- **App switcher session.** The first stroke holds command and opens the switcher on the next app.
+  When a stroke ends (or is interrupted by a palm or a second finger), command stays down for
+  `keepOpenMS`; a stroke that begins within that time continues the same session. It selects
+  when the time passes, or at once on a click or clear pointer movement (40 pt); Escape closes it
+  without selecting. Sliding back past the app it opened on cancels (escape). A stronger click
+  marks a wrap past the last app. `keepOpenMS` 0 is the old one-stroke switcher. Command is never
+  left down: every exit releases it, and the 10 s idle watchdog stays.
 
 Parameter kinds and how they are checked: **text** (anything); **key combo** (`KeyCombo` syntax such
 as `cmd+shift+4`, with modifiers `ctrl opt shift cmd fn`; a combo of modifiers alone is valid only on a
@@ -221,6 +268,7 @@ are stable.
 | `settingOutOfRange` | warning | A gesture setting outside its limits. |
 | `actionUnavailable` | warning | The action can't work on this Mac right now; the binding is kept. |
 | `tapWaitsForDoubleTap` | info | The zone has a tap and a double-tap, so a tap waits `doubleTapWindowMS` (`detail`, in ms) before it runs. |
+| `slideAndSwipes` | info | The edge has a slide and a swipe (same zone, or overlapping segments of one edge), so swipes there need a clearer flick. Attached to each such swipe. Copy: "Quick slides can look like swipes here, so swipes need a clearer flick on this edge." The recognizer asks a swipe on a zone with a slide bound for 260 mm/s and 9 mm (elsewhere 180 mm/s and 6 mm). |
 
 ## A broken config file
 

@@ -103,7 +103,8 @@ public final class Router {
         .info, "Gesture \(event.kind) \(event.phase) at \(event.zone) → \(binding?.action.rawValue ?? "unbound")")
     }
     guard let binding else { return }
-    let context = ActionContext(frontmostBundleID: frontmostBundleID, parameters: binding.parameters)
+    let context = ActionContext(
+      frontmostBundleID: frontmostBundleID, parameters: binding.parameters, motion: Self.motion(of: event))
     if shapes[binding.action] == .hold {
       press(binding, event: event, key: key, context: context)
       return
@@ -209,6 +210,13 @@ public final class Router {
     } catch {
       logger.log(.error, "Action \(hold.action.rawValue) failed to release: \(error)")
     }
+  }
+
+  /// The physical side of a slide event (millimetres, time, end), for the shared slide feel. `nil`
+  /// for discrete gestures and for events that don't know their zone's length.
+  static func motion(of event: GestureEvent) -> SlideMotion? {
+    guard event.kind == .slide, event.zoneLengthMM > 0 else { return nil }
+    return SlideMotion(deltaMM: event.delta * event.zoneLengthMM, timestamp: event.timestamp, atEnd: event.atEnd)
   }
 
   private func input(for event: GestureEvent, key: DiscreteKey) -> ActionInput? {
