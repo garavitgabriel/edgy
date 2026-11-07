@@ -146,8 +146,11 @@ public final class OverlayController {
     let dryRun = model.isDryRun
     let context = PlateContext.current(model: model)
     let catalog = model.mirrorCatalog
-    if decisions.contains(where: { if case .recognized = $0 { false } else { true } }) {
-      workArea = screens.workArea()
+    let newestBefore = timeline.entries.map(\.id).max() ?? 0
+    defer {
+      // Read the work area only when a plate that wasn't up appears (ids only grow on append):
+      // never for a slide's updates, which arrive every tick, nor for decisions with no plate.
+      if (timeline.entries.map(\.id).max() ?? 0) > newestBefore { workArea = screens.workArea() }
     }
     for decision in decisions {
       if case .recognized(let zone, let kind, let phase, _) = decision {

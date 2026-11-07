@@ -425,6 +425,20 @@ let volumeRan = LiveDecision.actionRan(
     #expect(check.map { c in level.map { c.maxY <= $0.minY - PlateDocking.margin } ?? false } == true)
     for _ in 0..<5 { controller.pump() }
     #expect(screens.workAreaReads == 1)
+    // The slide keeps updating every tick: the same plate, so no new read.
+    for level in [0.42, 0.44, 0.46, 0.48] {
+      feed(
+        model,
+        .actionUpdated(
+          BuiltInAction.brightness, zone: .edge(.left), kind: .slide,
+          outcome: ActionOutcome(level: level, detail: "Built-in Display")))
+      controller.pump()
+    }
+    #expect(screens.workAreaReads == 1)
+    // A decision with no plate (ordinary pointer use) reads nothing either.
+    feed(model, .rejected(contactID: 9, zone: nil, reason: .startedOutsideZone, deviceID: 1))
+    controller.pump()
+    #expect(screens.workAreaReads == 1)
   }
 
   @Test func noLevelPlateInDryRun() {

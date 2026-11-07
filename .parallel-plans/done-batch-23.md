@@ -15,7 +15,7 @@ Shots: `docs/design/build-shots/batch-18/` (re-made) and `docs/design/build-shot
 
 ### Must fix
 1. **[✓] Level plate and display check never sit on the document text.**
-   - `OverlayScreenProviding.workArea()` reports the focused text element's frame and its window (`OverlayWorkArea`). Live: `LiveScreens` reads the frontmost app's `AXFocusedUIElement` and `AXFocusedWindow` through Accessibility, with a 0.1 s messaging timeout. It reads once per batch of new plates, never on the 30 Hz tick. It returns empty, with one logged reason, when Accessibility isn't granted. Tests use `FakeOverlayScreens(work:)`.
+   - `OverlayScreenProviding.workArea()` reports the focused text element's frame and its window (`OverlayWorkArea`). Live: `LiveScreens` reads the frontmost app's `AXFocusedUIElement` and `AXFocusedWindow` through Accessibility, with a 0.1 s messaging timeout. It reads only when a plate that wasn't up appears. It never reads on the 30 Hz tick, for a slide's per-tick `actionUpdated`, or for decisions that make no plate (`levelPlateAndCheckStayClearOfTheText` asserts one read across a slide's updates and a `startedOutsideZone` rejection). It returns empty, with one logged reason, when Accessibility isn't granted. Tests use `FakeOverlayScreens(work:)`.
    - `PlateDocking.settle` slides a docked plate **along its edge**, never inward:
      - it never covers the text (plus an 8 pt gap) or another plate;
      - then, when there's room, it keeps 8 pt from the window.
@@ -150,7 +150,7 @@ Kill list: no halo (the rim is a 1 pt solid stroke), no hero numerals, no second
 
 ## Decisions I made (and why)
 - **The edge is always drawn** (ruling 1 allows it when indistinguishable; the isolated shots show it is).
-- **One work-area read per batch of new plates**, not per tick: AX calls are IPC to the frontmost app on the main thread. Plates that are already up keep their spot until the next decision batch.
+- **Work area read only when a new plate appears**, not per tick or per slide update: AX calls are IPC to the frontmost app on the main thread. Plates that are already up keep their spot until the next new plate.
 - **The text is a hard limit and the window a soft one.** BRIEF forbids covering text; the window gap is the critique's should-fix. When nothing on the edge clears the text, the docked frame stays (the edge is full; this never happens with a normal text column).
 - **The level track** uses `plateInk2` at 30% (no plate `line` token; `Shared/` is frozen).
 - **Existing test changed in direction, not intent:** `displayCheckSitsBesideTheLevelPlateTowardTheMiddle` → `displayCheckStacksAlongTheDockedEdge`, and `showsBesideTheLevelPlateAndCountsTheAsk` → `…AlongItsEdge…`. Both still check that the check sits beside its level plate, fully on screen; the asserted side changed because "inward" was the bug.
