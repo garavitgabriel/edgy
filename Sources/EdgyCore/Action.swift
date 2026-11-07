@@ -41,15 +41,35 @@ public enum ActionAvailability: Sendable, Hashable {
 }
 
 /// Where and why the action fires.
+/// The physical side of a slide step, for actions that step in millimetres, speed up with quick
+/// flicks or keep stepping at the end of the edge.
+public struct SlideMotion: Hashable, Sendable {
+  /// Signed travel since the previous event, in millimetres (+ = toward top/right).
+  public var deltaMM: Double
+  /// Device timestamp of this event, seconds.
+  public var timestamp: TimeInterval
+  /// -1 / +1 while resting at the low / high end of the zone, 0 otherwise (`GestureEvent.atEnd`).
+  public var atEnd: Int
+
+  public init(deltaMM: Double, timestamp: TimeInterval, atEnd: Int = 0) {
+    self.deltaMM = deltaMM
+    self.timestamp = timestamp
+    self.atEnd = atEnd
+  }
+}
+
 public struct ActionContext: Sendable {
   /// Bundle ID of the frontmost app, if known.
   public var frontmostBundleID: String?
   /// Free-form parameters from the binding (e.g. Shortcut name, step size).
   public var parameters: [String: String]
+  /// For slide input: the physical motion behind the normalized delta. `nil` when unknown.
+  public var motion: SlideMotion?
 
-  public init(frontmostBundleID: String?, parameters: [String: String]) {
+  public init(frontmostBundleID: String?, parameters: [String: String], motion: SlideMotion? = nil) {
     self.frontmostBundleID = frontmostBundleID
     self.parameters = parameters
+    self.motion = motion
   }
 }
 
