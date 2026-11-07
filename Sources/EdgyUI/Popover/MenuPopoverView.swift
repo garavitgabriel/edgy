@@ -49,8 +49,8 @@ public struct MenuPopoverView: View {
     case .brokenConfig(let problem):
       VStack(alignment: .leading, spacing: 0) {
         IssueBlock(symbol: "exclamationmark.circle", text: problem.sentence, detail: nil) {
+          // Recovery only; the file watcher reloads on save, so there's no Reload (bone 10).
           Button("Open config file") { actions.openConfigFile() }
-          Button("Reload") { actions.reloadConfig() }
         }
         switches
       }
@@ -102,7 +102,8 @@ public struct MenuPopoverView: View {
 
   private var chips: some View {
     ChipFlow(spacing: PopoverMetrics.chipGap) {
-      ForEach(ProfileChip.chips(model: model, frontmost: state.frontmost(model: model), apps: state.installedApps)) { chip in
+      ForEach(ProfileChip.chips(model: model, frontmost: state.frontmost(model: model), apps: state.installedApps)) {
+        chip in
         ChipView(chip: chip) {
           model.selectProfile(chip.ref)
           actions.openSettings()

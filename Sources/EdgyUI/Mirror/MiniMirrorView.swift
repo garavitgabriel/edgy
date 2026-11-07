@@ -64,7 +64,8 @@ public struct MiniMirrorView: View {
     let device = model.mirroredDevice
     let sizeMM =
       state == .noTrackpad
-      ? MirrorGeometry.defaultSensorSizeMM : device?.sensorSizeMM ?? model.lastKnownPadSizeMM ?? lastKnownSize ?? MirrorGeometry.defaultSensorSizeMM
+      ? MirrorGeometry.defaultSensorSizeMM
+      : device?.sensorSizeMM ?? model.lastKnownPadSizeMM ?? lastKnownSize ?? MirrorGeometry.defaultSensorSizeMM
     let geometry = MirrorGeometry(
       sensorSizeMM: sizeMM, settings: model.editor.config.gestures, pointsPerMM: Tokens.miniMirrorPointsPerMM)
     ZStack {
