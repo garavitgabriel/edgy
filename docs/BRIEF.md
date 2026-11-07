@@ -48,6 +48,7 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
    - **Pass-through corner:** a dashed rounded square. Dashed means pass-through and nothing else.
    - **Selected:** an `ink` ring around the zone.
    - **Live:** the accent contact, plus a thin accent border on the lit bar.
+   - **Which touches the mirror draws** (owner, 2026-11-07): only a touch that is a gesture candidate or a claim **inside a mapped zone**, or a rejection there. Plain pointer touches in the middle of the pad are **never drawn**. The mirror shows where the finger sits (absolute) while the pointer moves relatively, so drawing ordinary pointer use creates a second "cursor" that drifts against the real one.
    - Selection and live never look alike.
 3. **Labels are joined to their zone.**
    - Side strips are 8 mm, about 30 pt, too narrow for text. Their labels are tabs growing from the strip's inner side, in the same fill and with no gap.
@@ -60,7 +61,7 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
    - Mirrors under about 200 pt wide (presets, the popover mini mirror) may drop the corner action icons; the solid tile still means mapped.
    - Action names are the catalog's display names, spelled the same everywhere.
 4. **Recognized vs rejected by shape.**
-   - **Recognized:** a filled accent contact.
+   - **Recognized:** a filled accent contact. (Contacts appear only per bone 2's "which touches the mirror draws" rule: zone touches, never plain pointer use.)
    - **Rejected:** a hollow, struck circle.
    - A rejection states the measured value against the limit: **"Ignored: palm, 21 mm wide, limit 18 mm"**. This plate was every critic's KEEP; build it exactly like that.
    - **Copy pattern for every reason:** "Ignored: <reason>, <measured>, limit <limit>". Use the runtime's `RejectionMeasure` (measured, limit, unit) with its own unit (mm, ms, fingers). When the measure has no number (unit none), stop after the reason. Rewritten 2026-11-07 from the real measures in `.parallel-plans/done-batch-13.md`.
@@ -95,7 +96,7 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
    - Actions that can't take the gesture are dimmed, with **one** group note ("These need a slide.").
    - The picker never covers its trigger or the neighbouring zones, and never leaves the window.
 6. **The inspector:**
-   - It shows the selected zone's name (26), "Split into 1 2 3 4" (the runtime allows 1…4 segments), and **only the mapped gestures** with their actions in plain text.
+   - It shows the selected zone's name (26), the **Split control** (§ Split control below; the runtime allows 1…4 segments), and **only the mapped gestures** with their actions in plain text.
    - It ends with "Add gesture…".
    - Clicking a row opens the same pad popover. There is one place to map, not two.
    - While the picker is open, the row's value is blank (the popover header already says it).
@@ -117,7 +118,7 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
     - **Top half:** a live mini mirror (zones of the active profile plus the last touch where it landed), profile chips, and **Enabled** and **Test Mode** switches.
     - **Profile chips don't select anything.** Profiles follow the frontmost app automatically. The chip of the profile in effect is filled; the others are outlined. Clicking a chip opens Settings on that profile's tab. If the frontmost app has its own profile, its chip comes first.
     - **Two trackpads attached:** the mirrors (window, popover, onboarding) show **the pad touched last**, with no picker. Its outline follows that device's real proportions. When it switches, the outline cross-fades (150 ms).
-    - **Bottom half:** a plain list at native menu-row height, with an **`ink` hover wash (10%)**, not the system accent highlight (one hue): Pause for 1 hour, Settings… ⌘,, Open config file, Reload config ⌘R, About Edgy, Quit Edgy ⌘Q.
+    - **Bottom half:** a plain list at native menu-row height, with an **`ink` hover wash (10%)**, not the system accent highlight (one hue): Pause for 1 hour, Settings… ⌘,, About Edgy, Quit Edgy ⌘Q. **No config-file items:** everything is controlled in the UI, and the file reloads itself on save. "Open config file" appears only as recovery in the broken-config state (owner, 2026-11-07).
     - No power button, hero numeral or cards on cards.
 
 ### Surfaces
@@ -235,6 +236,7 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
 **One rule.**
 - The parameters sit directly under their binding row in the inspector, indented 24 pt.
 - Each takes one 28 pt row: the label on the left (13, `ink2`), the control on the right.
+- **A label never breaks mid-word.** If it doesn't fit beside its control, it goes on its own line above the control, at full width.
 - Validation text sits under its control (13, `ink`, with a small error icon). It is never red or accent.
 - A required parameter that's still empty leaves the binding row reading "Needs keys" / "Needs an app" in `ink2`. The pad tab shows the action name with "…".
 
@@ -391,8 +393,58 @@ Primary: **Continue**. One line in `ink2` under the rows: "You can change any of
 - **The config file is broken when it is reloaded** (this one comes first: put it above No Accessibility in the glyph precedence):
   - Edgy keeps running the last working settings.
   - **Glyph:** the exclamation shape.
-  - **Popover:** the top block reads "config.json has an error on line 14: <parser message>. Edgy kept the last working settings." · **Open config file** · **Reload**.
+  - **Popover:** the top block reads "config.json has an error on line 14: <parser message>. Edgy kept the last working settings." · **Open config file**. There's no Reload button: saving the file reloads it.
   - **Window:** a strip under the tabs with the same sentence, plus **Open config file** and **Replace with current settings** (writes the last working config, after a confirm sheet). **The window is read-only while the file is broken**, so nothing silently overwrites the user's edit.
+
+### Split control (spec, 2026-11-07, replaces "Split into 1 2 3 4")
+
+The owner found the small numeric segmented control unclear. The split is shown, not counted:
+
+- **One row under the zone name:** the label "Split" (13, `ink2`), then **four small edge diagrams** as a segmented control.
+  - Each segment is a 40 × 12 pt drawing of *this* edge in the pad's orientation: horizontal for top and bottom, 12 × 40 pt vertical for left and right.
+  - The drawing is divided into 1, 2, 3 or 4 rounded parts with 2 pt gaps.
+  - The selected one is filled `ink`; the others are hairline `line`. There are no numbers.
+- **Hover preview:** hovering a segment previews that split on the mirror. The edge shows its dividers as `ink` hairlines at 50% until the user clicks or leaves.
+- **Accessibility names:** "Whole edge", "2 parts", "3 parts", "4 parts".
+- **Hidden on corners and on app tabs** (§ App profiles).
+- Changing the split is one undo step. What happens to bindings is as the runtime's SplitPlan does today. If bindings will be moved or dropped, a one-line info note appears under the row before the click takes effect: "Upper half keeps Volume; lower half starts empty."
+
+### Picker clarity: icons and rhythm (spec, 2026-11-07)
+
+The owner found the picker cluttered and asked for more order, "maybe adding icons".
+
+**Row anatomy:**
+- A 16 pt **leading icon** in a 24 pt column, then the name (13, `ink`).
+- A trailing checkmark (`ink`) on the action currently bound to this slot.
+- Rows are 28 pt tall. A row with a sub-line is 44 pt: the sub-line (13, `ink2`) sits under the name, aligned to the name, not the icon.
+
+**The icon family:**
+- One stroke weight (1.5 pt at 16 pt), on the same grid as the gesture icons.
+- Line drawings, no fills except where a state needs one.
+- Drawn for Edgy, never stock system symbols (kill list).
+
+| Group | Icons (one per action unless noted) |
+|---|---|
+| Sound | speaker with waves (Volume) · speaker with a slash (Mute) · mic with a slash (Microphone Mute) |
+| Display | sun (Brightness) · keyboard with rays (Keyboard Brightness, Keyboard Backlight On / Off) |
+| Media | play-pause · skip-forward · skip-back |
+| System | a 2×2 window grid (Mission Control) · stacked windows (App Windows) · desktop with windows pushed aside (Show Desktop) · a screen with a side arrow (Space Left / Right, mirrored) · padlock (Lock Screen) · moon (Sleep Display) · mic with sound waves (Dictation) |
+| Windows | one window glyph with the target region filled: left half, right half, top half, bottom half, full (Maximize), centred box (Center), a bar at the bottom (Minimize), and an outline with a return hook (Restore) |
+| Apps | a rounded tile (Open App) · a chain link (Open URL) · a folder (Open File or Folder) · two overlapping tiles (Switch Apps) |
+| Keyboard | a keycap (Keyboard Shortcut) · a keycap with up/down ticks (Slide to Repeat Keys) · a keycap pressed down (Hold Keys) |
+| Shortcuts | three stacked rounded steps (Run Shortcut) |
+| — | a circle with a slash (Do nothing here) |
+
+**Group rhythm:**
+- Group headers are 11 pt semibold `ink2` with 14 pt above and 4 pt below.
+- No separator lines; space alone groups the rows.
+- The first group has no top space under the search field.
+
+**Unavailable actions:** the icon and name are in `ink2`. The sub-line gives the reason ("Needs a backlit keyboard"). They're still selectable.
+
+**Limited actions:** the icon and name are in `ink`. The sub-line gives the note ("Uses the system Control–Left shortcut").
+
+**Search:** filtering keeps the group headers of groups that still have matches. With no matches at all: "No actions match "xyz"." (13, `ink2`).
 
 ### Picker at catalog scale (spec, 2026-11-07)
 
