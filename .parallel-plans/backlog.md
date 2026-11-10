@@ -66,3 +66,8 @@ Items found in testing or left open by builders, to fold into a future round.
 - No window: **0.00% CPU, 15 wakeups/s** (budget 0.5% / 50) — was ~1.3% and ~730/s with no window, ~19% and ~2,700/s with a window open.
 - Still to measure hands-off: popover, Settings, Settings + App chooser, onboarding (budget 3% / 150); MacBook Pro; App chooser list on device (Gabriel).
 - Hardened runtime smoke on the pre-28 build: passed with no entitlements (touch, pointer tap, gestures, displays). Repeat on the merged build before the first notarized release.
+
+## Next UI polish batch (after critique 29 lands)
+- One key-combo formatter for every surface per BRIEF § "How a key combo is written" (plates write "fn⌃", should be "fn ⌃…"; order ⌃⌥⇧⌘, no spaces; named keys; ", " between steps).
+- Should a re-trigger while a key sequence is still sending show a plate? (today: ignored silently; design call)
+- Critique 29 items when they land.
