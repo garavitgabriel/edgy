@@ -49,7 +49,7 @@ cd edgy
 make app
 ```
 
-`make app` comes with the release scripts and isn't in the repo yet. Once it lands, it builds a release copy at `build/release/Edgy.app`. It signs it with your local Apple Development identity if you have one, and otherwise signs it ad hoc. It doesn't install or launch anything; drag the app into Applications and open it.
+`make app` builds a release copy at `build/release/Edgy.app`. It signs it with your local Apple Development identity if you have one, and otherwise signs it ad hoc. It doesn't install or launch anything; drag the app into Applications and open it.
 
 The trade-off: to get a new version, you pull and rebuild. If it was signed ad hoc, macOS treats each rebuild as a new app, and you'll need to grant Accessibility again (see Troubleshooting).
 
