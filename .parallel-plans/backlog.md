@@ -71,3 +71,11 @@ Items found in testing or left open by builders, to fold into a future round.
 - One key-combo formatter for every surface per BRIEF § "How a key combo is written" (plates write "fn⌃", should be "fn ⌃…"; order ⌃⌥⇧⌘, no spaces; named keys; ", " between steps).
 - Should a re-trigger while a key sequence is still sending show a plate? (today: ignored silently; design call)
 - Critique 29 items when they land.
+
+## Batch 33 merged (881f69d, 2026-11-10) — open after it
+The design session closed on 2026-11-10; these go to Gabriel or a fresh design session.
+- Design re-check of the combo format against BRIEF § "How a key combo is written" ("⌃B" no space, one formatter, arrows ←→↑↓). Tests pin it (`KeyComboTextTests.briefExample`, 28 cases); no design eye on the shots yet.
+- Builder's open questions: (1) hover line still joins with ", " ("Bottom: ⇧⌘[, Next Track, Play/Pause"), which reads like a sequence when combos are in it — use " and "? (2) On an inherited row, should Default's custom icon stay behind like the name? (3) "Control–Left Arrow" in the Space Left/Right availability copy: leave as system wording or write "⌃←"?
+- On device (Gabriel): Name and Icon opens scrolled to the selected icon; a fast double-trigger of a 2-step sequence shows one plate.
+- G1 checklist gains one item: app-mark desaturation on device (10 items now). Also still open: gut lines on S9–S12; switcher opens after one step.
+- Re-trigger during a sequence is now silent (`SequenceQuiet` in Overlay copies Actions' 40 ms step gap as a constant; if the gap changes, change both).
