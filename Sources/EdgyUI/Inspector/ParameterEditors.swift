@@ -189,10 +189,9 @@ private struct ParameterRow: View {
     case .keyCombo:
       KeyRecorderField(
         stored: value, isHold: model.editor.validator.descriptor(for: row.binding.action)?.shape == .hold,
+        allowsSequence: KeyRecorderController.allowsSequence(action: row.binding.action, parameter: parameter.key),
         recorder: model.keyRecorder, autostart: autofocus
-      ) { combo in
-        model.setParameter(parameter.key, to: combo?.description, in: row)
-      }
+      ) { model.setParameter(parameter.key, to: $0, in: row) }
     case .appBundleID:
       AppChooserField(bundleID: value, provider: model.installedApps) { bundleID in
         model.setParameter(parameter.key, to: bundleID, in: row)
@@ -293,49 +292,67 @@ struct FieldError: View {
 
 /// Idle: the combo as key symbols, or "Click to record" in `ink2`. Recording: a 2 pt accent ring,
 /// "Press keys…", held modifiers live in `ink2`. Esc cancels; ⌫ while idle clears.
+///
+/// On a sequence field (Keyboard Shortcut's `keys`, BRIEF § Key sequences):
+/// - The value shows as keycap groups joined by ", " ("⌃ B, N").
+/// - "+ Then…" (quiet `ink2`) sits right of the field once a combo is set, and records the next
+///   step. It's hidden while recording and at 4 steps.
+/// - ⌫ while idle removes the last step.
+/// - While recording, "Use Escape" sits under the field: Esc itself cancels, so this commits
+///   `escape` as the step (§ Recording Escape itself).
+///
+/// Hold Keys and the slide-repeat keys take one combo and get neither button.
 struct KeyRecorderField: View {
   var stored: String?
   var isHold: Bool
+  var allowsSequence = false
   var autostart = false
-  var commit: (KeyCombo?) -> Void
+  /// The new stored value (`nil` clears it).
+  var commit: (String?) -> Void
   @State private var controller: KeyRecorderController
   @FocusState private var focused: Bool
 
   init(
-    stored: String?, isHold: Bool, recorder: KeyComboRecording?, autostart: Bool = false,
-    controller: KeyRecorderController? = nil, commit: @escaping (KeyCombo?) -> Void
+    stored: String?, isHold: Bool, allowsSequence: Bool = false, recorder: KeyComboRecording?,
+    autostart: Bool = false, controller: KeyRecorderController? = nil, commit: @escaping (String?) -> Void
   ) {
     self.stored = stored
     self.isHold = isHold
+    self.allowsSequence = allowsSequence && !isHold
     self.autostart = autostart
     self.commit = commit
     _controller = State(
-      initialValue: controller ?? KeyRecorderController(recorder: recorder, isHold: isHold) { commit($0) })
+      initialValue: controller
+        ?? KeyRecorderController(recorder: recorder, isHold: isHold) { _, value in commit(value) })
   }
 
   static let width: CGFloat = 170
+  static let thenLabel = "+ Then…"
+  static let thenTooltip = "Send another shortcut after this one"
+  static let escapeLabel = "Use Escape"
+  static let escapeTooltip = "Record the Escape key itself"
+
+  /// Whether "Use Escape" shows: a sequence field (Keyboard Shortcut), while recording.
+  static func showsUseEscape(allowsSequence: Bool, isRecording: Bool) -> Bool {
+    allowsSequence && isRecording
+  }
 
   var body: some View {
     VStack(alignment: .trailing, spacing: 4) {
-      Button {
-        controller.isRecording ? controller.cancel() : controller.start()
-      } label: {
-        label.frame(maxWidth: Self.width, alignment: .leading).fieldChrome(
-          active: controller.isRecording, ring: Tokens.accent
-        )
-        .contentShape(Rectangle())
+      HStack(spacing: 8) {
+        field
+        if KeyRecorderController.showsThen(
+          stored: stored, allowsSequence: allowsSequence, isRecording: controller.isRecording)
+        {
+          QuietTextButton(title: Self.thenLabel, tooltip: Self.thenTooltip) {
+            focused = true
+            controller.start(after: stored)
+          }
+        }
       }
-      .buttonStyle(.plain)
-      .parameterRowField()
-      .focusable()
-      .focusEffectDisabled()
-      .focused($focused)
-      .onKeyPress(.delete) {
-        guard !controller.isRecording else { return .ignored }
-        commit(nil)
-        return .handled
+      if Self.showsUseEscape(allowsSequence: allowsSequence, isRecording: controller.isRecording) {
+        QuietTextButton(title: Self.escapeLabel, tooltip: Self.escapeTooltip) { controller.useEscape() }
       }
-      .accessibilityLabel(controller.isRecording ? "Press keys" : displayText ?? "Click to record")
       FieldError(text: controller.error).frame(maxWidth: Self.width + 16)
     }
     .onAppear {
@@ -344,6 +361,32 @@ struct KeyRecorderField: View {
       if !controller.isRecording { controller.start() }
     }
     .onDisappear { if controller.isRecording { controller.cancel() } }
+  }
+
+  private var field: some View {
+    Button {
+      controller.isRecording ? controller.cancel() : controller.start()
+    } label: {
+      label.frame(maxWidth: Self.width, alignment: .leading).fieldChrome(
+        active: controller.isRecording, ring: Tokens.accent
+      )
+      .contentShape(Rectangle())
+    }
+    .buttonStyle(.plain)
+    .parameterRowField()
+    .focusable()
+    .focusEffectDisabled()
+    .focused($focused)
+    // While recording, every key belongs to the recorder (Return, Tab, Space and Delete record
+    // directly): none may press the field, move focus or clear the value. The tap only listens,
+    // so the key also reaches this view; the key that commits is swallowed for a moment after.
+    .onKeyPress(phases: .all) { _ in controller.swallowsKeys ? .handled : .ignored }
+    .onKeyPress(.delete) {
+      guard !controller.swallowsKeys else { return .handled }
+      commit(KeyRecorderController.removingLastStep(stored))
+      return .handled
+    }
+    .accessibilityLabel(controller.isRecording ? "Press keys" : displayText ?? "Click to record")
   }
 
   private var displayText: String? {
@@ -362,10 +405,28 @@ struct KeyRecorderField: View {
     case .idle:
       if let displayText {
         Text(displayText).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink)
+          .lineLimit(1).truncationMode(.middle)
       } else {
         Text("Click to record").font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
       }
     }
+  }
+}
+
+/// A quiet text button beside or under a field: 13 regular `ink2`, no bezel, with a tooltip.
+struct QuietTextButton: View {
+  var title: String
+  var tooltip: String
+  var action: () -> Void
+
+  var body: some View {
+    Button(title, action: action)
+      .buttonStyle(.plain)
+      .font(Tokens.font(Tokens.typeBody))
+      .foregroundStyle(Tokens.ink2)
+      .lineLimit(1)
+      .fixedSize()
+      .help(tooltip)
   }
 }
 
