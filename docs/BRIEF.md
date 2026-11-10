@@ -283,6 +283,22 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
 
 **Per-binding haptics:** the last parameter row of every binding is a checkbox, "Haptics for this gesture", on by default.
 
+**Your own name and icon for a binding** (owner request, 2026-11-09; contract `Binding.customName` / `Binding.customIcon`, presentation only):
+- **Where:** the binding row's "…" menu gets **"Name and Icon…"**. It opens a small popover anchored to the row (one column, at most 320 pt wide), containing:
+  - a **Name** field. Its placeholder is the action's own name (e.g. "Hold Keys"). It's focused on open, and Return saves.
+  - the **icon grid**: the action icons at 16 pt in 28 pt cells, grouped and ordered as in the picker, with the same 11 pt group headers. The selected cell gets the `ink` ring, and the action's own icon is marked "Default" in its tooltip.
+  - **Reset name and icon** (a quiet text button, `ink2`), shown only when either is set.
+- **Limits:** at most **24 characters**, trimmed. An empty name, or one equal to the action's name, saves as no custom name. No emoji picker; typed emoji are allowed but not encouraged.
+- **Icon library (v1):** the action icons only (the contract stores an ActionID). No extra generic icons in v1. For dictation, the Dictation icon (mic with sound waves) already fits.
+- **Where the custom name and icon appear:**
+  - **Pad tab:** the custom name replaces the short-form rule (bone 3); if it's too long, the 12 pt fade applies, never "…".
+  - **Zone icons** (full mirror corners and the mini mirror): the custom icon.
+  - **Mini-mirror hover line:** the custom name ("Bottom-right: Dictate").
+  - **Inspector row:** the custom name in `ink` as the action text, with a sub-line in `ink2` naming the real action and its parameter ("Hold Keys: fn Space"), so it's never a mystery. Bindings without a custom name are unchanged.
+  - **Plates:** the value line is the custom name **with no verb** ("Dictate"). Holds read "Dictate, held" → "Dictate, released". Dry run reads "Would run Dictate". The second line is unchanged ("Bottom-right corner, long-press").
+  - **The picker** always shows real action names. The checkmark row is the real action.
+- **App profiles:** the name and icon belong to the binding. An inherited binding shows Default's name and icon. Renaming an inherited binding on an app tab creates an **override** (the same action with the new name), shown with the override dot and Revert, like any other override. Changing an overridden binding's action keeps its custom name only if the user hasn't cleared it.
+
 **Slide feel and hold timing (batch 20).**
 - These use the same parameter rows: a number gets a slider with its value plus unit on the right, and on/off gets a checkbox.
 - Each row may carry **one helper line** under it (13, `ink2`). This is the only place in the inspector where helper text appears.
@@ -493,6 +509,8 @@ The owner found the picker cluttered and asked for more order, "maybe adding ico
 **Scrolling and placement:**
 - Under the interior cap, long lists scroll. On open, the list scrolls so the checked (currently bound) action is visible; with nothing bound, it starts at the top.
 - When the picker is anchored to a side edge, it centres vertically on the anchor but is clamped so it clears the corner tiles **and their tabs**. If it can't, it gets shorter.
+
+**Hold actions come first on a long-press** (owner testing, 2026-11-09: Hold Keys was "easy to turn on, not easy to find"): when the picker opens for a **long-press**, the Keyboard group (with Hold Keys first) moves to the top of the list, above Sound. For every other gesture, Hold Keys is in the "N more need a long-press" disclosure, and its sub-line still shows there.
 
 **Hold Keys is findable as push-to-talk** (owner, 2026-11-07; generic, for any app that acts while a key is held):
 - Its picker sub-line (13, `ink2`) reads **"Hold any app's shortcut while your finger rests"**. It's the only available action whose sub-line describes a use.
