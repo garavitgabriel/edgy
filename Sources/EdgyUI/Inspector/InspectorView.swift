@@ -257,8 +257,12 @@ struct BindingRowView: View {
 
   // The catalog name: the "…" that means "it will ask for something" belongs to the picker (critique 21).
   // Batch 29: the user's own name replaces it, in `ink`; the real action moves to the sub-line.
-  private var name: String { BindingNaming.customName(row.binding) ?? model.actionName(row.binding.action) }
-  private var customNamed: Bool { BindingNaming.customName(row.binding) != nil }
+  // Item 11: a binding that names its target shows the target the same way (one rule, `BindingNaming.label`).
+  private var label: (text: String, level: BindingNaming.Level) {
+    BindingNaming.label(row.binding, actionName: model.actionName(row.binding.action))
+  }
+  private var name: String { label.text }
+  private var customNamed: Bool { label.level != .action }
   private var needs: String? { model.needsLabel(row.binding) }
 
   /// The action as text: one line, whole, when inline; else up to two lines at word boundaries.
@@ -304,7 +308,7 @@ struct BindingRowView: View {
       // "Hold Keys: fn Space": the real action and its parameter, so a custom name is never a mystery.
       HStack {
         Spacer(minLength: 0)
-        Text(BindingRowView.realAction(row.binding, model: model)).foregroundStyle(Tokens.ink2)
+        Text(BindingRowView.subLine(row.binding, model: model) ?? "").foregroundStyle(Tokens.ink2)
           .multilineTextAlignment(.trailing)
       }
     }
@@ -327,6 +331,16 @@ struct BindingRowView: View {
 
   /// The custom-name sub-line: the real action, then its parameter's short value when it has one
   /// ("Hold Keys: fn Space", "Keyboard Shortcut: ⌃ B, N"), or "Needs keys" when it's still empty.
+  /// The sub-line under a row whose text isn't the action's name: a custom name gets the real
+  /// action and parameter ("Hold Keys: fn Space"); a target gets the action ("Open App").
+  static func subLine(_ binding: EdgyCore.Binding, model: SettingsModel) -> String? {
+    switch BindingNaming.label(binding, actionName: model.actionName(binding.action)).level {
+    case .custom: return realAction(binding, model: model)
+    case .target: return model.actionName(binding.action)
+    case .action: return nil
+    }
+  }
+
   static func realAction(_ binding: EdgyCore.Binding, model: SettingsModel) -> String {
     let action = model.actionName(binding.action)
     if let needs = model.needsLabel(binding) { return "\(action): \(needs)" }

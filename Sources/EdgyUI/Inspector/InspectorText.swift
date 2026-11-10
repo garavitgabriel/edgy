@@ -315,6 +315,59 @@ enum BindingNaming {
     return binding.action
   }
 
+  /// Which level a label or icon came from (BRIEF: custom > target-derived > the action's own).
+  enum Level: Equatable { case custom, target, action }
+
+  /// The target a binding names, short: Open App → the app's name, Open URL → the host without
+  /// "www.", Open File or Folder → the last path component, Keyboard Shortcut / Hold Keys → the keys
+  /// ("⌃ Tab", "⌃ B, N", "fn Space"). `nil` when the action names no target or it's still empty.
+  static func target(_ binding: Binding, appName: (String) -> String = MirrorCopy.appName) -> String? {
+    let raw = { (key: String) -> String? in
+      let value = (binding.parameters[key] ?? "").trimmingCharacters(in: .whitespaces)
+      return value.isEmpty ? nil : value
+    }
+    switch binding.action.rawValue {
+    case "app.open": return raw("bundleID").map(appName)
+    case "url.open":
+      guard let text = raw("url") else { return nil }
+      guard let host = URL(string: text)?.host(), !host.isEmpty else { return text }
+      return host.hasPrefix("www.") ? String(host.dropFirst(4)) : host
+    case "file.open": return raw("path").map { ($0 as NSString).lastPathComponent }
+    case "keyboard.shortcut", "keyboard.hold": return raw("keys").map { KeyComboText.display($0) }
+    default: return nil
+    }
+  }
+
+  /// THE label rule, for every surface: the custom name, else the target, else the action's own
+  /// name. A missing required parameter has no target, so the caller's "…" rule still applies.
+  static func label(
+    _ binding: Binding, actionName: String, appName: (String) -> String = MirrorCopy.appName
+  ) -> (text: String, level: Level) {
+    if let custom = customName(binding) { return (custom, .custom) }
+    if let target = target(binding, appName: appName) { return (target, .target) }
+    return (actionName, .action)
+  }
+
+  /// What a zone draws: a custom icon, else Open App's app mark, else the action's icon.
+  enum Icon: Equatable {
+    case action(ActionID)
+    /// The app's own icon in the app-mark treatment; no icon of its own → the Open App tile in `ink2`.
+    case app(bundleID: String)
+  }
+
+  /// THE icon rule (same precedence as `label`).
+  static func icon(_ binding: Binding) -> (icon: Icon, level: Level) {
+    if let custom = binding.customIcon, custom != .doNothing, ActionIcons.has(custom) {
+      return (.action(custom), .custom)
+    }
+    if binding.action.rawValue == "app.open",
+      let id = binding.parameters["bundleID"]?.trimmingCharacters(in: .whitespaces), !id.isEmpty
+    {
+      return (.app(bundleID: id), .target)
+    }
+    return (.action(binding.action), .action)
+  }
+
   /// The IDs the icon library draws (what `SettingsEditor.setNameAndIcon` may store).
   static func library(catalog: [ActionDescriptor]) -> Set<ActionID> {
     Set(catalog.map(\.id).filter { $0 != .doNothing && ActionIcons.has($0) })

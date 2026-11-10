@@ -248,11 +248,15 @@ extension SettingsModel {
     } else if let haptics = existing?.binding.parameters[AppSettings.hapticsParameter] {
       binding.parameters[AppSettings.hapticsParameter] = haptics
     }
+    let descriptor = editor.validator.descriptor(for: action)
+    // Batch 29: the slot's own name and icon follow a new action (§ App profiles: kept unless cleared).
+    PickerChoice.carry(
+      from: existing?.binding, oldIsTurnedOff: existing?.source == .turnedOff, into: &binding,
+      actionName: descriptor?.displayName)
     inspectorDrafts.drafts[draftKey] = nil
     picking = nil
     // The binding just set from the picker is the open one.
     inspectorDrafts.open = draftKey
-    let descriptor = editor.validator.descriptor(for: action)
     if let descriptor, !descriptor.parameters.isEmpty { inspectorDrafts.focus = draftKey }
     if needsParameters(binding) {
       inspectorDrafts.drafts[draftKey] = binding
