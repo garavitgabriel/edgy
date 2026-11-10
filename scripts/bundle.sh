@@ -103,6 +103,8 @@ plutil -lint "$APP/Contents/Info.plist" >/dev/null
 
 SIGN_FLAGS=(--force)
 ((RUNTIME == 1)) && SIGN_FLAGS+=(--options runtime)
+# Entitlements only if one has been proven necessary (see docs/RELEASING.md); none by default.
+[[ -f "$ROOT/Resources/Edgy.entitlements" ]] && SIGN_FLAGS+=(--entitlements "$ROOT/Resources/Edgy.entitlements")
 
 if [[ "$SIGN" == "none" ]]; then
   echo "==> Leaving the app unsigned"

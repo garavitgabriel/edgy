@@ -58,7 +58,7 @@ Step 4. Check each item. The log line in quotes is the proof; a line under "fail
 
   [ ] Hold Keys
       Bind a long-press to Hold Keys (e.g. a modifier); hold, then lift. The key releases.
-      proof:    engine "Releasing hold ..." on lift; no actions "hold: ... failed"
+      proof:    engine "Gesture <kind> ended at <zone> → release <action>" on lift; no actions "hold: ... failed"
 
   [ ] Switch Apps
       Slide the switcher edge; the app switcher opens, follows your finger, selects on lift.
@@ -76,6 +76,7 @@ Step 4. Check each item. The log line in quotes is the proof; a line under "fail
 Step 5. When you're done, quit this build and relaunch your usual one (scripts/run-dev.sh).
 
 If a check fails only in this build: add the narrowest entitlement that fixes it to
-Resources/Edgy.entitlements, sign with --entitlements, re-run this script, and write the
-entitlement and the failure it fixes in docs/RELEASING.md. Until then Edgy ships with none.
+Resources/Edgy.entitlements (create the file if needed; bundle.sh and release.sh sign with it
+whenever it exists), re-run this script, and write the entitlement and the failure it fixes in
+docs/RELEASING.md. Until then Edgy ships with none.
 EOF

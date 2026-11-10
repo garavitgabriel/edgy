@@ -78,7 +78,7 @@ Then drag to Applications, open it, and confirm the first launch shows no "unide
 
 Notarization requires the hardened runtime. Edgy loads private frameworks by name at runtime (touch input, display brightness), talks to the system indicator over XPC and installs event taps. All of that comes from `/System`, which library validation allows, so **Edgy currently ships with no entitlements**.
 
-That is to be proven, not assumed: `scripts/smoke-hardened.sh` builds `build/release/Edgy.app` with the development identity plus `--options runtime` and lists each check with the log line that proves it. Any entitlement added after a failing check is recorded here as *entitlement → the failure it fixes*.
+That is to be proven, not assumed: `scripts/smoke-hardened.sh` builds `build/release/Edgy.app` with the development identity plus `--options runtime` and lists each check with the log line that proves it. If a check fails, the fix goes in `Resources/Edgy.entitlements` (both `bundle.sh` and `release.sh` sign with it whenever it exists), and the entitlement is recorded here as *entitlement → the failure it fixes*.
 
 | Entitlement | Failure it fixes |
 |---|---|

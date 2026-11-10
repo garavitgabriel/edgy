@@ -83,7 +83,10 @@ build_app() {
 
 sign_app() {
   stage "Signing the app with Developer ID, hardened runtime"
-  run codesign --force --options runtime --timestamp --sign "$IDENTITY" "$APP" ||
+  local flags=(--force --options runtime --timestamp)
+  # Entitlements only if one has been proven necessary (see docs/RELEASING.md); none by default.
+  [[ -f Resources/Edgy.entitlements ]] && flags+=(--entitlements Resources/Edgy.entitlements)
+  run codesign "${flags[@]}" --sign "$IDENTITY" "$APP" ||
     fail "codesign of the app failed."
   run codesign --verify --strict --deep --verbose=2 "$APP" ||
     fail "the app's signature does not verify."
