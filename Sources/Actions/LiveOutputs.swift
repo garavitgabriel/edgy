@@ -319,7 +319,8 @@ final class BuiltInDisplayCache: @unchecked Sendable {
         BuiltInDisplayCache.shared.invalidate()
       }, nil)
     if status != .success {
-      actionsLog.error("built-in display: reconfiguration callback not registered (\(status.rawValue)); reading per use")
+      actionsLog.error(
+        "built-in display: reconfiguration callback not registered (\(status.rawValue)); reading per use")
       cache.alwaysRead = true
     }
     return cache

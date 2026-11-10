@@ -219,7 +219,8 @@ enum TapReenable {
     reenable()
     if logged.exchange(true) == false {
       let why = type == .tapDisabledByTimeout ? "timeout" : "user input"
-      actionsLog.notice("key recorder: the system turned the tap off (\(why, privacy: .public)); turned it back on (logged once)")
+      actionsLog.notice(
+        "key recorder: the system turned the tap off (\(why, privacy: .public)); turned it back on (logged once)")
     }
     return true
   }

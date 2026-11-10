@@ -49,6 +49,12 @@ public final class Router {
     var check: DisplayCheckDetail.Request?
   }
   private var slideReports: [DiscreteKey: SlideReport] = [:]
+  /// Slides of an action that opens on travel (the app switcher), not yet open: silent until the
+  /// action first reports an outcome (batch 28: no tick, no `actionRan` for a resting finger).
+  private var awaitingOpen: Set<DiscreteKey> = []
+  /// Actions whose slide presses nothing until it travels (batch 26); they report their opening
+  /// as the gesture's first step.
+  static let opensOnTravel: Set<ActionID> = ["apps.switcher"]
 
   public init(actions: ActionPerforming, logger: EdgyLogging) {
     self.actions = actions
@@ -71,6 +77,7 @@ public final class Router {
     releaseHolds(reason: "reset")
     firedOnBegan.removeAll()
     slideReports.removeAll()
+    awaitingOpen.removeAll()
   }
 
   /// Send `.press(down: false)` for every pending hold, oldest first, and forget them. The
@@ -110,29 +117,45 @@ public final class Router {
       return
     }
     guard let input = input(for: event, key: key) else { return }
-    // Reported once per gesture: a discrete gesture when it fires, a slide at its start.
-    let firstOfGesture = input == .trigger || event.phase == .began
+    // Reported once per gesture: a discrete gesture when it fires, a slide at its start (a slide
+    // that opens on travel: when it opens).
+    var firstOfGesture = input == .trigger || event.phase == .began
+    let opensOnTravel = event.kind == .slide && Self.opensOnTravel.contains(binding.action)
     if testMode {
       guard firstOfGesture else { return }
       actions.feedback(.gestureCaught, context: context)
       onDecision?(.wouldRun(binding.action, zone: event.zone, kind: event.kind))
       return
     }
-    if event.kind == .slide && event.phase == .began {
+    // Batch 26 follow-up (batch 28): the switcher's opening plays its own haptic; a finger
+    // resting on its edge ticks nothing. Was: every slide `.began` played `gestureCaught`.
+    if event.kind == .slide && event.phase == .began && !opensOnTravel {
       actions.feedback(.gestureCaught, context: context)
     }
+    if opensOnTravel && event.phase == .began { awaitingOpen.insert(key) }
+    let ending = event.kind == .slide && (event.phase == .ended || event.phase == .cancelled)
     defer {
-      if event.kind == .slide && (event.phase == .ended || event.phase == .cancelled) {
+      if ending {
         finishSlideReport(key)
+        awaitingOpen.remove(key)
       }
     }
     do {
       let outcome = try actions.performReporting(binding.action, input: input, context: context)
       if case .trigger = input { actions.feedback(.actionFired, context: context) }
+      if opensOnTravel {
+        // Silent until the action says it is showing; that update is the gesture's first step.
+        // Was (batch 26): `actionRan(outcome: nil)` at `.began`.
+        guard awaitingOpen.contains(key) ? outcome != nil : true else { return }
+        firstOfGesture = awaitingOpen.remove(key) != nil
+      }
       report(outcome, binding.action, event, key: key, first: firstOfGesture)
     } catch {
       logger.log(.error, "Action \(binding.action.rawValue) failed: \(error)")
-      if firstOfGesture { report(error, binding.action, event) }
+      if firstOfGesture || awaitingOpen.contains(key) {
+        awaitingOpen.remove(key)
+        report(error, binding.action, event)
+      }
     }
   }
 
