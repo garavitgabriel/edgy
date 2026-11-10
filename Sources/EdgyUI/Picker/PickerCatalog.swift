@@ -76,9 +76,10 @@ struct PickerCatalog: Equatable {
     }
     var sections: [Section] = []
     var others: [Item] = []
-    for group in groups {
+    for group in Self.arranged(groups, for: gesture) {
       var fitting: [Item] = []
-      for descriptor in Self.ordered(group.actions) where descriptor.id != .doNothing && matches(descriptor) {
+      for descriptor in Self.ordered(group.actions, for: gesture)
+      where descriptor.id != .doNothing && matches(descriptor) {
         let item = Item(descriptor: descriptor, availability: availability(descriptor.id))
         if ConfigValidator.shape(descriptor.shape, fits: gesture) { fitting.append(item) } else { others.append(item) }
       }
@@ -95,11 +96,18 @@ struct PickerCatalog: Equatable {
   static let useLine: [ActionID: String] = [
     "keyboard.hold": "Hold any app's shortcut while your finger rests"
   ]
+  // Last App has no sub-line: its name says what it does (§ Picker clarity, 2026-11-09).
+
+  /// Last App (`app.last`, batch 32's engine half). Built against the ID: until it is in the
+  /// catalog, nothing lists it.
+  static let lastApp: ActionID = "app.last"
 
   /// Extra words search matches, beside the display name (owner's ruling, batch 27): typing what
   /// a hold shortcut is for finds Hold Keys.
   static let searchAliases: [ActionID: [String]] = [
-    "keyboard.hold": ["hold", "push to talk", "talk", "dictation", "voice"]
+    "keyboard.hold": ["hold", "push to talk", "talk", "dictation", "voice"],
+    // Back to the app used before (§ Picker clarity, 2026-11-09).
+    lastApp: ["back", "previous", "return", "toggle"],
   ]
 
   /// BRIEF § Picker clarity: within a group, the icon table's order (most-used first), never
@@ -119,8 +127,9 @@ struct PickerCatalog: Equatable {
     // Windows
     "window.leftHalf", "window.rightHalf", "window.topHalf", "window.bottomHalf", "window.maximize",
     "window.center", "window.minimize", "window.restore",
-    // Apps
-    "app.open", "url.open", "file.open", "apps.switcher",
+    // Apps (ruled 2026-11-09: Last App second, Switch Apps third; was app.open, url.open,
+    // file.open, apps.switcher)
+    "app.open", lastApp, "apps.switcher", "url.open", "file.open",
     // Keyboard
     "keyboard.shortcut", "keyboard.slideSteps", "keyboard.hold",
     // Shortcuts
@@ -130,15 +139,31 @@ struct PickerCatalog: Equatable {
   private static let rank: [ActionID: Int] = Dictionary(
     uniqueKeysWithValues: iconTableOrder.enumerated().map { ($1, $0) })
 
-  /// `actions` in icon-table order; unnamed ones after, in their given order.
-  static func ordered(_ actions: [ActionDescriptor]) -> [ActionDescriptor] {
-    actions.enumerated()
+  /// `actions` in icon-table order; unnamed ones after, in their given order. On a long-press,
+  /// Hold Keys comes first (§ Picker clarity: hold actions come first on a long-press).
+  static func ordered(_ actions: [ActionDescriptor], for gesture: GestureKind? = nil) -> [ActionDescriptor] {
+    let holdFirst = gesture == .longPress
+    return actions.enumerated()
       .sorted { a, b in
-        let ra = rank[a.element.id] ?? iconTableOrder.count + a.offset
-        let rb = rank[b.element.id] ?? iconTableOrder.count + b.offset
-        return ra < rb
+        func key(_ entry: (offset: Int, element: ActionDescriptor)) -> Int {
+          if holdFirst, entry.element.id == "keyboard.hold" { return -1 }
+          return rank[entry.element.id] ?? iconTableOrder.count + entry.offset
+        }
+        return key(a) < key(b)
       }
       .map(\.element)
+  }
+
+  /// Groups in catalog order, except on a long-press, where Keyboard (Hold Keys' group) moves to
+  /// the top, above Sound (owner testing, 2026-11-09: Hold Keys was "easy to turn on, not easy to
+  /// find"). One move over the eight groups when the list is built.
+  static func arranged(_ groups: [ActionGroup], for gesture: GestureKind) -> [ActionGroup] {
+    guard gesture == .longPress, let index = groups.firstIndex(where: { $0.category == .keyboard }) else {
+      return groups
+    }
+    var arranged = groups
+    arranged.insert(arranged.remove(at: index), at: 0)
+    return arranged
   }
 
   /// "need a slide", "need a long-press", "need a slide or long-press", "need a tap, swipe or

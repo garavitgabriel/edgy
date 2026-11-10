@@ -171,6 +171,11 @@ import Testing
       Binding(zone: .edge(.right), gesture: .slide, action: "audio.volume"),
       Binding(zone: .edge(.right, segment: 0, segments: 3), gesture: .slide, action: "audio.volume"),
       Binding(zone: .edge(.right), gesture: .swipe(.up), action: "media.next"),
+      // Batch 29: key sequences and a hand-edited name and icon.
+      Binding(zone: .corner(.bottomRight), gesture: .doubleTap, action: "fake.press", parameters: ["keys": "a b"]),
+      Binding(
+        zone: .corner(.bottomRight), gesture: .longPress, action: "keyboard.shortcut",
+        parameters: ["keys": "a b c d e"], customName: String(repeating: "x", count: 25), customIcon: "nope.icon"),
     ]
     let bad: [(String, String)] = [
       ("combo", "x+y"), ("link", "nowhere"), ("count", "x"), ("count", "99"), ("mode", "z"), ("app", "x"),
@@ -185,7 +190,8 @@ import Testing
     config.appProfiles["bad id"] = Profile(bindings: [])
     // On a Mac where one bound action (the defaults' next-track swipe) can't work.
     let onThisMac = ConfigValidator(
-      catalog: FakeCatalog.descriptors, availability: ["media.next": .unavailable(reason: "test")])
+      catalog: FakeCatalog.descriptors + [KeySequenceValidationTests.shortcut],
+      availability: ["media.next": .unavailable(reason: "test")])
     let found = Set(onThisMac.validate(config).map(\.code))
     #expect(found == Set(ValidationIssue.Code.allCases))
   }

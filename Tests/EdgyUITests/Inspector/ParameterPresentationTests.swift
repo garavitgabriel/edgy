@@ -60,9 +60,13 @@ import Testing
   }
 
   @Test func rowMenusGreyOutWhatDoesntApply() {
-    #expect(RowMenu.items(for: .inherited).map(\.enabled) == [true, true, false])
-    #expect(RowMenu.items(for: .turnedOff).map(\.enabled) == [true, false, true])
-    #expect(RowMenu.items(for: nil).map(\.title) == ["Change action…", "Remove gesture"])
+    // Batch 29 ruling ("Name and Icon…" joins every row's menu, second, greyed on a turned-off row).
+    // Before: #expect(RowMenu.items(for: .inherited).map(\.enabled) == [true, true, false])
+    // Before: #expect(RowMenu.items(for: .turnedOff).map(\.enabled) == [true, false, true])
+    // Before: #expect(RowMenu.items(for: nil).map(\.title) == ["Change action…", "Remove gesture"])
+    #expect(RowMenu.items(for: .inherited).map(\.enabled) == [true, true, true, false])
+    #expect(RowMenu.items(for: .turnedOff).map(\.enabled) == [true, false, false, true])
+    #expect(RowMenu.items(for: nil).map(\.title) == ["Change action…", "Name and Icon…", "Remove gesture"])
   }
 
   @Test func theTapNoteOffersItsFixAndOpeningAMenuSelectsTheRow() {

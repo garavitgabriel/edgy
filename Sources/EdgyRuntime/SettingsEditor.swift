@@ -20,6 +20,10 @@ public enum SettingsEditorError: Error, Equatable {
   /// nothing silently overwrites the user's hand edit. Fix the file, or
   /// `replaceFileWithCurrentSettings()`.
   case readOnly(ConfigProblem)
+  /// `setNameAndIcon`: nothing is bound at that slot (in the profile, or inherited from Default).
+  case bindingNotFound(BindingKey)
+  /// `setNameAndIcon`: the icon isn't one the icon library draws. Nothing was changed.
+  case unknownIcon(ActionID)
 }
 
 /// The config file stopped decoding or validating when it was reloaded. Edgy keeps running the
@@ -323,6 +327,64 @@ public final class SettingsEditor {
       } else {
         profile.bindings.append(binding)
       }
+    }
+  }
+
+  // MARK: Your own name and icon (batch 29)
+
+  /// Longest custom name, in characters, after trimming (BRIEF § Your own name and icon).
+  public static let customNameLimit = 24
+
+  /// What `name` saves as for a binding to `action`: trimmed, cut to `customNameLimit` characters,
+  /// and `nil` when empty or equal to the action's own name (`actionName`).
+  public static func customName(_ name: String?, actionName: String?) -> String? {
+    guard let name else { return nil }
+    let trimmed = String(name.trimmingCharacters(in: .whitespacesAndNewlines).prefix(customNameLimit))
+      .trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !trimmed.isEmpty, trimmed != actionName else { return nil }
+    return trimmed
+  }
+
+  /// The icon library: every catalog action but "Do nothing". The UI passes the IDs it draws.
+  public var iconLibrary: Set<ActionID> { Set(validator.catalog.map(\.id)).subtracting([.doNothing]) }
+
+  /// Sets the name and icon of the binding at `key` in `ref` as **one undo step**. The name is
+  /// normalized by `customName(_:actionName:)`; an icon equal to the bound action's own saves as
+  /// `nil`, and any other icon must be in `library` (default `iconLibrary`) or the edit is refused
+  /// with `unknownIcon`. On an inheriting app tab, a binding that shows through from Default becomes
+  /// an override (the same action and parameters with the new name and icon), so it gets the override
+  /// dot and Revert. The engine never reads either field.
+  public func setNameAndIcon(
+    _ key: BindingKey, in ref: ProfileRef, name: String?, icon: ActionID?, library: Set<ActionID>? = nil
+  ) throws {
+    try refuseWhileBroken()
+    let own = profile(ref)?.bindings.first { $0.key == key }
+    var binding: Binding
+    switch ref {
+    case .default:
+      guard let own else { throw SettingsEditorError.bindingNotFound(key) }
+      binding = own
+    case .app(let bundleID):
+      guard let app = config.appProfiles[bundleID] else { throw SettingsEditorError.profileNotFound(ref) }
+      if let own {
+        binding = own
+      } else if app.inheritsDefault,
+        let inherited = config.defaultProfile.bindings.first(where: { $0.key == key && $0.action != .doNothing })
+      {
+        binding = inherited
+      } else {
+        throw SettingsEditorError.bindingNotFound(key)
+      }
+    }
+    let ownIcon = icon == binding.action ? nil : icon
+    if let ownIcon, !(library ?? iconLibrary).contains(ownIcon) {
+      throw SettingsEditorError.unknownIcon(ownIcon)
+    }
+    binding.customName = Self.customName(name, actionName: validator.descriptor(for: binding.action)?.displayName)
+    binding.customIcon = ownIcon
+    switch ref {
+    case .default: try setBinding(binding, in: .default)
+    case .app(let bundleID): try overrideBinding(binding, forApp: bundleID)
     }
   }
 

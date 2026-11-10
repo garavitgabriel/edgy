@@ -100,12 +100,18 @@ public struct MiniMirrorView: View {
   }
 
   /// The zone's actions by the pad tabs' short names: a pair reads as one word ("Tracks"), and
-  /// the bone-3 short names stand in ("Mic off", "Shortcut").
+  /// the bone-3 short names stand in ("Mic off", "Shortcut"). A custom name stands as it is.
   static func shortActionNames(_ zone: MirrorZone) -> [String] {
-    let ids = Set(zone.actions)
+    let custom = zone.actions.indices.map { zone.customNamed.indices.contains($0) && zone.customNamed[$0] }
+    let ids = Set(zip(zone.actions, custom).filter { !$0.1 }.map(\.0))
     var names: [String] = []
     var consumed = Set<ActionID>()
-    for (id, name) in zip(zone.actions, zone.actionNames) where !consumed.contains(id) {
+    for (index, (id, name)) in zip(zone.actions, zone.actionNames).enumerated() {
+      if custom[index] {
+        if !names.contains(name) { names.append(name) }
+        continue
+      }
+      if consumed.contains(id) { continue }
       var word = ZoneLabel.shortNames[id] ?? name
       if let pair = ZoneLabel.pairs.first(where: { $0.0 == id || $0.1 == id }), ids.contains(pair.0),
         ids.contains(pair.1)

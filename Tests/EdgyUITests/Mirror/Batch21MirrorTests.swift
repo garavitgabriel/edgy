@@ -24,17 +24,21 @@ struct Batch21MirrorTests {
     let zone = Zone.edge(.bottom, segment: 1, segments: 4)
     let shortcut = Binding(
       zone: zone, gesture: .doubleTap, action: "keyboard.shortcut", parameters: ["keys": "ctrl+opt+space"])
-    #expect(ZoneLabel.text(for: [shortcut], catalog: catalog) == "Keyboard Shortcut")
-    // (a) the parameter's short value, (b) is not needed when (a) exists.
-    #expect(ZoneLabel.shorterForms(for: [shortcut], catalog: catalog) == ["⌃⌥ Space"])
+    // Before the target ruling (BRIEF § Bindings that name their target, batch 29: the target is the primary text):
+    // #expect(ZoneLabel.text(for: [shortcut], catalog: catalog) == "Keyboard Shortcut")
+    // #expect(ZoneLabel.shorterForms(for: [shortcut], catalog: catalog) == ["⌃⌥ Space"])
+    #expect(ZoneLabel.text(for: [shortcut], catalog: catalog) == "⌃⌥ Space")
+    #expect(ZoneLabel.shorterForms(for: [shortcut], catalog: catalog).isEmpty)
     // No value yet: the short name keeps the "needs a parameter" ellipsis, nothing else gets one.
     let empty = Binding(zone: zone, gesture: .doubleTap, action: "keyboard.shortcut")
     #expect(ZoneLabel.shorterForms(for: [empty], catalog: catalog) == ["Shortcut…"])
     let app = Binding(zone: zone, gesture: .tap, action: "app.open", parameters: ["bundleID": "com.example.quillpad"])
-    #expect(ZoneLabel.shorterForms(for: [app], catalog: catalog) == ["Quillpad"])
+    // Before the target ruling: #expect(ZoneLabel.shorterForms(for: [app], catalog: catalog) == ["Quillpad"])
+    #expect(ZoneLabel.text(for: [app], catalog: catalog) == "Quillpad")
     let file = Binding(zone: zone, gesture: .tap, action: "file.open", parameters: ["path": "~/Notes/Plans.md"])
     if catalog["file.open"] != nil {
-      #expect(ZoneLabel.shorterForms(for: [file], catalog: catalog).first == "Plans.md")
+      // Before the target ruling: #expect(ZoneLabel.shorterForms(for: [file], catalog: catalog).first == "Plans.md")
+      #expect(ZoneLabel.text(for: [file], catalog: catalog) == "Plans.md")
     }
     let mic = Binding(zone: .corner(.topLeft), gesture: .doubleTap, action: "mic.mute")
     #expect(ZoneLabel.shorterForms(for: [mic], catalog: catalog) == ["Mic off"])

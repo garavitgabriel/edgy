@@ -65,6 +65,8 @@ final class InspectorDrafts {
   var focus: Key?
   /// The row whose "…" menu is open (a note's fix can open it).
   var openMenu: BindingKey?
+  /// The row whose "Name and Icon…" popover is open (batch 29).
+  var naming: BindingKey?
   /// The one open binding (§ Binding parameters: "Only one binding is open at a time"): the row
   /// the user clicked or the one just set from the picker. `SettingsModel.openBinding(in:rows:)`
   /// resolves it (and the automatic open for an empty required parameter).
@@ -246,11 +248,15 @@ extension SettingsModel {
     } else if let haptics = existing?.binding.parameters[AppSettings.hapticsParameter] {
       binding.parameters[AppSettings.hapticsParameter] = haptics
     }
+    let descriptor = editor.validator.descriptor(for: action)
+    // Batch 29: the slot's own name and icon follow a new action (§ App profiles: kept unless cleared).
+    PickerChoice.carry(
+      from: existing?.binding, oldIsTurnedOff: existing?.source == .turnedOff, into: &binding,
+      actionName: descriptor?.displayName)
     inspectorDrafts.drafts[draftKey] = nil
     picking = nil
     // The binding just set from the picker is the open one.
     inspectorDrafts.open = draftKey
-    let descriptor = editor.validator.descriptor(for: action)
     if let descriptor, !descriptor.parameters.isEmpty { inspectorDrafts.focus = draftKey }
     if needsParameters(binding) {
       inspectorDrafts.drafts[draftKey] = binding
