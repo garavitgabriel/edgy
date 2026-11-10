@@ -236,6 +236,9 @@ struct BindingRowView: View {
       )
       .contentShape(Rectangle())
       .onTapGesture { model.openRow(row.id) }
+      .popover(isPresented: namingBinding, arrowEdge: .bottom) {
+        NameAndIconPopover(model: model, row: row)
+      }
       .padding(.horizontal, -6)
       .accessibilityElement(children: .combine)
       .accessibilityAddTraits(.isButton)
@@ -245,8 +248,17 @@ struct BindingRowView: View {
     }
   }
 
+  /// The "Name and Icon…" popover, anchored to the row (only the inline block hosts it).
+  private var namingBinding: SwiftUI.Binding<Bool> {
+    let drafts = model.inspectorDrafts
+    return SwiftUI.Binding(
+      get: { drafts.naming == row.id }, set: { if !$0, drafts.naming == row.id { drafts.naming = nil } })
+  }
+
   // The catalog name: the "…" that means "it will ask for something" belongs to the picker (critique 21).
-  private var name: String { model.actionName(row.binding.action) }
+  // Batch 29: the user's own name replaces it, in `ink`; the real action moves to the sub-line.
+  private var name: String { BindingNaming.customName(row.binding) ?? model.actionName(row.binding.action) }
+  private var customNamed: Bool { BindingNaming.customName(row.binding) != nil }
   private var needs: String? { model.needsLabel(row.binding) }
 
   /// The action as text: one line, whole, when inline; else up to two lines at word boundaries.
@@ -261,7 +273,7 @@ struct BindingRowView: View {
     switch row.source {
     case .inherited:
       HStack(spacing: 12) {
-        actionText(name, inline: inline)
+        actionText(name, inline: inline).foregroundStyle(customNamed ? Tokens.ink : Tokens.ink2)
         if inline { Text("from Default").fixedSize() }
       }
       .foregroundStyle(Tokens.ink2)
@@ -274,18 +286,28 @@ struct BindingRowView: View {
       HStack(alignment: .firstTextBaseline, spacing: 12) {
         HStack(alignment: .firstTextBaseline, spacing: 6) {
           Circle().fill(Tokens.ink).frame(width: 5, height: 5).alignmentGuide(.firstTextBaseline) { $0.height + 3 }
-          actionText(needs ?? name, inline: inline).foregroundStyle(needs == nil ? Tokens.ink : Tokens.ink2)
+          actionText(customNamed ? name : needs ?? name, inline: inline)
+            .foregroundStyle(needs == nil || customNamed ? Tokens.ink : Tokens.ink2)
         }
         if inline { TextAction(title: "Revert") { model.revert(row) }.fixedSize() }
       }
     case .appOnly, nil:
-      actionText(needs ?? name, inline: inline).foregroundStyle(needs == nil ? Tokens.ink : Tokens.ink2)
+      actionText(customNamed ? name : needs ?? name, inline: inline)
+        .foregroundStyle(needs == nil || customNamed ? Tokens.ink : Tokens.ink2)
     }
   }
 
   /// "Default: X" under an overridden or turned-off row (with **Revert** trailing when the row had
   /// no room for it), and "from Default" when it moved off the row.
   @ViewBuilder private func subLines(inline: Bool) -> some View {
+    if customNamed, !isPicking {
+      // "Hold Keys: fn Space": the real action and its parameter, so a custom name is never a mystery.
+      HStack {
+        Spacer(minLength: 0)
+        Text(BindingRowView.realAction(row.binding, model: model)).foregroundStyle(Tokens.ink2)
+          .multilineTextAlignment(.trailing)
+      }
+    }
     if let base = row.defaultBinding, row.source == .overridden || row.source == .turnedOff {
       HStack(alignment: .firstTextBaseline, spacing: 12) {
         Text("Default: \(model.actionName(base.action))").foregroundStyle(Tokens.ink2)
@@ -301,6 +323,15 @@ struct BindingRowView: View {
         Text("from Default").foregroundStyle(Tokens.ink2)
       }
     }
+  }
+
+  /// The custom-name sub-line: the real action, then its parameter's short value when it has one
+  /// ("Hold Keys: fn Space", "Keyboard Shortcut: ⌃ B, N"), or "Needs keys" when it's still empty.
+  static func realAction(_ binding: EdgyCore.Binding, model: SettingsModel) -> String {
+    let action = model.actionName(binding.action)
+    if let needs = model.needsLabel(binding) { return "\(action): \(needs)" }
+    guard let value = ZoneLabel.shortValue(for: binding) else { return action }
+    return "\(action): \(value)"
   }
 
   /// Warnings and errors attached to this binding, said once under it. Overlaps sit under the
@@ -331,10 +362,11 @@ struct RowMenu: View {
   /// The items, in order, with whether each applies.
   static func items(for source: EffectiveBinding.Source?) -> [(title: String, enabled: Bool)] {
     switch source {
-    case nil, .appOnly: return [("Change action…", true), ("Remove gesture", true)]
+    // Batch 29: "Name and Icon…" follows "Change action…" (greyed on a turned-off row: nothing runs).
+    case nil, .appOnly: return [("Change action…", true), ("Name and Icon…", true), ("Remove gesture", true)]
     case .inherited, .overridden, .turnedOff:
       return [
-        ("Change action…", true), ("Turn off here", source != .turnedOff),
+        ("Change action…", true), ("Name and Icon…", source != .turnedOff), ("Turn off here", source != .turnedOff),
         ("Revert to Default", source != .inherited),
       ]
     }
@@ -378,6 +410,7 @@ struct RowMenu: View {
   private func perform(_ title: String) {
     switch title {
     case "Change action…": model.openRow(row.id)
+    case "Name and Icon…": model.inspectorDrafts.naming = row.id
     case "Remove gesture": model.remove(row)
     case "Turn off here": model.turnOff(row)
     default: model.revert(row)

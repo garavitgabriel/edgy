@@ -65,6 +65,8 @@ final class InspectorDrafts {
   var focus: Key?
   /// The row whose "…" menu is open (a note's fix can open it).
   var openMenu: BindingKey?
+  /// The row whose "Name and Icon…" popover is open (batch 29).
+  var naming: BindingKey?
   /// The one open binding (§ Binding parameters: "Only one binding is open at a time"): the row
   /// the user clicked or the one just set from the picker. `SettingsModel.openBinding(in:rows:)`
   /// resolves it (and the automatic open for an empty required parameter).
