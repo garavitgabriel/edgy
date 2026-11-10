@@ -21,9 +21,9 @@ import Testing
 /// not only the first (the log line is once; the re-enable is always).
 @Test func pointerGuardTapDisabledByTimeoutIsReEnabledEveryTime() {
   let tap = FakeTap()
-  let guard_ = PointerGuardCore(tap: tap, cursor: FakeCursor(), scheduler: FakeScheduler(), safetyTimeout: 3)
-  guard_.engage()
+  let pointerGuard = PointerGuardCore(tap: tap, cursor: FakeCursor(), scheduler: FakeScheduler(), safetyTimeout: 3)
+  pointerGuard.engage()
   for _ in 0..<5 { #expect(tap.send(.disabledByTimeout) == .pass) }
   #expect(tap.enableCalls == Array(repeating: true, count: 5))
-  #expect(guard_.reEnableCount == 5)
+  #expect(pointerGuard.reEnableCount == 5)
 }
