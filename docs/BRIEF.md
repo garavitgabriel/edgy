@@ -291,6 +291,19 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
 
 **Per-binding haptics:** the last parameter row of every binding is a checkbox, "Haptics for this gesture", on by default.
 
+**Bindings that name their target show the target** (owner, 2026-11-09: two Open App corners were indistinguishable):
+- **Pad tab** (bone 3's short value, with the 12 pt fade, never "…"):
+  - **Open App** → the app's name ("Quillpad").
+  - **Open URL** → the host without "www." ("github.com").
+  - **Open File or Folder** → the last path component ("Notes" / "report.pdf").
+  - **Keyboard Shortcut** → **always its keys** ("⌃Tab"; a sequence reads "⌃B, N"). A tab reading "Keyboard Shortcut" is a bug.
+  - **Hold Keys** → its keys ("fn Space").
+  - Before the parameter is set, the tab shows the action name with "…" (the existing needs-a-parameter rule).
+- **Zone icon** (full-mirror corners and the mini mirror, including 10 pt): **Open App** uses the **app's own icon in the app-mark treatment** (the same as profile tabs and chips: the real icon desaturated, 70% opacity in dark mode), never full colour, because one hue applies to the mirror too. An app with no icon of its own → the Open App tile in `ink2`. Open URL and Open File keep their action icons (link, folder).
+- **Hover line:** the target name ("Top-right: Quillpad"). **Plates:** as already specced ("Opened Quillpad"; dry run "Would open Quillpad").
+- **Inspector row:** the target name in `ink` as the action text ("Quillpad"), with an `ink2` sub-line naming the action ("Open App"). It's the same pattern as a custom name, so the row is never a mystery.
+- **Precedence**, for both name and icon: **custom name/icon (user-set) > target-derived (app, host, file, keys) > the action's own.**
+
 **Your own name and icon for a binding** (owner request, 2026-11-09; contract `Binding.customName` / `Binding.customIcon`, presentation only):
 - **Where:** the binding row's "…" menu gets **"Name and Icon…"**. It opens a small popover anchored to the row (one column, at most 320 pt wide), containing:
   - a **Name** field. Its placeholder is the action's own name (e.g. "Hold Keys"). It's focused on open, and Return saves.
