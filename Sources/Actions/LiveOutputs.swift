@@ -44,7 +44,11 @@ final class LiveBrightnessOutput: BrightnessOutput {
     return (symbols, display)
   }
 
-  private static func builtInDisplay() -> CGDirectDisplayID? {
+  /// The built-in panel, cached; read again only after the display configuration changes
+  /// (batch 28: availability asks on every settings render).
+  private static func builtInDisplay() -> CGDirectDisplayID? { BuiltInDisplayCache.shared.current() }
+
+  fileprivate static func readBuiltInDisplay() -> CGDirectDisplayID? {
     var count: UInt32 = 0
     guard CGGetOnlineDisplayList(0, nil, &count) == .success, count > 0 else { return nil }
     var displays = [CGDirectDisplayID](repeating: 0, count: Int(count))
@@ -301,5 +305,49 @@ final class LiveShortcutRunner: ShortcutRunner {
         actionsLog.error("shortcut \(name, privacy: .private) failed to launch: \(error, privacy: .public)")
       }
     }
+  }
+}
+
+/// Remembers the built-in display's ID between display reconfigurations (batch 28): the online
+/// display list is read once, then again only after Quartz reports a change.
+final class BuiltInDisplayCache: @unchecked Sendable {
+  static let shared: BuiltInDisplayCache = {
+    let cache = BuiltInDisplayCache(read: LiveBrightnessOutput.readBuiltInDisplay)
+    let status = CGDisplayRegisterReconfigurationCallback(
+      { _, flags, _ in
+        guard !flags.contains(.beginConfigurationFlag) else { return }
+        BuiltInDisplayCache.shared.invalidate()
+      }, nil)
+    if status != .success {
+      actionsLog.error("built-in display: reconfiguration callback not registered (\(status.rawValue)); reading per use")
+      cache.alwaysRead = true
+    }
+    return cache
+  }()
+
+  private let lock = NSLock()
+  private let read: () -> CGDirectDisplayID?
+  /// `.some(nil)` = read, no built-in display; `nil` = not read since the last change.
+  private var cached: CGDirectDisplayID??
+  fileprivate var alwaysRead = false
+  /// For tests: how many times the display list was read.
+  private(set) var reads = 0
+
+  init(read: @escaping () -> CGDirectDisplayID?) { self.read = read }
+
+  func current() -> CGDirectDisplayID? {
+    lock.lock()
+    defer { lock.unlock() }
+    if !alwaysRead, let cached { return cached }
+    let value = read()
+    reads += 1
+    cached = .some(value)
+    return value
+  }
+
+  func invalidate() {
+    lock.lock()
+    cached = nil
+    lock.unlock()
   }
 }

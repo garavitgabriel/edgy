@@ -78,8 +78,8 @@ public struct ActionPickerView: View {
 
   private func actions(zone: Zone, gesture: GestureKind) -> some View {
     let catalog = PickerCatalog(
-      groups: model.editor.catalogByCategory, gesture: gesture, query: query,
-      isAppTab: model.selectedProfile != .default, availability: model.editor.availability(of:))
+      groups: model.mirrorGroups, gesture: gesture, query: query,
+      isAppTab: model.selectedProfile != .default, availability: model.mirrorAvailability(of:))
     let current = model.inspectorRows(for: zone).first { $0.gesture == gesture && $0.source != .turnedOff }?
       .binding.action
     let selectable = catalog.selectable.map(\.id) + (catalog.offersDoNothing ? [ActionID.doNothing] : [])
