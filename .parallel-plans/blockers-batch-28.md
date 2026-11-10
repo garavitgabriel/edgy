@@ -13,5 +13,4 @@ All code items (1–6) are committed, including add-app, chips and tabs (`AppMar
    What we have so far: wakeups went from 732/s to 0/s, but CPU could not be judged because the trackpad was in use (see done-batch-28.md). If a state is over budget, take `sample Edgy 5`. CPU from live touch frames redrawing an open mirror is a real change, not idle cost.
 2. **App chooser on device.** Open Open App → "Choose an app". The list should appear within 300 ms (after "Loading apps…" if slow). Confirm the empty-list report is gone. It was not reproduced from this session.
 
-## Still open from this session
-3. `/builder-close`.
+`/builder-close` done (vault ee40142). Nothing else is open from this session.
