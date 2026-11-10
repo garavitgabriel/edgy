@@ -117,7 +117,7 @@ The full text and evidence are in `docs/design/bones.md` and `docs/design/canvas
    - **One plate component** is shared by the overlay and the onboarding feedback: same radius, same 17/13 type pair, same inset. In the render, C and D look like two products; don't build that.
    - **The plate is always dark** (the espresso plate of renders D and S8) in both system appearances. Over dark documents it gets a 0.5 pt light edge (`rgba(255,230,210,.24)`).
    - **Contacts on a plate** (filled accent, or the dry-run ring) get a 1 pt cream rim (`#FBEADB` at 70%) for ≥3:1, like the app icon's dot. It's a stroke, never a halo.
-   - **Run-mode trigger plates** show the bare action name ("Play/Pause"). Actions with a parameter keep a past-tense verb plus the object ("Opened Quillpad", "Pressed ⇧⌘ 4", "Ran <name>"), pairing with dry run's "Would …". The plate edge is always drawn; it isn't gated on the backdrop. The display check is the one plate exempt from the 17/13 pair.
+   - **Run-mode trigger plates** show the bare action name ("Play/Pause"). Actions with a parameter keep a past-tense verb plus the object ("Opened Quillpad", "Pressed ⇧⌘4", "Ran <name>"), pairing with dry run's "Would …". The plate edge is always drawn; it isn't gated on the backdrop. The display check is the one plate exempt from the 17/13 pair.
 10. **The menu-bar popover** (not a plain menu):
     - **Top half:** a live mini mirror (zones of the active profile plus the last touch where it landed), profile chips, and **Enabled** and **Test Mode** switches.
     - **Profile chips don't select anything.** Profiles follow the frontmost app automatically. The chip of the profile in effect is filled; the others are outlined. Clicking a chip opens Settings on that profile's tab. If the frontmost app has its own profile, its chip comes first.
@@ -256,12 +256,18 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
 - A required parameter that's still empty leaves the binding row reading "Needs keys" / "Needs an app" in `ink2`. The pad tab shows the action name with "…".
 
 **Key-combo recorder** (`keys`, `upKeys`, `downKeys`):
-- **Idle:** a field showing the combo as system key symbols plus the key name ("⌃⌥ Space", "⌘⇧ 4"). Empty, it reads "Click to record" in `ink2`.
+- **Idle:** a field showing the combo as system key symbols plus the key name ("⌃⌥Space", "⇧⌘4"). Empty, it reads "Click to record" in `ink2`.
 - **Recording:**
   - The field gets a 2 pt **accent** ring (recording is live) and reads "Press keys…".
   - Modifiers you're holding appear live in `ink2` as you press them, and turn `ink` when the combo commits.
   - Esc cancels. ⌫ while idle clears. Recording swallows the keys, so nothing reaches the app.
 - **Right-hand modifiers** show as "Right ⌘" or "Right ⌥" when the runtime distinguishes them.
+- **How a key combo is written — one helper for every surface** (field, pad tab, inspector sub-line, plates, hover line), as the system writes shortcuts:
+  - Modifier symbols in the system order **⌃⌥⇧⌘**, then the key, with **no spaces**: "⌃B", "⇧⌘4", "⌃⌥Space", "⌃Tab", "⌥Esc".
+  - **fn is a word, so it's followed by one space:** "fn Space", "fn ⌃B". On its own it's "fn".
+  - Named keys are words: Space, Tab, Return, Esc, Delete, plus arrows as "←", "→", "↑", "↓".
+  - Sequences join steps with ", ": "⌃B, N".
+  - Right-hand modifiers stay "Right ⌘" in the field; tabs and plates use the plain symbol.
 - **Recording Escape itself** (owner case 2026-11-09: a zone that sends Escape to interrupt a terminal). A bare Esc still **cancels** recording, as people expect. While a Keyboard Shortcut field (or a sequence step) is recording, a quiet **"Use Escape"** text button (`ink2`, 13) appears under the field, with the tooltip "Record the Escape key itself". Clicking it commits `escape` as that step and ends recording. Esc with modifiers (e.g. ⌥Esc) records normally. It's **not shown on Hold Keys** (holding Escape has no use case). Every other key, including Return, Tab, Space and Delete, records directly while recording; only Esc needs the button. Display: "Esc" (in sequences: "⌃B, Esc").
 - **Key sequences (Keyboard Shortcut only; owner request 2026-11-09).** One gesture can send up to **4 shortcuts in order** (e.g. a terminal prefix, then a command):
   - **One shortcut looks and works exactly as today.** A sequence is opt-in.
