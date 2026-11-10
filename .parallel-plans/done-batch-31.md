@@ -25,7 +25,7 @@ Branch `worktree-edgy-public`. Changed only the owned paths: `README.md`, `LICEN
   - the config path (`ConfigStore.swift`), the log subsystem (`Logging.swift`);
   - what is read: `TypingActivity.swift` keeps only the time of the last key-down, and the recorder's listen-only tap runs only while recording.
   - I left out a "Turn back on" step for external displays: there is no UI control for it on `main`.
-- [x] Commands: I ran `git clone`'s URL check (`git remote -v`), `swift build --product edgy-trace` (via the triple), and the log command. **Not run here, comes with batch 30:** `make app` (no `Makefile` on this branch yet). The README describes it exactly as the batch 30 brief specifies (output `build/release/Edgy.app`, development identity, else ad hoc, never installs or launches). Check that once batch 30 merges.
+- [x] Commands: ran the log command and `git remote -v` (for the clone URL); `swift build` builds `edgy-trace` (via the triple). **Not run:** `git clone` itself, and the `edgy-trace devices` / `record` commands in CONTRIBUTING (copied from `scripts/record-traces.md`; recording needs a human at the trackpad). **Not run here, comes with batch 30:** `make app` (no `Makefile` on this branch yet). The README describes it exactly as the batch 30 brief specifies (output `build/release/Edgy.app`, development identity, else ad hoc, never installs or launches). Check that once batch 30 merges.
 - [x] Relative links and images resolve (scripted check: every `](…)`, `src`/`srcset` and every `docs/…`/`scripts/…` path in the new files exists).
 - [x] Denylist over the tree (`git grep -niE -f ~/.config/edgy-names-denylist`, with the new files staged): prints nothing.
 - [x] Verification triple: `swift build && swift test && swift format lint --strict -r Sources Tests Package.swift` passes (303 tests in 42 suites).
@@ -38,6 +38,7 @@ Branch `worktree-edgy-public`. Changed only the owned paths: `README.md`, `LICEN
 | `SECURITY.md` | `SECURITY_CONTACT`. Also confirm the "reply within a week" promise, or change it. |
 | `README.md`, `.github/ISSUE_TEMPLATE/config.yml` | Clone/security URL `github.com/garavitgabriel/edgy` (from `git remote -v`). Change it if the public repo gets a different name or owner. |
 | `README.md` § Build it yourself | The `make app` description: re-check it against batch 30's real `Makefile`. |
+| `README.md` § Download | "The signed, notarized build updates itself": the updater is not on `main` and not in batch 30 (release plan P2 step 4). Keep the sentence only if the updater ships before launch. |
 | `README.md` § Troubleshooting, first case | It says to remove and re-add Edgy in Accessibility after an ad hoc rebuild. Confirm that is the fix on device. |
 
 ## History scan (counts and hashes only)
@@ -57,6 +58,7 @@ All the hits are reachable from `main`, so publishing the existing history publi
 - **`.parallel-plans/CHIEF-HANDOFF-2026-11-07.md`, `backlog.md`, the dated `2026-11-0*-edgy-v0*.md` plans** are private working notes. They include vault paths and the business plan.
 - **16 `done-batch-*.md` files** contain absolute `/Users/…` home paths (5–13, 16–18, 20, 23, 24, 26). `Tests/ActionsTests/PickerTests.swift` uses `/Users/me/…`, which is a fake fixture and fine.
 - **`docs/BRIEF.md`** names the owner-private design canvas. That's harmless, but it points at something outsiders can't open.
+- **Machine names / emails in tracked files:** `git grep` for `.local`, host-name and personal email patterns found nothing.
 - **Commit author email:** all 317 commits use one personal gmail address. Use a `noreply` address in the public repo if that matters.
 - The `$5|Stripe|vault` grep also hit four PNGs under `docs/design/build-shots/`. Those are coincidental byte matches in binary data, not text.
 

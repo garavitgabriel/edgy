@@ -11,10 +11,10 @@ Edgy is a macOS menu-bar app. Slide a finger up the right edge to change the vol
 
 ## What it does
 
-- **Any zone, any action.** Four edges and four corners. An edge can be split into up to four parts. Each zone takes a slide, a tap, a double-tap, a swipe along the edge or a long-press, and each gesture runs one action: volume, brightness, keyboard brightness, media keys, mute, Mission Control, Spaces, window halves, opening an app, a URL or a file, a keyboard shortcut, holding keys down while you press, switching apps, or running one of your Shortcuts.
+- **Any zone, any action.** Four edges and four corners. An edge can be split into up to four parts. Edges take a slide, a tap, a double-tap, a swipe along the edge or a long-press; corners take a tap, a double-tap or a long-press. Each gesture runs one action: volume, brightness, keyboard brightness, media keys, mute, Mission Control, Spaces, window halves, opening an app, a URL or a file, a keyboard shortcut, holding keys down while you press, switching apps, or running one of your Shortcuts.
 - **Per-app profiles.** Add an app and override only the gestures you want changed there. Everything else follows the default profile, and you can turn Edgy off in one app entirely.
-- **No misfires.** A resting palm, a two-finger scroll near the edge, a touch right after you typed, a physical click: each is turned down for a measured reason. Contacts wider than 18 mm are palms. Edge gestures wait 500 ms after a key press. You can change each limit under Advanced… in the settings window.
-- **Test Mode.** Turn it on in the menu-bar popover and every touch shows a plate on screen: what ran ("Volume 64%"), or why a touch was ignored ("Ignored: palm, 21 mm wide, limit 18 mm"). Check "Don't run actions" to see what would have run without running it.
+- **No misfires.** A resting palm, a two-finger scroll near the edge, a touch right after you typed, a physical click: each is turned down, and Test Mode tells you why, with the measure and the limit where there is one. Contacts wider than 18 mm are palms. Edge gestures wait 500 ms after a key press. You can change each limit under Advanced… in the settings window.
+- **Test Mode.** Turn it on in the menu-bar popover and each gesture in a mapped zone shows a plate on screen: what ran ("Volume 64%"), or why a touch was ignored ("Ignored: palm, 21 mm wide, limit 18 mm"). Check "Don't run actions" to see what would have run without running it.
 
 <img src="docs/readme/rejected-light.png" alt="Onboarding step 2: the trackpad drawing with a struck contact on the right edge and the line &quot;Ignored: swipe too short, 4 mm, needs 6 mm&quot;." width="480">
 <img src="docs/readme/popover-dark.png" alt="The menu-bar popover in dark mode: a small trackpad drawing with a live touch on the right edge, the profile chips, and the Enabled and Test Mode switches." width="240">
@@ -41,7 +41,7 @@ The signed, notarized build updates itself: [DOWNLOAD_URL](DOWNLOAD_URL). It's t
 
 ### Build it yourself
 
-You need macOS 14 or later and a Swift 6.0 or later toolchain (the Xcode command line tools are enough).
+You need macOS 14 or later and a Swift 6.0 or later toolchain.
 
 ```bash
 git clone https://github.com/garavitgabriel/edgy.git
@@ -58,7 +58,8 @@ The trade-off: a build you make yourself doesn't update itself, so you pull and 
 Edgy asks for **Accessibility** access. It uses it to keep the pointer still while you slide along an edge and to send the keys most actions need: media keys, volume with the system indicator, shortcuts, held keys, window moves and Spaces. Opening apps, URLs and files works without it. You can skip the step and grant it later; touches still show in Test Mode.
 
 What Edgy reads:
-- the positions and sizes of the fingers on your trackpad;
+- the positions and sizes of the fingers on your trackpad, and the pointer's movement, which it holds still during a slide;
+- which app is in front, to pick its profile;
 - that a key was pressed and when, so it can ignore the edges while you type, never which key;
 - the keys you press while you record a shortcut in Settings, and only then.
 
