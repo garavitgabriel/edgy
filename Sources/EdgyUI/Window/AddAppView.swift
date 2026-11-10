@@ -19,6 +19,8 @@ public struct AddAppView: View {
   @State private var start: AppProfileStart = .defaultWithChanges
   @State private var loaded: Bool
   private let done: () -> Void
+  /// The list comes from `model.installedApps` (not a fixed preview list).
+  private let loadsLive: Bool
 
   static let width: CGFloat = 340
   static let maxListHeight: CGFloat = 360
@@ -30,6 +32,7 @@ public struct AddAppView: View {
     self.model = model
     _apps = State(initialValue: apps ?? [])
     _loaded = State(initialValue: apps != nil)
+    loadsLive = apps == nil
     _step = State(initialValue: step)
     self.done = done
   }
@@ -72,6 +75,8 @@ public struct AddAppView: View {
       }
       .frame(maxHeight: Self.maxListHeight)
       .fixedSize(horizontal: false, vertical: true)
+      // Batch 28: a loaded (live) list reads icons off the main thread; a fixed list draws in place.
+      .environment(\.appIconsLoadOffMain, loadsLive)
     }
     .padding(16)
   }

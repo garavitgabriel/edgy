@@ -161,6 +161,8 @@ struct AppMark: View {
   /// On a filled `ink` chip the fallback draws in the window tint, not `ink2`.
   var onInk = false
   @Environment(\.colorScheme) private var scheme
+  @Environment(\.appIconsLoadOffMain) private var offMain
+  @State private var loaded: AppIconCache.Icon?
 
   static let size: CGFloat = 14
   static let darkOpacity = 0.7
@@ -168,7 +170,7 @@ struct AppMark: View {
   /// Critique 22 must-fix: only a bundle that ships its own icon counts. A missing path, a bundle
   /// with no `CFBundleIconFile`/`CFBundleIconName`, or one whose named icon isn't in its resources
   /// (the system would draw its generic application icon, a pale square) has no icon.
-  static func hasIcon(_ path: String?) -> Bool {
+  nonisolated static func hasIcon(_ path: String?) -> Bool {
     guard let path, FileManager.default.fileExists(atPath: path) else { return false }
     let url = URL(fileURLWithPath: path)
     let contents = url.appendingPathComponent("Contents")
@@ -187,23 +189,38 @@ struct AppMark: View {
   }
 
   /// The mark for `path`: its own icon desaturated, or `nil` when `hasIcon` says it has none.
-  static func icon(_ path: String?) -> NSImage? {
+  /// Reads the bundle every call: views go through `AppIconCache` (batch 28).
+  nonisolated static func icon(_ path: String?) -> NSImage? {
     guard let path, hasIcon(path) else { return nil }
     return NSWorkspace.shared.icon(forFile: path)
   }
 
+  /// Batch 28: read once per path through `AppIconCache`, never per body evaluation; off the main
+  /// thread in live lists (`appIconsLoadOffMain`).
+  private var mark: AppIconCache.Icon? {
+    guard let path else { return AppIconCache.Icon.none }
+    return loaded ?? (offMain ? AppIconCache.shared.cached(path) : AppIconCache.shared.icon(path))
+  }
+
   var body: some View {
     Group {
-      if let icon = Self.icon(path) {
+      switch mark {
+      case .image(let icon)?:
         Image(nsImage: icon).resizable().saturation(0)
           .aspectRatio(contentMode: .fit)
           .frame(width: Self.size, height: Self.size)
           .opacity(scheme == .dark ? Self.darkOpacity : 1)
-      } else {
+      case .none?:
         ActionIcon(id: "app.open", size: Self.size).foregroundStyle(onInk ? Tokens.windowTint : Tokens.ink2)
+      case nil:
+        Color.clear.frame(width: Self.size, height: Self.size)
       }
     }
     .accessibilityHidden(true)
+    .task(id: path) {
+      guard offMain, let path, AppIconCache.shared.cached(path) == nil else { return }
+      loaded = await AppIconCache.shared.load(path)
+    }
   }
 }
 
