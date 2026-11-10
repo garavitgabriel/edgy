@@ -154,6 +154,15 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
   var switcherWatchdog: ScheduledWork?
   /// The app switcher's keep-open timer while a session lingers between strokes.
   var switcherLinger: ScheduledWork?
+  /// The `keyboard.shortcut` sequence still sending, if any (batch 32). Behind `keyLock`.
+  var keySequence: KeySequenceRun?
+  var sequenceGeneration = 0
+
+  /// Apps in the order they were in front, for `app.last`. Behind `appHistoryLock`: the
+  /// activation tracker records from its own thread.
+  let apps: AppActivationOutput
+  let appHistoryLock = NSLock()
+  var appHistory = AppHistory()
 
   // Window memory (see `ActionRegistry+Windows.swift`). Guarded by `windowLock`.
   let windowLock = NSRecursiveLock()
@@ -179,9 +188,11 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     workspace: WorkspaceOutput, windows: WindowOutput, system: SystemOutput, levelKeys: LevelKeyOutput,
     displays: DisplayBrightnessControlling, backlight: KeyboardBacklightOutput, dictation: DictationOutput,
     waiter: TransitionWaiter, scheduler: ActionScheduler,
-    switcherInput: SwitcherInputMonitor = NoSwitcherInputMonitor()
+    switcherInput: SwitcherInputMonitor = NoSwitcherInputMonitor(),
+    apps: AppActivationOutput = NoAppActivations()
   ) {
     self.switcherInput = switcherInput
+    self.apps = apps
     self.settings = settings
     self.audio = audio
     self.display = display
@@ -199,6 +210,8 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     self.dictation = dictation
     self.waiter = waiter
     self.scheduler = scheduler
+    // Listen-only, event-driven: Last App needs the apps used before its first trigger.
+    apps.startObserving { [weak self] app in self?.appActivated(app) }
   }
 
   public let available: [ActionDescriptor] = ActionCatalog.all
@@ -425,8 +438,8 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     if phase == .began { keySteps = nil }
     defer { if phase == .ended || phase == .cancelled { keySteps = nil } }
 
-    let up = try keyedCombo(ActionParameterKey.upKeys, for: id, in: context)
-    let down = try keyedCombo(ActionParameterKey.downKeys, for: id, in: context)
+    let up = try singleCombo(ActionParameterKey.upKeys, for: id, in: context, keyed: true)
+    let down = try singleCombo(ActionParameterKey.downKeys, for: id, in: context, keyed: true)
     let unit = try stepUnit(
       id, in: context, legacyRange: ActionCatalog.stepRange, legacyDefault: ActionCatalog.defaultStep,
       zoneLengthMM: Self.zoneLength(delta: delta, motion: context.motion))
@@ -525,10 +538,11 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     case BuiltInAction.runShortcut:
       shortcuts.run(name: try text(ActionParameterKey.shortcutName, for: id, in: context))
     case BuiltInAction.keyboardShortcut:
-      let keys = try keyedCombo(ActionParameterKey.keys, for: id, in: context)
-      try unavailable(id) { try keyboard.post(keys) }
+      try performShortcut(id, context: context)
     case BuiltInAction.openApp:
       try openApp(id, context: context)
+    case BuiltInAction.lastApp:
+      try performLastApp(id)
     case BuiltInAction.openURL:
       let raw = try text(ActionParameterKey.url, for: id, in: context)
       guard let url = URL(string: raw), let scheme = url.scheme, !scheme.isEmpty else {

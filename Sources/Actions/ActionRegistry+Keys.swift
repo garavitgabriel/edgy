@@ -333,7 +333,7 @@ extension ActionRegistry {
     defer { keyLock.unlock() }
     releaseHeld()
     guard down else { return }
-    let combo = try combo(ActionParameterKey.keys, for: id, in: context)
+    let combo = try singleCombo(ActionParameterKey.keys, for: id, in: context, keyed: false)
     let maxSeconds = try number(
       ActionParameterKey.maxSeconds, for: id, in: context, range: ActionCatalog.holdMaxSecondsRange,
       default: ActionCatalog.defaultHoldMaxSeconds)

@@ -17,14 +17,14 @@ import Testing
         "media.previous", "shortcut.run",
         "keyboard.backlight", "keyboard.backlightToggle",
         "keyboard.shortcut", "keyboard.slideSteps", "keyboard.hold",
-        "app.open", "url.open", "file.open", "apps.switcher",
+        "app.open", "app.last", "url.open", "file.open", "apps.switcher",
         "system.missionControl", "system.appWindows", "system.showDesktop", "spaces.left", "spaces.right",
         "system.lockScreen", "system.sleepDisplay", "system.dictation", "edgy.none",
         "window.leftHalf", "window.rightHalf", "window.topHalf", "window.bottomHalf", "window.maximize",
         "window.center", "window.minimize", "window.restore",
       ])
     #expect(Set(ids).count == ids.count)
-    #expect(ids.count == 34)
+    #expect(ids.count == 35)
   }
 
   @Test func shapesAndCategories() {
@@ -39,7 +39,8 @@ import Testing
     let expected: [String: ActionCategory] = [
       "audio.volume": .sound, "audio.mute": .sound, "mic.mute": .sound, "display.brightness": .display,
       "media.playPause": .media, "media.next": .media, "media.previous": .media, "shortcut.run": .shortcuts,
-      "keyboard.shortcut": .keyboard, "keyboard.slideSteps": .keyboard, "app.open": .apps, "url.open": .apps,
+      "keyboard.shortcut": .keyboard, "keyboard.slideSteps": .keyboard, "app.open": .apps, "app.last": .apps,
+      "url.open": .apps,
       "file.open": .apps, "system.missionControl": .system, "system.appWindows": .system,
       "system.showDesktop": .system, "spaces.left": .system, "spaces.right": .system,
       "system.lockScreen": .system, "system.sleepDisplay": .system, "window.leftHalf": .windows,

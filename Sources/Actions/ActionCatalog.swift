@@ -15,6 +15,8 @@ public enum BuiltInAction {
   public static let keyboardSlideSteps: ActionID = "keyboard.slideSteps"
 
   public static let openApp: ActionID = "app.open"
+  /// Brings back the app that was in front before the current one (batch 32).
+  public static let lastApp: ActionID = "app.last"
   public static let openURL: ActionID = "url.open"
   public static let openFile: ActionID = "file.open"
 
@@ -208,6 +210,7 @@ enum ActionCatalog {
           kind: .choice([ActionParameterKey.frontmostStay, ActionParameterKey.frontmostHide]), required: false,
           defaultValue: ActionParameterKey.frontmostHide, displayName: "When Already in Front"),
       ]),
+    ActionDescriptor(id: BuiltInAction.lastApp, shape: .trigger, displayName: "Last App", category: .apps),
     ActionDescriptor(
       id: BuiltInAction.openURL, shape: .trigger, displayName: "Open URL", category: .apps,
       parameters: [ActionParameter(key: ActionParameterKey.url, kind: .url, required: true, displayName: "URL")]),

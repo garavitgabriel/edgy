@@ -303,8 +303,8 @@ import Testing
 @Suite struct RegistryShapeTests {
   /// v0.1's eight actions keep their ids and shapes (and must stay in the catalog).
   /// v0.1's eight actions lead the catalog, exactly as before. (v0.2 appends 20 more after them,
-  /// v0.3 five more, v0.4 "Do nothing"; `availablePinsTheFullIdList` pins the whole list and
-  /// `available.count == 34`.)
+  /// v0.3 five more, v0.4 "Do nothing", batch 32 "Last App"; `availablePinsTheFullIdList` pins
+  /// the whole list and `available.count == 35`.)
   @Test func availableListsExactlyTheEightActions() {
     let h = Harness()
     let v01 = Array(h.registry.available.prefix(8))
@@ -322,7 +322,7 @@ import Testing
         "shortcut.run": .trigger,
       ])
     #expect(h.registry.available.allSatisfy { !$0.displayName.isEmpty })
-    #expect(h.registry.available.count == 34)
+    #expect(h.registry.available.count == 35)
   }
 }
 
