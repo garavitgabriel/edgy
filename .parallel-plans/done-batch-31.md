@@ -37,7 +37,7 @@ Branch `worktree-edgy-public`. Changed only the owned paths: `README.md`, `LICEN
 | `README.md` § Download | `DOWNLOAD_URL` (appears twice: link text and target). No price is stated, on purpose. |
 | `SECURITY.md` | `SECURITY_CONTACT`. Also confirm the "reply within a week" promise, or change it. |
 | `README.md`, `.github/ISSUE_TEMPLATE/config.yml` | Clone/security URL `github.com/garavitgabriel/edgy` (from `git remote -v`). Change it if the public repo gets a different name or owner. |
-| `README.md` § Build it yourself | The `make app` description: re-check it against batch 30's real `Makefile`. |
+| `README.md` § Build it yourself | The README marks `make app` as not in the repo yet ("comes with the release scripts and isn't in the repo yet. Once it lands, …"), so the claim is true of `main` today. When batch 30 merges, delete that first sentence and the "Once it lands," and check the rest against the real `Makefile`. `scripts/bundle.sh` was not offered as a stopgap: it was not run here (it rebuilds `build/Edgy.app`, the copy in use) and it refuses to sign without an Apple Development identity. |
 | `README.md` § Download | The README makes no auto-update claim: the updater is not on `main` and not in batch 30 (release plan P2 step 4). Once it ships, add "It updates itself." to the Download line and restore the update contrast in the build-it-yourself trade-off. |
 | `README.md` § Troubleshooting, first case | It says to remove and re-add Edgy in Accessibility after an ad hoc rebuild. Confirm that is the fix on device. |
 
