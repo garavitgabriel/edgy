@@ -55,7 +55,12 @@ final class RecordingPresenter: OverlayPresenting {
 final class ManualClock: OverlayClock {
   var now: TimeInterval = 1000
   private(set) var ticking = false
-  func startTicking(_ tick: @escaping @MainActor () -> Void) { ticking = true }
+  /// How many times the controller asked for a repeating tick (batch 28: zero while idle).
+  private(set) var starts = 0
+  func startTicking(_ tick: @escaping @MainActor () -> Void) {
+    ticking = true
+    starts += 1
+  }
   func stopTicking() { ticking = false }
 }
 
@@ -350,9 +355,12 @@ let volumeRan = LiveDecision.actionRan(
 
   @Test func stopTakesEverythingDown() {
     let (controller, presenter, clock, model) = overlayRig()
-    #expect(clock.ticking)
+    // Batch 28: the clock no longer runs from `start()`; it starts when a plate goes up.
+    // Was: #expect(clock.ticking)
+    #expect(!clock.ticking)
     feed(model, volumeRan)
     controller.pump()
+    #expect(clock.ticking)
     controller.stop()
     #expect(!clock.ticking)
     #expect(presenter.tornDown == 1)
@@ -649,3 +657,94 @@ final class OverlayFakeEngine: LiveEngine, @unchecked Sendable {
   controller.pump()
   #expect(engine.feedObservers == 2)
 }
+
+// MARK: Batch 28: quiet when idle
+
+/// Batch 28: no repeating timer while nothing is up; a decision starts it, an empty timeline stops it.
+@MainActor @Test func overlayClockIsStoppedWhenIdleAndStartsOnADecision() {
+  let (controller, _, clock, model) = overlayRig()
+  #expect(clock.starts == 0)
+  #expect(!controller.isTicking)
+  // Idle turns (nothing arrived) never ask for ticks.
+  controller.pump()
+  controller.pump()
+  #expect(clock.starts == 0)
+  feed(model, volumeRan)
+  controller.pump()
+  #expect(clock.starts == 1)
+  #expect(clock.ticking)
+  // Linger, fade, gone: the clock stops with the last plate.
+  feed(model, slideEnded)
+  controller.pump()
+  clock.now += 30
+  controller.pump()
+  clock.now += 1
+  controller.pump()
+  #expect(!clock.ticking)
+  #expect(!controller.isTicking)
+  controller.pump()
+  #expect(clock.starts == 1)
+}
+
+/// Batch 28: the overlay wakes on a decision by itself, with no tick running.
+@MainActor @Test func overlayWakesOnADecisionWithoutAClock() async {
+  let (controller, presenter, clock, model) = overlayRig()
+  #expect(!clock.ticking)
+  feed(model, volumeRan)
+  for _ in 0..<20 where presenter.shown.isEmpty { await Task.yield() }
+  #expect(presenter.shown.count == 1)
+  #expect(clock.ticking)
+  // It registers again: a second decision after the first plate is gone wakes it too.
+  feed(model, slideEnded)
+  controller.pump()
+  clock.now += 30
+  controller.pump()
+  clock.now += 1
+  controller.pump()
+  #expect(presenter.shown.isEmpty)
+  feed(model, volumeRan)
+  for _ in 0..<20 where presenter.shown.isEmpty { await Task.yield() }
+  #expect(presenter.shown.count == 1)
+}
+
+/// Batch 28: screens are read when a plate appears or the screens change, never per tick.
+@MainActor @Test func overlayReadsScreensOnlyWhenAPlateAppears() {
+  let presenter = RecordingPresenter()
+  let model = PreviewFixtures.model()
+  let screens = CountingOverlayScreens([laptopScreen])
+  let clock = ManualClock()
+  let controller = OverlayController(model: model, screens: screens, presenter: presenter, clock: clock)
+  controller.start()
+  controller.showsTestModePlates = true
+  let afterStart = screens.reads
+  feed(model, volumeRan)
+  controller.pump()
+  let afterPlate = screens.reads
+  #expect(afterPlate > afterStart)
+  for _ in 0..<10 {
+    clock.now += 0.03
+    controller.pump()
+  }
+  #expect(screens.reads == afterPlate)
+  screens.screens = [deskScreen]
+  controller.screensChanged()
+  #expect(presenter.shown.first?.screenID == "2")
+}
+
+@MainActor
+final class CountingOverlayScreens: OverlayScreenProviding {
+  private var stored: [OverlayScreen]
+  private(set) var reads = 0
+  var screens: [OverlayScreen] {
+    get {
+      reads += 1
+      return stored
+    }
+    set { stored = newValue }
+  }
+  var mainScreenID: String? { stored.first?.id }
+  init(_ screens: [OverlayScreen]) { stored = screens }
+  func workArea() -> OverlayWorkArea { OverlayWorkArea() }
+}
+
+let slideEnded = LiveDecision.recognized(zone: .edge(.right), kind: .slide, phase: .ended, deviceID: 0)

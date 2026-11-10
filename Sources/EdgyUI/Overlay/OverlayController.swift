@@ -4,6 +4,7 @@ import EdgyCore
 import EdgyRuntime
 import Foundation
 import OSLog
+import Observation
 
 /// One screen as the overlay sees it (AppKit global coordinates).
 struct OverlayScreen: Equatable {
@@ -56,7 +57,8 @@ protocol OverlayPresenting: AnyObject {
   func tearDown()
 }
 
-/// The overlay clock: the current time and a repeating tick on the main run loop.
+/// The overlay clock: the current time and a repeating tick on the main run loop. The controller
+/// asks for ticks only while a plate is up or fading (batch 28: no repeating timer while idle).
 @MainActor
 protocol OverlayClock: AnyObject {
   var now: TimeInterval { get }
@@ -90,6 +92,12 @@ public final class OverlayController {
   private let log = Logger(subsystem: "com.garavit.edgy", category: "overlay")
   private(set) var timeline = OverlayTimeline()
   private var isRunning = false
+  /// The clock is ticking (a plate is up, fading, or the display check is asked).
+  private(set) var isTicking = false
+  /// The screens as last read: when a plate appears or the screens change, never per tick.
+  private var screenList: [OverlayScreen] = []
+  private var mainScreenID: String?
+  private var screenObserver: NSObjectProtocol?
   /// The display check on screen: its display key and name.
   private(set) var askingDisplay: (key: String, name: String)? {
     didSet { if askingDisplay == nil { checkFrame = nil } }
@@ -115,19 +123,71 @@ public final class OverlayController {
     isRunning = true
     _ = model.takeDecisions()
     model.startFeed()
-    clock.startTicking { [weak self] in self?.pump() }
+    refreshScreens()
+    observeDecisions()
+    screenObserver = NotificationCenter.default.addObserver(
+      forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
+    ) { [weak self] _ in
+      MainActor.assumeIsolated { self?.screensChanged() }
+    }
   }
 
   public func stop() {
     guard isRunning else { return }
     isRunning = false
-    clock.stopTicking()
+    if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
+    screenObserver = nil
+    setTicking(false)
     timeline.removeAll()
     askingDisplay = nil
     presenter.tearDown()
   }
 
   // MARK: The loop
+
+  /// Wakes on every new decision (`decisionSerial` changes) without a clock. Observation calls
+  /// back once per registration (before the write lands), so the pump runs on the next main turn
+  /// and registers again.
+  private func observeDecisions() {
+    guard isRunning else { return }
+    withObservationTracking {
+      _ = model.decisionSerial
+    } onChange: { [weak self] in
+      Task { @MainActor in self?.wake() }
+    }
+  }
+
+  /// A decision arrived: register for the next one and run a turn (which starts the clock if a
+  /// plate went up).
+  func wake() {
+    guard isRunning else { return }
+    observeDecisions()
+    pump()
+  }
+
+  /// Ticks only while something is on screen or fading; idle costs nothing.
+  private func setTicking(_ on: Bool) {
+    guard on != isTicking else { return }
+    isTicking = on
+    if on {
+      clock.startTicking { [weak self] in self?.pump() }
+    } else {
+      clock.stopTicking()
+    }
+  }
+
+  private func refreshScreens() {
+    screenList = screens.screens
+    mainScreenID = screens.mainScreenID
+  }
+
+  /// The displays were rearranged, added or removed: read them again and redraw what is up.
+  func screensChanged() {
+    guard isRunning else { return }
+    refreshScreens()
+    checkFrame = nil
+    render()
+  }
 
   /// One turn: take the model's decisions, update the plates, drop finished fades, draw.
   func pump() {
@@ -139,6 +199,7 @@ public final class OverlayController {
     timeline.tick(now: clock.now)
     if askingDisplay != nil, !timeline.entries.contains(where: \.content.isDisplayCheck) { askingDisplay = nil }
     render()
+    setTicking(isRunning && (!timeline.entries.isEmpty || askingDisplay != nil))
   }
 
   func receive(_ decisions: [LiveDecision]) {
@@ -150,7 +211,10 @@ public final class OverlayController {
     defer {
       // Read the work area only when a plate that wasn't up appears (ids only grow on append):
       // never for a slide's updates, which arrive every tick, nor for decisions with no plate.
-      if (timeline.entries.map(\.id).max() ?? 0) > newestBefore { workArea = screens.workArea() }
+      if (timeline.entries.map(\.id).max() ?? 0) > newestBefore {
+        workArea = screens.workArea()
+        refreshScreens()
+      }
     }
     for decision in decisions {
       if case .recognized(let zone, let kind, let phase, _) = decision {
@@ -193,15 +257,15 @@ public final class OverlayController {
     }
     askingDisplay = nil
     timeline.dismissDisplayCheck()
-    render()
+    pump()
   }
 
   // MARK: Layout
 
   /// Every plate on its screen, docked and stacked.
   func placements() -> [PlatePlacement] {
-    let all = screens.screens
-    guard let fallback = all.first(where: { $0.id == screens.mainScreenID }) ?? all.first else { return [] }
+    let all = screenList
+    guard let fallback = all.first(where: { $0.id == mainScreenID }) ?? all.first else { return [] }
     let now = clock.now
     var used: [String: Int] = [:]
     var levelFrames: [String: (CGRect, Zone?)] = [:]
@@ -254,7 +318,7 @@ public final class OverlayController {
 
   private func render() {
     guard isRunning else { return }
-    presenter.present(placements(), screens: screens.screens) { [weak self] responds in
+    presenter.present(placements(), screens: screenList) { [weak self] responds in
       self?.answerDisplayCheck(responds)
     }
   }
@@ -336,7 +400,7 @@ final class LiveScreens: OverlayScreenProviding {
 
 @MainActor
 final class RunLoopClock: OverlayClock {
-  /// About 30 ticks a second: smooth 200 ms fades, cheap when nothing is up.
+  /// About 30 ticks a second: smooth 200 ms fades. Runs only while a plate is up (batch 28).
   static let interval: TimeInterval = 1.0 / 30
   private var timer: Timer?
 
