@@ -41,6 +41,7 @@ Source: design supplement 2 (artboard S11 for actions, S12 for the split control
 | `url-open.svg` | `url.open` | Open URL | Apps |
 | `file-open.svg` | `file.open` | Open File or Folder | Apps |
 | `apps-switcher.svg` | `apps.switcher` | Switch Apps | Apps |
+| `app-last.svg` | `app.last` *(id per the runtime)* | Last App | Apps |
 | `keyboard-shortcut.svg` | `keyboard.shortcut` | Keyboard Shortcut | Keyboard |
 | `keyboard-slide-steps.svg` | `keyboard.slideSteps` | Slide to Repeat Keys | Keyboard |
 | `keyboard-hold.svg` | `keyboard.hold` | Hold Keys | Keyboard |

@@ -262,6 +262,13 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
   - Modifiers you're holding appear live in `ink2` as you press them, and turn `ink` when the combo commits.
   - Esc cancels. ⌫ while idle clears. Recording swallows the keys, so nothing reaches the app.
 - **Right-hand modifiers** show as "Right ⌘" or "Right ⌥" when the runtime distinguishes them.
+- **Key sequences (Keyboard Shortcut only; owner request 2026-11-09).** One gesture can send up to **4 shortcuts in order** (e.g. a terminal prefix, then a command):
+  - **One shortcut looks and works exactly as today.** A sequence is opt-in.
+  - After a combo commits, a quiet **"+ Then…"** text button (`ink2`, tooltip "Send another shortcut after this one") appears right of the field. Clicking it records the next step, exactly like the first. It's hidden at 4 steps. Recording still ends when each combo commits; there's no open-ended "keep recording" mode.
+  - **Display:** steps as separate keycap groups separated by **", "**: "⌃B, N". That's the same in the field, on the pad tab ("⌃B, N", which is the parameter's short value per bone 3, with the 12 pt fade if long), on the plates ("Pressed ⌃B, N"; dry run "Would press ⌃B, N") and on the inspector sub-line.
+  - **Editing:** ⌫ while the field is idle removes the **last step** (with one step left, it clears it, as today). Esc cancels only the step being recorded. Each step can't be edited on its own in v1: remove back to it and re-record.
+  - **Modifiers alone** are not allowed as a step (that's Hold Keys' job); the inline error is the existing one.
+  - No helper line (the batch-20 helper rule stays limited to tuning rows). The button and its tooltip explain themselves.
 - **Hold Keys with no keys yet:** under the recorder, an `ink2` line (13): **"Press the shortcut your app uses while held. For a key like fn alone, hold it a second, then let go."** No suggestion chip. The line disappears once a combo is recorded.
 - **Modifiers alone:**
   - On a **hold** action (push-to-talk), releasing all held modifiers after holding them ≥0.6 s commits them ("fn", "⌃⌥").
@@ -490,12 +497,12 @@ The owner found the picker cluttered and asked for more order, "maybe adding ico
 | Media | play-pause · skip-forward · skip-back |
 | System | a 2×2 window grid (Mission Control) · stacked windows (App Windows) · desktop with windows pushed aside (Show Desktop) · a screen with a side arrow (Space Left / Right, mirrored) · padlock (Lock Screen) · moon (Sleep Display) · mic with sound waves (Dictation) |
 | Windows | one window glyph with the target region filled: left half, right half, top half, bottom half, full (Maximize), centred box (Center), a bar at the bottom (Minimize), and an outline with a return hook (Restore) |
-| Apps | a rounded tile (Open App) · a chain link (Open URL) · a folder (Open File or Folder) · two overlapping tiles (Switch Apps) |
+| Apps | a rounded tile (Open App) · a tile with a return hook arrow (**Last App**: back to the app you used before; `assets/icons/app-last.svg`) · two overlapping tiles (Switch Apps) · a chain link (Open URL) · a folder (Open File or Folder) |
 | Keyboard | a keycap (Keyboard Shortcut) · a keycap with up/down ticks (Slide to Repeat Keys) · a keycap pressed down (Hold Keys) |
 | Shortcuts | three stacked rounded steps (Run Shortcut) |
 | — | a circle with a slash (Do nothing here) |
 
-**Order within a group:** the icon table's order (most-used first), never alphabetical. Search results keep it.
+**Order within a group:** the icon table's order (most-used first), never alphabetical. Search results keep it. **Last App** has no sub-line (the name is self-explanatory), and search also matches it on back, previous, return, toggle.
 
 **Group rhythm:**
 - Group headers are 11 pt semibold `ink2` with 14 pt above and 4 pt below.
