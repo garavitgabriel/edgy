@@ -8,7 +8,7 @@ import Testing
 @testable import EdgyUI
 
 /// Batch 29 plates (BRIEF § Your own name and icon, § Key sequences): a custom name is the whole
-/// value line with no verb; a key sequence reads "Pressed ⌃ B, N". The second line never changes.
+/// value line with no verb; a key sequence reads "Pressed ⌃B, N". The second line never changes.
 @MainActor
 @Suite(.serialized)
 struct Batch29OverlayTests {
@@ -23,6 +23,12 @@ struct Batch29OverlayTests {
 
   static let playNamed = EdgyCore.Binding(
     zone: corner, gesture: .doubleTap, action: BuiltInAction.playPause, customName: "Dictate")
+
+  /// The shots' custom-named trigger (critique 29 should-fix 5: "Dictate" is the long-press Hold
+  /// Keys binding, which can't take a double-tap): Open App named "Notes" on the double-tap.
+  static let notes = EdgyCore.Binding(
+    zone: corner, gesture: .doubleTap, action: BuiltInAction.openApp,
+    parameters: ["bundleID": "com.example.quillpad"], customName: "Notes")
 
   static let sequence = EdgyCore.Binding(
     zone: .edge(.top), gesture: .tap, action: BuiltInAction.keyboardShortcut, parameters: ["keys": "ctrl+b n"])
@@ -51,7 +57,13 @@ struct Batch29OverlayTests {
     #expect(
       plate(.actionRan(BuiltInAction.openApp, zone: Self.corner, kind: .tap), context: Self.context(app))?.title
         == "Write")
-    try shoot([content], "plate-custom-run")
+    // Before critique 29 should-fix 5 the shot showed "Dictate" on the double-tap:
+    // try shoot([content], "plate-custom-run")
+    let notes = try #require(
+      plate(.actionRan(BuiltInAction.openApp, zone: Self.corner, kind: .doubleTap), context: Self.context(Self.notes)))
+    #expect(notes.title == "Notes")
+    #expect(notes.detail == "Bottom-right corner, double-tap")
+    try shoot([notes], "plate-custom-run")
   }
 
   @Test func holdPlateReadsHeldThenReleased() throws {
@@ -93,7 +105,14 @@ struct Batch29OverlayTests {
       dryRun: true)
     #expect(held?.title == "Would hold Dictate")
     #expect(held?.released(cancelled: false)?.title == "Would release Dictate")
-    try shoot([content], "plate-custom-dry-run")
+    // Before critique 29 should-fix 5 the shot showed "Would run Dictate" on the double-tap:
+    // try shoot([content], "plate-custom-dry-run")
+    let notes = try #require(
+      plate(
+        .wouldRun(BuiltInAction.openApp, zone: Self.corner, kind: .doubleTap), context: Self.context(Self.notes),
+        dryRun: true))
+    #expect(notes.title == "Would run Notes")
+    try shoot([notes], "plate-custom-dry-run")
   }
 
   @Test func withoutACustomNameNothingChanges() {
@@ -124,23 +143,31 @@ struct Batch29OverlayTests {
       plate(
         .actionRan(BuiltInAction.keyboardShortcut, zone: .edge(.top), kind: .tap), context: Self.context(Self.sequence))
     )
-    #expect(ran.title == "Pressed ⌃ B, N")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(ran.title == "Pressed ⌃ B, N")
+    #expect(ran.title == "Pressed ⌃B, N")
     #expect(ran.detail == "Top edge, tap")
     let dry = try #require(
       plate(
         .wouldRun(BuiltInAction.keyboardShortcut, zone: .edge(.top), kind: .tap), context: Self.context(Self.sequence),
         dryRun: true))
-    #expect(dry.title == "Would press ⌃ B, N")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(dry.title == "Would press ⌃ B, N")
+    #expect(dry.title == "Would press ⌃B, N")
     // One combo is unchanged when run, and reads "Would press" in dry run (BRIEF § Key sequences).
     var single = Self.sequence
     single.parameters = ["keys": "cmd+shift+4"]
     #expect(
       plate(.actionRan(BuiltInAction.keyboardShortcut, zone: .edge(.top), kind: .tap), context: Self.context(single))?
-        .title == "Pressed ⇧⌘ 4")
+        // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+        // .title == "Pressed ⇧⌘ 4")
+        .title == "Pressed ⇧⌘4")
     #expect(
       plate(
         .wouldRun(BuiltInAction.keyboardShortcut, zone: .edge(.top), kind: .tap), context: Self.context(single),
-        dryRun: true)?.title == "Would press ⇧⌘ 4")
+        // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+        // dryRun: true)?.title == "Would press ⇧⌘ 4")
+        dryRun: true)?.title == "Would press ⇧⌘4")
     #expect(PlateNaming.keys(["keys": "ctrl+b nope+"]) == nil)
     try shoot([ran, dry], "plate-sequence")
   }

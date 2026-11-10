@@ -341,10 +341,16 @@ import Testing
   }
 
   @Test func combosShowAsKeySymbols() {
-    #expect(KeyComboText.display("ctrl+opt+space") == "⌃⌥ Space")
-    #expect(KeyComboText.display("cmd+shift+4") == "⇧⌘ 4")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(KeyComboText.display("ctrl+opt+space") == "⌃⌥ Space")
+    #expect(KeyComboText.display("ctrl+opt+space") == "⌃⌥Space")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(KeyComboText.display("cmd+shift+4") == "⇧⌘ 4")
+    #expect(KeyComboText.display("cmd+shift+4") == "⇧⌘4")
     #expect(KeyComboText.display("fn") == "fn")
     #expect(KeyComboText.display("ctrl+opt") == "⌃⌥")
-    #expect(KeyComboText.display("fn+ctrl+f5") == "fn ⌃ F5")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(KeyComboText.display("fn+ctrl+f5") == "fn ⌃ F5")
+    #expect(KeyComboText.display("fn+ctrl+f5") == "fn ⌃F5")
   }
 }

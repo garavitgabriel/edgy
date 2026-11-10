@@ -27,7 +27,9 @@ struct Batch21MirrorTests {
     // Before the target ruling (BRIEF § Bindings that name their target, batch 29: the target is the primary text):
     // #expect(ZoneLabel.text(for: [shortcut], catalog: catalog) == "Keyboard Shortcut")
     // #expect(ZoneLabel.shorterForms(for: [shortcut], catalog: catalog) == ["⌃⌥ Space"])
-    #expect(ZoneLabel.text(for: [shortcut], catalog: catalog) == "⌃⌥ Space")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(ZoneLabel.text(for: [shortcut], catalog: catalog) == "⌃⌥ Space")
+    #expect(ZoneLabel.text(for: [shortcut], catalog: catalog) == "⌃⌥Space")
     #expect(ZoneLabel.shorterForms(for: [shortcut], catalog: catalog).isEmpty)
     // No value yet: the short name keeps the "needs a parameter" ellipsis, nothing else gets one.
     let empty = Binding(zone: zone, gesture: .doubleTap, action: "keyboard.shortcut")
@@ -45,7 +47,9 @@ struct Batch21MirrorTests {
   }
 
   @Test func fitPicksTheFirstFormThatFitsElseClipsTheLastWithoutEllipsis() {
-    let forms = ["Keyboard Shortcut, Next Track and Play/Pause", "⌘ Left, Next Track and Play/Pause"]
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo; critique 29 must-fix 3: arrows as ←→↑↓; critique 29 design answer 1: combined edge labels never use commas:
+    // let forms = ["Keyboard Shortcut, Next Track and Play/Pause", "⌘ Left, Next Track and Play/Pause"]
+    let forms = ["Keyboard Shortcut and 2 more", "⌘← and 2 more"]
     let wide = MirrorPad.fit(forms, room: 1000)
     #expect(wide == MirrorPad.FittedLabel(text: forms[0], clipWidth: nil))
     let middle = MirrorPad.fit(forms, room: MirrorPad.textWidth(forms[1]) + 1)
@@ -63,8 +67,13 @@ struct Batch21MirrorTests {
     let part = Zone.edge(.bottom, segment: 1, segments: 4)
     config.defaultProfile.bindings += [
       Binding(zone: part, gesture: .swipe(.left), action: "keyboard.shortcut", parameters: ["keys": "cmd+left"]),
-      Binding(zone: part, gesture: .swipe(.right), action: "media.next"),
-      Binding(zone: part, gesture: .doubleTap, action: "media.playPause"),
+      // Before critique 29 design answer 1 ("A and 2 more" now fits a quarter bar), the label
+      // was long through three names:
+      // Binding(zone: part, gesture: .swipe(.right), action: "media.next"),
+      // Binding(zone: part, gesture: .doubleTap, action: "media.playPause"),
+      Binding(
+        zone: part, gesture: .doubleTap, action: "url.open",
+        parameters: ["url": "https://documentation.example.com"]),
     ]
     let model = PreviewFixtures.model(config: config)
     let mirror = pad(model)
@@ -72,7 +81,9 @@ struct Batch21MirrorTests {
     let fitted = mirror.fittedLabel(zone, placement: mirror.labelPlacement(zone))
     #expect(fitted.clipWidth != nil)
     #expect(!fitted.text.contains("…"))
-    #expect(fitted.text.hasPrefix("⌘ Left"))
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo; critique 29 must-fix 3: arrows as ←→↑↓:
+    // #expect(fitted.text.hasPrefix("⌘ Left"))
+    #expect(fitted.text.hasPrefix("⌘←"))
   }
 
   // MARK: Tab and zone as one shape

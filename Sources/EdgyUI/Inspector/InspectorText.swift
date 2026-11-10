@@ -1,3 +1,4 @@
+import Actions
 import EdgyCore
 import EdgyRuntime
 import Foundation
@@ -252,49 +253,24 @@ enum IssueCopy {
   }
 }
 
-/// Key combos as system key symbols plus the key name: "⌃⌥ Space", "⇧⌘ 4", "fn".
-enum KeyComboText {
-  static func symbols(_ modifiers: Set<KeyCombo.Modifier>) -> String {
-    var text = modifiers.contains(.fn) ? "fn" : ""
-    let symbols: [(KeyCombo.Modifier, String)] = [(.ctrl, "⌃"), (.opt, "⌥"), (.shift, "⇧"), (.cmd, "⌘")]
-    let rest = symbols.filter { modifiers.contains($0.0) }.map(\.1).joined()
-    if !rest.isEmpty { text += text.isEmpty ? rest : " \(rest)" }
-    return text
-  }
-
-  static func display(_ combo: KeyCombo) -> String {
-    let mods = symbols(combo.modifiers)
-    guard let key = combo.key else { return mods }
-    let name = keyName(key)
-    return mods.isEmpty ? name : "\(mods) \(name)"
-  }
-
-  /// Display text for a stored combo string; the raw text when it doesn't parse. A key sequence
-  /// (Keyboard Shortcut, "ctrl+b n") shows as keycap groups joined by ", ": "⌃ B, N" (BRIEF § Key
-  /// sequences), the same in the field, the pad tab, the sub-line and the plates.
+/// Stored `keys` text → the one formatter (`Actions.KeyComboText.text`, BRIEF "How a key combo is
+/// written"). This extension only parses; it writes no text of its own.
+extension KeyComboText {
+  /// Display text for a stored combo or sequence ("ctrl+b n" → "⌃B, N"); the raw text when it
+  /// doesn't parse.
   static func display(_ stored: String) -> String {
-    if let combo = KeyCombo(stored) { return display(combo) }
-    let steps = ConfigValidator.keySteps(stored).map { KeyCombo($0) }
-    guard steps.count > 1, !steps.contains(nil) else { return stored }
-    return steps.compactMap { $0.map(display) }.joined(separator: ", ")
+    text(steps: ConfigValidator.keySteps(stored)) ?? stored
+  }
+
+  /// Held modifiers while recording ("⌃⌥", "fn ⌃"); empty when none.
+  static func held(_ modifiers: Set<KeyCombo.Modifier>) -> String {
+    KeyCombo(modifiers: modifiers).map(text) ?? ""
   }
 
   /// The stored steps of a `keys` value ("ctrl+b n" → ["ctrl+b", "n"]); empty for an empty value.
   static func steps(_ stored: String) -> [String] {
     let trimmed = stored.trimmingCharacters(in: .whitespaces)
     return trimmed.isEmpty ? [] : ConfigValidator.keySteps(trimmed)
-  }
-
-  static func keyName(_ key: String) -> String {
-    let named: [String: String] = [
-      "return": "Return", "tab": "Tab", "space": "Space", "delete": "Delete", "forwarddelete": "Forward Delete",
-      "escape": "Esc", "left": "Left Arrow", "right": "Right Arrow", "up": "Up Arrow", "down": "Down Arrow",
-      "home": "Home", "end": "End", "pageup": "Page Up", "pagedown": "Page Down", "minus": "-", "equal": "=",
-      "leftbracket": "[", "rightbracket": "]", "backslash": "\\", "semicolon": ";", "quote": "'", "comma": ",",
-      "period": ".", "slash": "/", "grave": "`",
-    ]
-    if let name = named[key] { return name }
-    return key.uppercased()
   }
 }
 
@@ -320,7 +296,7 @@ enum BindingNaming {
 
   /// The target a binding names, short: Open App → the app's name, Open URL → the host without
   /// "www.", Open File or Folder → the last path component, Keyboard Shortcut / Hold Keys → the keys
-  /// ("⌃ Tab", "⌃ B, N", "fn Space"). `nil` when the action names no target or it's still empty.
+  /// ("⌃Tab", "⌃B, N", "fn Space"). `nil` when the action names no target or it's still empty.
   static func target(_ binding: Binding, appName: (String) -> String = MirrorCopy.appName) -> String? {
     let raw = { (key: String) -> String? in
       let value = (binding.parameters[key] ?? "").trimmingCharacters(in: .whitespaces)

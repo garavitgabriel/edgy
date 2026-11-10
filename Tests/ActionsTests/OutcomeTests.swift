@@ -102,7 +102,8 @@ private func externalHarness(_ display: DisplayInfo = desk, settings: AppSetting
     #expect(try report(h, "keyboard.hold", .press(down: true), ["keys": "fn"]) == ActionOutcome(detail: "fn"))
     _ = try report(h, "keyboard.hold", .press(down: false), ["keys": "fn"])
     #expect(
-      try report(h, "keyboard.hold", .press(down: true), ["keys": "ctrl+opt+space"])?.detail == "⌃⌥ Space")
+      try report(h, "keyboard.hold", .press(down: true), ["keys": "ctrl+opt+space"])?.detail == "⌃⌥Space")
+    // Before BRIEF's combo ruling (critique 29 must-fix 1, no space before the key): "⌃⌥ Space".
     _ = try report(h, "keyboard.hold", .press(down: false))
   }
 
@@ -131,12 +132,16 @@ private func externalHarness(_ display: DisplayInfo = desk, settings: AppSetting
       try report(h, "keyboard.slideSteps", .delta(0, phase: .began), ["upKeys": "up", "downKeys": "down"]) == nil)
   }
 
+  /// Was `KeyCombo.displayText`, deleted by critique 29 must-fix 2 (one formatter). The old
+  /// expectations stay beside the ruled ones: "⇧⌘ 4" (must-fix 1) and "fn⌃" (must-fix 2).
   @Test func displayTextOrdersModifiersLikeTheSystem() {
-    #expect(KeyCombo("cmd+shift+4")?.displayText == "⇧⌘ 4")
-    #expect(KeyCombo("ctrl+opt")?.displayText == "⌃⌥")
-    #expect(KeyCombo("fn+ctrl")?.displayText == "fn⌃")
-    #expect(KeyCombo("f5")?.displayText == "F5")
-    #expect(KeyCombo("a")?.displayText == "A")
+    // #expect(KeyCombo("cmd+shift+4")?.displayText == "⇧⌘ 4")
+    #expect(KeyCombo("cmd+shift+4").map(KeyComboText.text) == "⇧⌘4")
+    #expect(KeyCombo("ctrl+opt").map(KeyComboText.text) == "⌃⌥")
+    // #expect(KeyCombo("fn+ctrl")?.displayText == "fn⌃")
+    #expect(KeyCombo("fn+ctrl").map(KeyComboText.text) == "fn ⌃")
+    #expect(KeyCombo("f5").map(KeyComboText.text) == "F5")
+    #expect(KeyCombo("a").map(KeyComboText.text) == "A")
   }
 }
 

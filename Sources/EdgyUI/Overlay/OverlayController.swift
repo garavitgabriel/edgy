@@ -91,6 +91,8 @@ public final class OverlayController {
   private let clock: OverlayClock
   private let log = Logger(subsystem: "com.garavit.edgy", category: "overlay")
   private(set) var timeline = OverlayTimeline()
+  /// Keeps a re-trigger quiet while a key sequence is still sending (batch 33 fix 4).
+  private(set) var sequenceQuiet = SequenceQuiet()
   private var isRunning = false
   /// The clock is ticking (a plate is up, fading, or the display check is asked).
   private(set) var isTicking = false
@@ -225,6 +227,7 @@ public final class OverlayController {
         continue
       }
       if content.isTestModeOnly && !showsTestModePlates { continue }
+      if !dryRun, !sequenceQuiet.admits(decision, context: context, now: now) { continue }
       if case .displayCheck(let key) = content.kind {
         guard askDisplayCheck(key: key, name: content.displayName ?? "") else { continue }
       }

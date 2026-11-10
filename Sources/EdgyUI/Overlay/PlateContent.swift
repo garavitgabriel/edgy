@@ -210,7 +210,7 @@ extension PlateContent {
   }
 
   /// A trigger's run line: the catalog name ("Play/Pause"), or what it did with its parameter
-  /// ("Opened Quillpad", "Pressed ⇧⌘ 4").
+  /// ("Opened Quillpad", "Pressed ⇧⌘4").
   private static func runTitle(
     _ id: ActionID, parameters: [String: String], catalog: [ActionID: ActionDescriptor], context: PlateContext
   ) -> String {

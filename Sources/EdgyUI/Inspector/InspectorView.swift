@@ -302,14 +302,16 @@ struct BindingRowView: View {
   }
 
   /// "Default: X" under an overridden or turned-off row (with **Revert** trailing when the row had
-  /// no room for it), and "from Default" when it moved off the row.
+  /// no room for it), and "from Default" when it moved off the row. Every sub-line is
+  /// left-aligned under the gesture name (critique 29 should-fix 1).
   @ViewBuilder private func subLines(inline: Bool) -> some View {
     if customNamed, !isPicking {
       // "Hold Keys: fn Space": the real action and its parameter, so a custom name is never a mystery.
+      // Left, under the gesture name, like "Default: …" (critique 29 should-fix 1).
       HStack {
-        Spacer(minLength: 0)
         Text(BindingRowView.subLine(row.binding, model: model) ?? "").foregroundStyle(Tokens.ink2)
-          .multilineTextAlignment(.trailing)
+          .multilineTextAlignment(.leading)
+        Spacer(minLength: 0)
       }
     }
     if let base = row.defaultBinding, row.source == .overridden || row.source == .turnedOff {
@@ -323,14 +325,14 @@ struct BindingRowView: View {
       }
     } else if row.source == .inherited, !inline, !isPicking {
       HStack {
-        Spacer(minLength: 0)
         Text("from Default").foregroundStyle(Tokens.ink2)
+        Spacer(minLength: 0)
       }
     }
   }
 
   /// The custom-name sub-line: the real action, then its parameter's short value when it has one
-  /// ("Hold Keys: fn Space", "Keyboard Shortcut: ⌃ B, N"), or "Needs keys" when it's still empty.
+  /// ("Hold Keys: fn Space", "Keyboard Shortcut: ⌃B, N"), or "Needs keys" when it's still empty.
   /// The sub-line under a row whose text isn't the action's name: a custom name gets the real
   /// action and parameter ("Hold Keys: fn Space"); a target gets the action ("Open App").
   static func subLine(_ binding: EdgyCore.Binding, model: SettingsModel) -> String? {

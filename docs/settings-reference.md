@@ -293,7 +293,7 @@ stays one step, so an older `"cmd + 4"` is still one combo). Every step must par
 modifier-only step is refused with `invalidKeyCombo` + `modifierOnlyNeedsHold`, more than 4 steps is
 `keySequenceTooLong`, and a second step anywhere else (Hold Keys, Slide to Repeat Keys) is
 `keySequenceNotAllowed`. `ConfigValidator.keySteps(_:)` splits a value; `checkKeys(_:allowsSequence:hold:)`
-checks one. The UI shows steps as keycap groups joined by ", " ("⌃ B, N").
+checks one. The UI shows steps as keycap groups joined by ", " ("⌃B, N").
 
 ### Your own name and icon (`Binding.customName`, `Binding.customIcon`)
 
@@ -361,7 +361,7 @@ These live on `Engine`, not in the config.
 | `display.brightness`, built-in | after the change | — | true while `hud` is `native` |
 | `display.brightness`, external | after the change | the display's name | false (Edgy draws the level plate) |
 | `keyboard.backlight` | after the change | — | false |
-| `keyboard.hold` | — | the combo as read: "fn", "⌃⌥ Space", "⇧⌘ 4" | false |
+| `keyboard.hold` | — | the combo as read: "fn", "⌃⌥Space", "⇧⌘4" (`KeyComboText.text`, the one formatter) | false |
 | `apps.switcher` | — | — | true (the system's switcher is the feedback) |
 | everything else | `nil` outcome | | |
 

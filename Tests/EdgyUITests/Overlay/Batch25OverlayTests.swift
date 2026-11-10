@@ -33,7 +33,9 @@ import Testing
 
   @Test func parameterRunsArePastTenseWithTheirObject() {
     #expect(title(BuiltInAction.openApp, .corner(.bottomRight), .doubleTap) == "Opened Quillpad")
-    #expect(title(BuiltInAction.keyboardShortcut, .edge(.top), .tap) == "Pressed ⇧⌘ 4")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(title(BuiltInAction.keyboardShortcut, .edge(.top), .tap) == "Pressed ⇧⌘ 4")
+    #expect(title(BuiltInAction.keyboardShortcut, .edge(.top), .tap) == "Pressed ⇧⌘4")
     #expect(title(BuiltInAction.runShortcut, .corner(.topLeft), .doubleTap) == "Ran Morning lights")
     // A plain trigger stays bare: the catalog name, no verb.
     #expect(title(BuiltInAction.playPause, .edge(.bottom), .tap) == "Play/Pause")
@@ -45,7 +47,9 @@ import Testing
       PlateView(mark: .level(0.4), title: "Brightness 40%", detail: "Desk 34")
       PlateView(mark: .rejected, title: "Ignored: palm, 21 mm wide, limit 18 mm")
       PlateView(mark: .recognized, title: "Opened Quillpad", detail: "Bottom-right corner, double-tap")
-      PlateView(mark: .recognized, title: "Pressed ⇧⌘ 4", detail: "Top edge, tap")
+      // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+      // PlateView(mark: .recognized, title: "Pressed ⇧⌘ 4", detail: "Top edge, tap")
+      PlateView(mark: .recognized, title: "Pressed ⇧⌘4", detail: "Top edge, tap")
       PlateView(mark: .recognized, title: "Ran Morning lights", detail: "Top-left corner, double-tap")
       PlateView(mark: .recognized, title: "Play/Pause", detail: "Bottom edge, tap")
     }

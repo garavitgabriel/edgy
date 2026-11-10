@@ -184,14 +184,12 @@ enum PlateNaming {
     id == BuiltInAction.keyboardBacklight ? "Keyboard" : name(id, catalog: catalog)
   }
 
-  /// The keys as the user reads them ("fn", "⌃⌥ Space"), from the binding's `keys`. A key
-  /// sequence (Keyboard Shortcut, BRIEF § Key sequences) reads as its combos joined by ", "
-  /// ("⌃ B, N"). `nil` when the value is missing or any step doesn't parse.
+  /// The keys as the user reads them ("fn", "⌃⌥Space", "⌃B, N"), from the binding's `keys`,
+  /// through the one formatter (`KeyComboText`). `nil` when the value is missing or any step
+  /// doesn't parse.
   static func keys(_ parameters: [String: String]) -> String? {
     guard let stored = parameters[ActionParameterKey.keys] else { return nil }
-    let steps = ConfigValidator.keySteps(stored).map { KeyCombo($0) }
-    guard !steps.isEmpty, !steps.contains(nil) else { return nil }
-    return steps.compactMap { $0?.displayText }.joined(separator: ", ")
+    return KeyComboText.text(steps: ConfigValidator.keySteps(stored))
   }
 
   /// The object of "open": the app's name, the URL's host, the file's name.

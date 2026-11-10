@@ -85,7 +85,9 @@ import Testing
     #expect(BindingRowView.realAction(try row(model).binding, model: model) == "Hold Keys: fn Space")
     let shortcut = EdgyCore.Binding(
       zone: .corner(.bottomRight), gesture: .longPress, action: "keyboard.shortcut", parameters: ["keys": "ctrl+b n"])
-    #expect(BindingRowView.realAction(shortcut, model: model) == "Keyboard Shortcut: ⌃ B, N")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(BindingRowView.realAction(shortcut, model: model) == "Keyboard Shortcut: ⌃ B, N")
+    #expect(BindingRowView.realAction(shortcut, model: model) == "Keyboard Shortcut: ⌃B, N")
     let empty = EdgyCore.Binding(zone: .corner(.bottomRight), gesture: .longPress, action: "keyboard.hold")
     #expect(BindingRowView.realAction(empty, model: model) == "Hold Keys: Needs keys")
     let mute = EdgyCore.Binding(zone: .corner(.bottomRight), gesture: .tap, action: "audio.mute")
@@ -165,8 +167,12 @@ import Testing
     }
     #expect(target("url.open", "url", "https://www.example.org/a") == "example.org")
     #expect(target("file.open", "path", "~/Documents/Notes") == "Notes")
-    #expect(target("keyboard.shortcut", "keys", "ctrl+tab") == "⌃ Tab")
-    #expect(target("keyboard.shortcut", "keys", "ctrl+b n") == "⌃ B, N")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(target("keyboard.shortcut", "keys", "ctrl+tab") == "⌃ Tab")
+    #expect(target("keyboard.shortcut", "keys", "ctrl+tab") == "⌃Tab")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(target("keyboard.shortcut", "keys", "ctrl+b n") == "⌃ B, N")
+    #expect(target("keyboard.shortcut", "keys", "ctrl+b n") == "⌃B, N")
     #expect(target("keyboard.hold", "keys", "fn+space") == "fn Space")
     #expect(target("audio.mute", "keys", "a") == nil)
   }
