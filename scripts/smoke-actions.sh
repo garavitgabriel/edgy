@@ -7,7 +7,8 @@
 # checks the native volume HUD with headphones, drives the app switcher, holds a key, toggles
 # Dictation, the keyboard backlight, and snaps a full-screen window. v0.4 steps (24+): fn-only
 # push-to-talk, the hold watchdog, the key recorder (needs Input Monitoring for your terminal
-# app), and the installed-apps and Shortcuts listings. It asks before each step and
+# app), and the installed-apps and Shortcuts listings. Batch 32 steps (35+): key sequences
+# into a terminal multiplexer and a text field, and Last App. It asks before each step and
 # restores prior values at the end (levels also on Ctrl-C); it closes the document it opened.
 #
 # Media keys, key shortcuts and window snapping need Accessibility for your terminal app (System Settings → Privacy & Security →
@@ -511,6 +512,64 @@ if ask("34. Switch Apps opens on travel, never on contact: rest, tap, a short nu
   settle(1.0)
   print("  Did the switcher open on the next app with the one 8 mm step, and pick it about 0.4 s later?")
   print("  On the real pad: rest a finger on the switcher edge, tap it, nudge it; only a real slide opens it.")
+}
+// Batch 32: key sequences (Keyboard Shortcut, up to 4 combos 40 ms apart) and Last App.
+/// True when the system still sees a modifier down (nothing should be stuck after a sequence).
+func modifiersStuck() -> Bool {
+  let flags = CGEventSource.flagsState(.combinedSessionState)
+  return !flags.intersection([.maskControl, .maskAlternate, .maskShift, .maskCommand, .maskSecondaryFn]).isEmpty
+}
+if ask("35. Two-step sequence into a terminal multiplexer: its prefix, then c (new window). Prefix [ctrl+b]:") {
+  let typed = (readLine() ?? "").trimmingCharacters(in: .whitespaces)
+  let prefix = typed.isEmpty ? "ctrl+b" : typed
+  print("  Click into a terminal running the multiplexer within 5 s (hands off the keyboard).")
+  settle(5.0)
+  fire("keyboard.shortcut", ["keys": "\(prefix) c"])
+  settle(1.0)
+  print("  Did it open a new multiplexer window (not type a literal c)? Modifiers stuck: \(modifiersStuck())")
+  print("  Then: trigger it twice quickly by hand from a bound zone; the second press is ignored while it sends.")
+}
+if ask("36. Four-step sequence into a text field: h, i, shift+1, return (types \"hi!\" and a new line)?") {
+  if openedDocument {
+    fire("app.open", ["bundleID": textEdit, "whenFrontmost": "stay"])
+    settle(1.0)
+  } else {
+    print("  Click into any text field within 5 s.")
+    settle(5.0)
+  }
+  fire("keyboard.shortcut", ["keys": "h i shift+1 return"])
+  settle(1.0)
+  print("  Did it type \"hi!\" then a new line, in order? Modifiers stuck: \(modifiersStuck()) (expect false).")
+  print("  Type a letter yourself: it should come out lowercase (shift not stuck).")
+}
+if ask("37. Last App: back and forth between two apps, then after one of them quits?") {
+  // Its own registry with the live activation tracker (the shared one above has none).
+  let tracked = ActionRegistry(
+    settings: .defaults, audio: audio, display: display, media: LiveMediaKeyOutput(), hud: hud,
+    haptics: haptics, shortcuts: LiveShortcutRunner(), keyboard: keyboard, workspace: workspace,
+    windows: windows, system: LiveSystemOutput(keyboard: keyboard), levelKeys: levelKeys,
+    displays: makeLiveDisplayBrightness(), backlight: backlight, dictation: LiveDictationOutput(),
+    waiter: LiveTransitionWaiter(), scheduler: LiveActionScheduler(), apps: LiveAppActivations())
+  func last(_ label: String) {
+    check(label) {
+      try tracked.perform("app.last", input: .trigger, context: ActionContext(frontmostBundleID: nil, parameters: [:]))
+    }
+  }
+  print("  Click app A, wait, then click app B, within 8 s (two regular apps, both left running).")
+  settle(8.0)
+  last("back to A")
+  settle(1.5)
+  print("  Is app A in front, with no switcher shown?")
+  last("back to B")
+  settle(1.5)
+  print("  Is app B in front again?")
+  print("  Now quit app A (cmd+q in it, or from the Dock) within 10 s, then click app B again.")
+  settle(10.0)
+  last("after A quit")
+  settle(1.5)
+  print("  Did it go to the app you used before A (or do nothing if there was none), never relaunch A?")
+  print("  Logs say which path ran (\"was refused; pressing the switcher shortcut\" means the fallback):")
+  print("    /usr/bin/log show --last 2m --predicate 'subsystem == \"com.garavit.edgy\"' --info | grep 'last app'")
 }
 print("\nNot run here: system.lockScreen and system.sleepDisplay (they end the session). Bind them and try by hand.")
 

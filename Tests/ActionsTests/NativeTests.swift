@@ -283,7 +283,7 @@ private let panel = DisplayInfo(id: 1, name: "Built-in Display", kind: .builtIn,
       "spaces.left": Copy.spaceLeft, "spaces.right": Copy.spaceRight, "system.lockScreen": Copy.lockScreen,
       "system.dictation": Copy.dictation,
     ]
-    #expect(h.registry.available.count == 34)
+    #expect(h.registry.available.count == 35)
     for descriptor in h.registry.available {
       let id = descriptor.id.rawValue
       let expected: ActionAvailability = limited[id].map { .limited(reason: $0) } ?? .available

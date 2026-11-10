@@ -96,9 +96,18 @@ final class MockKeyboardOutput: KeyboardOutput {
   private(set) var heldKeys = Set<String>()
   /// Throws on the first low-level event equal to this (e.g. `"cmd+shift+tab down"`), once.
   var failOnEvent: String?
+  /// Fails the first `post` of this combo (e.g. `"ctrl+x"`), once, as if it broke halfway: its
+  /// modifiers and key are left down (batch 32: a sequence must release them).
+  var failOnPost: String?
 
   func post(_ combo: KeyCombo) throws {
     if let failure { throw failure }
+    if combo.description == failOnPost {
+      failOnPost = nil
+      heldModifiers.formUnion(combo.modifiers)
+      if let key = combo.key { heldKeys.insert(key) }
+      throw OutputError("post failed halfway")
+    }
     posted.append(combo.description)
   }
   func setModifiers(_ modifiers: [KeyCombo.Modifier], down: Bool) throws {
@@ -332,6 +341,7 @@ struct Harness {
   let waiter = MockTransitionWaiter()
   let scheduler = MockScheduler()
   let switcherInput = MockSwitcherInput()
+  let apps = MockAppActivations()
   let registry: ActionRegistry
 
   init(settings: AppSettings = .defaults, levelKeys working: Bool = false) {
@@ -340,7 +350,7 @@ struct Harness {
       settings: settings, audio: audio, display: display, media: media, hud: hud, haptics: haptics,
       shortcuts: shortcuts, keyboard: keyboard, workspace: workspace, windows: windows, system: system,
       levelKeys: levelKeys, displays: displays, backlight: backlight, dictation: dictation, waiter: waiter,
-      scheduler: scheduler, switcherInput: switcherInput)
+      scheduler: scheduler, switcherInput: switcherInput, apps: apps)
   }
 
   /// A slide update with the physical motion behind it (millimetres, a timestamp, an end).
@@ -455,4 +465,39 @@ final class MockSwitcherInput: SwitcherInputMonitor, @unchecked Sendable {
 
   /// Delivers an interrupt as the live monitor would (only while listening).
   func send(_ interrupt: SwitcherInterrupt) { handler?(interrupt) }
+}
+
+/// App activations, driven by the test (batch 32, `app.last`).
+final class MockAppActivations: AppActivationOutput, @unchecked Sendable {
+  let ownPID: Int32 = 999
+  private(set) var handler: (@Sendable (AppActivation) -> Void)?
+  var running = Set<Int32>()
+  var front: AppActivation?
+  /// The system refuses every activation (the switcher-shortcut fallback).
+  var refuses = false
+  /// Pids `activate` was asked for, in order.
+  private(set) var activated: [Int32] = []
+
+  func startObserving(_ handler: @escaping @Sendable (AppActivation) -> Void) { self.handler = handler }
+  func frontmost() -> AppActivation? { front }
+  func isRunning(_ app: AppActivation) -> Bool { running.contains(app.pid) }
+  func activate(_ app: AppActivation) -> Bool {
+    activated.append(app.pid)
+    guard !refuses, running.contains(app.pid) else { return false }
+    front = app
+    return true
+  }
+
+  /// The user brings an app to the front: it is frontmost and the tracker hears about it.
+  func userActivates(_ app: AppActivation) {
+    running.insert(app.pid)
+    front = app
+    handler?(app)
+  }
+
+  /// The app quits.
+  func quit(_ app: AppActivation) {
+    running.remove(app.pid)
+    if front?.pid == app.pid { front = nil }
+  }
 }

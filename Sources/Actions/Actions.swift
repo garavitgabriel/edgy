@@ -11,7 +11,10 @@ public enum ActionsInfo {
 /// The live action registry, backed by real system outputs. Only the app may call this;
 /// tests must build registries from mock outputs.
 ///
-/// Building the registry has no side effects: every output connects or loads on first use.
+/// Building the registry has no side effects on the system: every output connects or loads on
+/// first use. The one exception is listen-only: the Last App tracker starts observing the
+/// workspace's did-activate notification at once (event-driven, never polling), because it needs
+/// the apps used before its first trigger.
 /// The returned object is an `ActionRegistry`; the app can cast to it to update `settings`.
 public func makeLiveActionRegistry(settings: AppSettings) -> ActionPerforming {
   let keyboard = LiveKeyboardOutput()
@@ -22,5 +25,6 @@ public func makeLiveActionRegistry(settings: AppSettings) -> ActionPerforming {
     windows: LiveWindowOutput(), system: LiveSystemOutput(keyboard: keyboard), levelKeys: LiveLevelKeyOutput(),
     displays: makeLiveDisplayBrightness(), backlight: LiveKeyboardBacklightOutput(),
     dictation: LiveDictationOutput(), waiter: LiveTransitionWaiter(),
-    scheduler: LiveActionScheduler(), switcherInput: LiveSwitcherInputMonitor())
+    scheduler: LiveActionScheduler(), switcherInput: LiveSwitcherInputMonitor(),
+    apps: LiveAppActivations())
 }
