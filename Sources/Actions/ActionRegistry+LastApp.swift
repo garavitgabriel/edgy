@@ -20,7 +20,11 @@ extension ActionRegistry {
     appHistoryLock.lock()
     if let front { appHistory.record(front, ownPID: apps.ownPID) }
     let target = appHistory.previous(frontmostPID: front?.pid, isRunning: apps.isRunning)
+    let remembered = appHistory.recent.prefix(4).map { $0.bundleID ?? "pid \($0.pid)" }.joined(separator: " > ")
     appHistoryLock.unlock()
+    actionsLog.notice(
+      "last app: front \(front?.bundleID ?? "none", privacy: .public), remembered \(remembered, privacy: .public), going to \(target?.bundleID ?? "nothing", privacy: .public)"
+    )
     guard let target else {
       actionsLog.info("last app: no previous app; nothing to do")
       return
