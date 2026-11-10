@@ -295,8 +295,13 @@ struct FieldError: View {
 ///
 /// On a sequence field (Keyboard Shortcut's `keys`, BRIEF § Key sequences):
 /// - The value shows as keycap groups joined by ", " ("⌃B, N").
-/// - "+ Then…" (quiet `ink2`) sits right of the field once a combo is set, and records the next
-///   step. It's hidden while recording and at 4 steps.
+/// - "Add another key" (the bordered button, `ink` label) sits on its own line under the field,
+///   left-aligned with it, once a combo is set, and records the next step. It's hidden while
+///   recording and at 4 steps. It never sits beside the field: at the inspector's width the field,
+///   its label and the button don't fit one row, so it takes this one layout at every width and the
+///   field never moves (owner ruling 2026-11-10, replacing the quiet "+ Then…").
+/// - Under it, "Sends these one after another." (13, `ink2`) while the button shows or the value has
+///   2+ steps. Not while recording.
 /// - ⌫ while idle removes the last step.
 /// - While recording, "Use Escape" sits under the field: Esc itself cancels, so this commits
 ///   `escape` as the step (§ Recording Escape itself).
@@ -327,8 +332,11 @@ struct KeyRecorderField: View {
   }
 
   static let width: CGFloat = 170
-  static let thenLabel = "+ Then…"
+  // Before the owner ruling 2026-11-10 (the quiet text button hid in plain sight):
+  // static let thenLabel = "+ Then…"
+  static let thenLabel = "Add another key"
   static let thenTooltip = "Send another shortcut after this one"
+  static let sequenceHint = "Sends these one after another."
   static let escapeLabel = "Use Escape"
   static let escapeTooltip = "Record the Escape key itself"
 
@@ -337,29 +345,45 @@ struct KeyRecorderField: View {
     allowsSequence && isRecording
   }
 
+  /// Whether "Sends these one after another." shows: a sequence field, idle, while "Add another
+  /// key" shows or the value has 2+ steps.
+  static func showsSequenceHint(stored: String?, allowsSequence: Bool, isRecording: Bool) -> Bool {
+    guard allowsSequence, !isRecording else { return false }
+    return KeyRecorderController.showsThen(stored: stored, allowsSequence: allowsSequence, isRecording: false)
+      || KeyComboText.steps(stored ?? "").count >= 2
+  }
+
+  /// The field's full width with its chrome; the lines under it share its leading edge.
+  static var fieldWidth: CGFloat { width + 16 }
+
   var body: some View {
-    VStack(alignment: .trailing, spacing: 4) {
-      HStack(spacing: 8) {
-        field
-        // A sequence field always keeps the button's width, so the field never jumps when
-        // "+ Then…" hides at 4 steps or while recording (critique 29 should-fix 4).
-        if allowsSequence {
-          let shows = KeyRecorderController.showsThen(
-            stored: stored, allowsSequence: allowsSequence, isRecording: controller.isRecording)
-          QuietTextButton(title: Self.thenLabel, tooltip: Self.thenTooltip) {
+    // A sequence field sits at the start of its column (where "+ Then…" used to keep it), with the
+    // button and hint on their own lines under it, left-aligned with it. Nothing sits beside the
+    // field, so its x is the same with the button showing or hidden (critique 29 should-fix 4).
+    VStack(alignment: allowsSequence ? .leading : .trailing, spacing: 4) {
+      field.anchorPreference(key: RecorderPartBounds.self, value: .bounds) { [.field: $0] }
+      if allowsSequence {
+        if KeyRecorderController.showsThen(
+          stored: stored, allowsSequence: allowsSequence, isRecording: controller.isRecording)
+        {
+          AddAnotherKeyButton {
             focused = true
             controller.start(after: stored)
           }
-          .opacity(shows ? 1 : 0)
-          .disabled(!shows)
-          .accessibilityHidden(!shows)
+          .anchorPreference(key: RecorderPartBounds.self, value: .bounds) { [.button: $0] }
+        }
+        if Self.showsSequenceHint(stored: stored, allowsSequence: allowsSequence, isRecording: controller.isRecording) {
+          Text(Self.sequenceHint).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
+            .lineLimit(1).fixedSize()
+            .anchorPreference(key: RecorderPartBounds.self, value: .bounds) { [.hint: $0] }
         }
       }
       if Self.showsUseEscape(allowsSequence: allowsSequence, isRecording: controller.isRecording) {
         QuietTextButton(title: Self.escapeLabel, tooltip: Self.escapeTooltip) { controller.useEscape() }
       }
-      FieldError(text: controller.error).frame(maxWidth: Self.width + 16)
+      FieldError(text: controller.error).frame(maxWidth: Self.fieldWidth)
     }
+    .frame(maxWidth: allowsSequence ? .infinity : nil, alignment: .leading)
     .onAppear {
       guard autostart else { return }
       focused = true
@@ -418,6 +442,32 @@ struct KeyRecorderField: View {
         Text("Click to record").font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
       }
     }
+  }
+}
+
+/// Where the recorder's parts land (the field, "Add another key", the hint), for layout checks.
+struct RecorderPartBounds: PreferenceKey {
+  enum Part { case field, button, hint }
+  static let defaultValue: [Part: Anchor<CGRect>] = [:]
+  static func reduce(value: inout [Part: Anchor<CGRect>], nextValue: () -> [Part: Anchor<CGRect>]) {
+    value.merge(nextValue()) { $1 }
+  }
+}
+
+/// "Add another key": the inspector's standard bordered button (as "Choose…"), 13 `ink` label, never
+/// wraps, with its tooltip.
+struct AddAnotherKeyButton: View {
+  var action: () -> Void
+
+  var body: some View {
+    Button(action: action) {
+      Text(KeyRecorderField.thenLabel).foregroundStyle(Tokens.ink)
+    }
+    .buttonStyle(.bordered)
+    .font(Tokens.font(Tokens.typeBody))
+    .lineLimit(1)
+    .fixedSize()
+    .help(KeyRecorderField.thenTooltip)
   }
 }
 

@@ -11,7 +11,7 @@ import Observation
 /// - Modifiers held show live (in `ink2`) while recording.
 /// - Modifiers alone: on a hold action they commit only when held ≥ `modifierHold` (0.6 s); a
 ///   shorter press keeps listening. On a trigger action they show the inline error instead.
-/// - Key sequences (Keyboard Shortcut's `keys` only, BRIEF § Key sequences): "+ Then…" records
+/// - Key sequences (Keyboard Shortcut's `keys` only, BRIEF § Key sequences): "Add another key" records
 ///   the next step the same way (`start(after:)`); its commit stores the earlier steps plus the new
 ///   one, joined by one space. Esc, a timeout or a refused step leave the earlier steps alone. ⌫
 ///   while idle removes the last step (`removingLastStep`).
@@ -38,7 +38,7 @@ final class KeyRecorderController {
   @ObservationIgnored private let commit: (KeyCombo, String) -> Void
   @ObservationIgnored private var heldSince: Date?
   @ObservationIgnored private var task: Task<Void, Never>?
-  /// The earlier steps while "+ Then…" records the next one (`nil` = recording replaces the value).
+  /// The earlier steps while "Add another key" records the next one (`nil` = recording replaces the value).
   @ObservationIgnored private(set) var base: [String]?
 
   /// `commit` gets the recorded combo alone (one-combo fields; a sequence step still commits).
@@ -68,7 +68,7 @@ final class KeyRecorderController {
     begin()
   }
 
-  /// "+ Then…": records the next step after `stored`'s steps. Does nothing at the step limit.
+  /// "Add another key": records the next step after `stored`'s steps. Does nothing at the step limit.
   func start(after stored: String?) {
     let steps = KeyComboText.steps(stored ?? "")
     guard steps.count < ConfigValidator.keySequenceLimit else { return }
@@ -174,7 +174,7 @@ final class KeyRecorderController {
     ConfigValidator.keySequenceActions.contains(action) && parameter == "keys"
   }
 
-  /// Whether "+ Then…" shows: a sequence field, idle, with 1–3 steps.
+  /// Whether "Add another key" shows: a sequence field, idle, with 1–3 steps.
   static func showsThen(stored: String?, allowsSequence: Bool, isRecording: Bool) -> Bool {
     guard allowsSequence, !isRecording else { return false }
     let count = KeyComboText.steps(stored ?? "").count
