@@ -61,3 +61,8 @@ Items found in testing or left open by builders, to fold into a future round.
 ## Before going public (from batch 31's scan, 2026-11-09)
 - Fill `DOWNLOAD_URL` (README) and `SECURITY_CONTACT` (SECURITY.md); add "It updates itself." once the updater ships.
 - History has 5 commits with denylist hits (1 message, 4 diffs), private notes in `.parallel-plans/`, home paths in done reports, and a personal email as author on every commit. **Plan: the public repo starts from ONE clean first commit** (noreply author, no `.parallel-plans/`, denylist + home-path grep on that tree); this private repo stays the working one. Needs Gabriel's OK at launch.
+
+## Batch 28 result (measured 2026-11-09, Mac mini, main 4273147, hands off 36 s)
+- No window: **0.00% CPU, 15 wakeups/s** (budget 0.5% / 50) — was ~1.3% and ~730/s with no window, ~19% and ~2,700/s with a window open.
+- Still to measure hands-off: popover, Settings, Settings + App chooser, onboarding (budget 3% / 150); MacBook Pro; App chooser list on device (Gabriel).
+- Hardened runtime smoke on the pre-28 build: passed with no entitlements (touch, pointer tap, gestures, displays). Repeat on the merged build before the first notarized release.

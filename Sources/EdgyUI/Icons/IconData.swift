@@ -8,6 +8,13 @@ import CoreGraphics
 extension IconDrawing {
   /// Every exported drawing, keyed by SVG file name (without `.svg`).
   static let all: [String: IconDrawing] = [
+    "app-last": IconDrawing(
+      width: 16, height: 16,
+      elements: [
+        .rect(x: 1.75, y: 1.75, width: 8, height: 8, rx: 2.4, fill: false, stroke: 1.5),
+        .path("M13.75 4.5 V9.75 A3 3 0 0 1 10.75 12.75 H6.75", fill: false, stroke: 1.5),
+        .path("M8.5 11 L6.75 12.75 L8.5 14.5", fill: false, stroke: 1.5),
+      ]),
     "app-open": IconDrawing(
       width: 16, height: 16,
       elements: [
@@ -342,6 +349,7 @@ extension IconDrawing {
 
   /// Action id → drawing file (the README table in `docs/design/assets/icons/`).
   static let fileForAction: [String: String] = [
+    "app.last": "app-last",
     "app.open": "app-open",
     "apps.switcher": "apps-switcher",
     "audio.mute": "audio-mute",
