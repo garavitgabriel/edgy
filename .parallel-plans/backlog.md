@@ -43,3 +43,12 @@ Items found in testing or left open by builders, to fold into a future round.
 - `switcherAppCount()` still runs on every `.began`; move it to the opening.
 - Sensitivity scales the opening travel (sensitivity 2 opens at 4 mm of real travel) — note in settings-reference.
 - EdgyUI `ParameterPresentationTests` / `Batch15SnapshotTests` hardcode the old Switch Apps helper line in their own descriptors; re-point at the catalog and re-shoot `batch-22/inspector-switch-apps-keep-open-off`.
+
+## Performance / system citizenship (measured 2026-11-09, Mac mini, build 16:10 2026-11-07)
+- Edgy idles at ~19% of a core with ~2,700 idle wakeups/s while the onboarding window is open (uptime avg 0.3% CPU, so it's state-dependent). `sample` hot path: SwiftUI layout of PadMirrorView/MiniMirrorView every frame.
+- Causes found:
+  1. `OverlayController` runs `RunLoopClock` at 30 Hz forever (always on), even with no plate up.
+  2. `takeDecisions()` writes `pendingDecisions = []` every tick and `receive(_:)` reassigns `liveTouches`/`pendingDecisions` even when unchanged → Observation invalidates every observing view 30×/s.
+  3. Mirror bodies recompute `catalogByCategory` (sort) and `availability(of:)` → `LiveBrightnessOutput.builtInDisplay()` (CGGetOnlineDisplayList) per render.
+  4. The pointer-guard event tap and the multitouch callback run on the MAIN run loop, the same thread doing (1)–(3): pointer events system-wide wait on Edgy's UI work (input lag; risk of tapDisabledByTimeout). Possible link to Gabriel's "settings freezes" report.
+- Fix plan: batch 28 (event-driven overlay, Observation hygiene, cached mirror data, taps/callbacks on their own thread with timeout re-enable) + `scripts/measure-idle.sh` with a budget (idle, no window: <0.5% CPU and <50 wakeups/s; settings open and idle: <3%).
