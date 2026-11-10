@@ -35,7 +35,18 @@ final class LiveAppActivations: AppActivationOutput, @unchecked Sendable {
   func activate(_ app: AppActivation) -> Bool {
     guard let running = NSRunningApplication(processIdentifier: app.pid), !running.isTerminated else { return false }
     running.unhide()
-    return running.activate()
+    // Through the workspace, like a Dock click: a bare `activate()` reports success yet is dropped
+    // when the target sits in a full-screen Space (reported 2026-11-10). Opening a running app
+    // launches nothing; it only brings it forward.
+    guard let url = running.bundleURL else { return running.activate() }
+    let configuration = NSWorkspace.OpenConfiguration()
+    configuration.activates = true
+    NSWorkspace.shared.openApplication(at: url, configuration: configuration) { _, error in
+      if let error {
+        actionsLog.error("last app: bringing the app forward failed: \(error, privacy: .public)")
+      }
+    }
+    return true
   }
 
   private static func describe(_ app: NSRunningApplication) -> AppActivation {
