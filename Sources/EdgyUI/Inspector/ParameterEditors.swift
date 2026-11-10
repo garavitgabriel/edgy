@@ -341,13 +341,18 @@ struct KeyRecorderField: View {
     VStack(alignment: .trailing, spacing: 4) {
       HStack(spacing: 8) {
         field
-        if KeyRecorderController.showsThen(
-          stored: stored, allowsSequence: allowsSequence, isRecording: controller.isRecording)
-        {
+        // A sequence field always keeps the button's width, so the field never jumps when
+        // "+ Then…" hides at 4 steps or while recording (critique 29 should-fix 4).
+        if allowsSequence {
+          let shows = KeyRecorderController.showsThen(
+            stored: stored, allowsSequence: allowsSequence, isRecording: controller.isRecording)
           QuietTextButton(title: Self.thenLabel, tooltip: Self.thenTooltip) {
             focused = true
             controller.start(after: stored)
           }
+          .opacity(shows ? 1 : 0)
+          .disabled(!shows)
+          .accessibilityHidden(!shows)
         }
       }
       if Self.showsUseEscape(allowsSequence: allowsSequence, isRecording: controller.isRecording) {

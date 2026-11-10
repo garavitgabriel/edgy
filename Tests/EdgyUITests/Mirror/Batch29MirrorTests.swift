@@ -82,8 +82,18 @@ struct Batch29MirrorTests {
     let mirror = pad(model)
     let fit = mirror.fittedLabel(corner, placement: mirror.labelPlacement(corner))
     #expect(fit.text == long)
-    #expect(fit.clipWidth != nil)
+    // Before critique 29 design answer 3 (corner tabs grow to 40% of their edge), this name clipped:
+    // #expect(fit.clipWidth != nil)
+    #expect(fit.clipWidth == nil)
     #expect(!fit.text.contains("…"))
+    // A name wider than 40% of the edge still fades, never "…".
+    let wide = String(repeating: "W", count: SettingsEditor.customNameLimit)
+    let wideModel = try named(Self.dictate, name: wide, icon: nil)
+    let wideCorner = try zone(wideModel, .corner(.bottomRight))
+    let wideFit = pad(wideModel).fittedLabel(wideCorner, placement: pad(wideModel).labelPlacement(wideCorner))
+    #expect(wideFit.text == wide)
+    #expect(wideFit.clipWidth != nil)
+    #expect(!wideFit.text.contains("…"))
     try shootPad(model, "pad-tab-custom-long")
   }
 

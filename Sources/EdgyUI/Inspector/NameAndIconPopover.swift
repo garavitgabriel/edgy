@@ -45,22 +45,29 @@ struct NameAndIconPopover: View {
         }
         .accessibilityLabel("Name")
 
-      ScrollView(.vertical) {
-        VStack(alignment: .leading, spacing: 0) {
-          ForEach(Array(Self.groups(model: model).enumerated()), id: \.element.title) { index, group in
-            Text(group.title)
-              .font(Tokens.font(Tokens.typeSmall, semibold: true))
-              .foregroundStyle(Tokens.ink2)
-              .padding(.top, index == 0 ? 0 : 14)
-              .padding(.bottom, 4)
-            LazyVGrid(columns: Self.columns, alignment: .leading, spacing: 0) {
-              ForEach(group.ids, id: \.self) { id in iconCell(id) }
+      ScrollViewReader { proxy in
+        ScrollView(.vertical) {
+          VStack(alignment: .leading, spacing: 0) {
+            ForEach(Array(groups.enumerated()), id: \.element.title) { index, group in
+              Text(group.title)
+                .font(Tokens.font(Tokens.typeSmall, semibold: true))
+                .foregroundStyle(Tokens.ink2)
+                .padding(.top, index == 0 ? 0 : 14)
+                .padding(.bottom, 4)
+              // Not lazy: every cell exists on open, so the selected one can be scrolled to.
+              Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
+                ForEach(Self.rows(group.ids), id: \.self) { row in
+                  GridRow { ForEach(row, id: \.self) { id in iconCell(id).id(id) } }
+                }
+              }
             }
           }
+          .padding(.vertical, 12)
         }
-        .padding(.vertical, 12)
+        .frame(maxHeight: 300)
+        // The selected cell in view on open, like the picker's checked row (critique 29 should-fix 2).
+        .onAppear { proxy.scrollTo(Self.cell(for: selectedIcon, in: groups), anchor: .center) }
       }
-      .frame(maxHeight: 300)
 
       if isSet {
         Button("Reset name and icon") { reset() }
@@ -76,13 +83,22 @@ struct NameAndIconPopover: View {
     .onDisappear { saveNameIfChanged() }
   }
 
-  static let columns = Array(repeating: GridItem(.fixed(cell), spacing: 0), count: 10)
+  static let columnCount = 10
+
+  /// `ids` in rows of `columnCount`.
+  static func rows(_ ids: [ActionID]) -> [[ActionID]] {
+    stride(from: 0, to: ids.count, by: columnCount).map { Array(ids[$0..<min($0 + columnCount, ids.count)]) }
+  }
+
+  private var groups: [Group] { Self.groups(model: model) }
 
   private func iconCell(_ id: ActionID) -> some View {
-    let selected = id == selectedIcon
-    let own = id == row.binding.action
+    let sharing = Self.sharing(id, in: groups)
+    let selected = id == Self.cell(for: selectedIcon, in: groups)
+    let own = sharing.contains(row.binding.action)
     return Button {
-      save(icon: id, close: false)
+      // A shared cell on the action's own drawing is the default, not a custom icon.
+      save(icon: own ? row.binding.action : id, close: false)
     } label: {
       ActionIcon(id: id, size: Self.iconSize)
         .foregroundStyle(Tokens.ink)
@@ -95,24 +111,63 @@ struct NameAndIconPopover: View {
         .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
-    .help(own ? "Default" : model.actionName(id))
-    .accessibilityLabel(own ? "Default" : model.actionName(id))
+    .help(own ? "Default" : Self.tooltip(sharing, model: model))
+    .accessibilityLabel(own ? "Default" : Self.tooltip(sharing, model: model))
     .accessibilityAddTraits(selected ? .isSelected : [])
   }
 
   /// The icon library, grouped and ordered like the picker: catalog groups in order, icon-table
   /// order within each, only IDs the icon family draws ("Do nothing" has none to offer).
+  ///
+  /// Each drawing appears once (critique 29 design answer 4): an action whose drawing an earlier
+  /// cell already shows joins that cell (`shared`), whose tooltip names both.
   struct Group: Equatable {
     var title: String
     var ids: [ActionID]
+    /// Every action a cell stands for, the cell's own first, for cells drawn by more than one.
+    var shared: [ActionID: [ActionID]] = [:]
   }
 
   static func groups(model: SettingsModel) -> [Group] {
-    model.mirrorGroups.compactMap { group in
-      let ids = PickerCatalog.ordered(group.actions).map(\.id).filter { $0 != .doNothing && ActionIcons.has($0) }
-      guard !ids.isEmpty else { return nil }
-      return Group(title: PickerCatalog.Section(category: group.category, items: []).title, ids: ids)
+    var seen: [(drawing: IconDrawing, cell: ActionID)] = []
+    var groups: [Group] = []
+    for group in model.mirrorGroups {
+      var result = Group(title: PickerCatalog.Section(category: group.category, items: []).title, ids: [])
+      for id in PickerCatalog.ordered(group.actions).map(\.id) where id != .doNothing {
+        guard let drawing = ActionIcons.drawing(for: id) else { continue }
+        if let twin = seen.first(where: { $0.drawing == drawing })?.cell {
+          for index in groups.indices where groups[index].ids.contains(twin) {
+            groups[index].shared[twin, default: [twin]].append(id)
+          }
+          if result.ids.contains(twin) { result.shared[twin, default: [twin]].append(id) }
+          continue
+        }
+        seen.append((drawing, id))
+        result.ids.append(id)
+      }
+      if !result.ids.isEmpty { groups.append(result) }
     }
+    return groups
+  }
+
+  /// Every action the cell `id` stands for (just `id` unless its drawing is shared).
+  static func sharing(_ id: ActionID, in groups: [Group]) -> [ActionID] {
+    groups.lazy.compactMap { $0.shared[id] }.first ?? [id]
+  }
+
+  /// The cell that shows `icon`: its own, or the cell it shares a drawing with.
+  static func cell(for icon: ActionID, in groups: [Group]) -> ActionID {
+    for group in groups {
+      if group.ids.contains(icon) { return icon }
+      if let cell = group.shared.first(where: { $0.value.contains(icon) })?.key { return cell }
+    }
+    return icon
+  }
+
+  /// "Keyboard Brightness", or both names for a shared drawing: "Keyboard Brightness and
+  /// Keyboard Backlight On/Off".
+  static func tooltip(_ sharing: [ActionID], model: SettingsModel) -> String {
+    sharing.map { model.actionName($0) }.joined(separator: " and ")
   }
 
   private func save(icon: ActionID?, close: Bool) {

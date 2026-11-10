@@ -251,8 +251,8 @@ extension SettingsModel {
     let descriptor = editor.validator.descriptor(for: action)
     // Batch 29: the slot's own name and icon follow a new action (§ App profiles: kept unless cleared).
     PickerChoice.carry(
-      from: existing?.binding, oldIsTurnedOff: existing?.source == .turnedOff, into: &binding,
-      actionName: descriptor?.displayName)
+      from: existing?.binding, oldIsTurnedOff: existing?.source == .turnedOff,
+      oldIsInherited: existing?.source == .inherited, into: &binding, actionName: descriptor?.displayName)
     inspectorDrafts.drafts[draftKey] = nil
     picking = nil
     // The binding just set from the picker is the open one.

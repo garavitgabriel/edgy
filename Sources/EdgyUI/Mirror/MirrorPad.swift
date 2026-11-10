@@ -151,9 +151,14 @@ struct MirrorPad: View {
   static let fadedOpacity = 0.4
   /// The fade at the end of a label that still doesn't fit (bone 3).
   static let labelFade: CGFloat = 12
-  /// Longest tab, in millimetres of pad: side strips, corners.
+  /// Longest side-strip tab, in millimetres of pad.
   static let sideTabMaxMM: CGFloat = 40
+  /// A corner tab's width for choosing among the label's forms (render A: "Mic off").
   static let cornerTabMaxMM: CGFloat = 26
+  /// When even the shortest form is wider, the corner tab grows along its edge (the top or
+  /// bottom, which it runs along) up to this share of that edge's length before the fade applies
+  /// (critique 29 design answer 3: "example.com" fits instead of fading to "example.co").
+  static let cornerTabEdgeShare: CGFloat = 0.4
   /// The `ink` selection ring sits this far outside the zone's outline, this thick.
   static let ringGap: CGFloat = 1.5
   static let ringWidth: CGFloat = 2
@@ -424,8 +429,17 @@ struct MirrorPad: View {
     return max(maxMM * geometry.pointsPerMM - 18 - CGFloat(marks), 0)
   }
 
+  /// Room a corner tab's last form may grow into before it fades: 40% of its edge (answer 3).
+  func cornerGrowRoom(_ zone: MirrorZone) -> CGFloat {
+    let marks = (zone.overridden ? 10 : 0) + (zone.unavailable ? 18 : 0)
+    let edge = geometry.size.width * Self.cornerTabEdgeShare
+    return max(max(edge, Self.cornerTabMaxMM * geometry.pointsPerMM) - 18 - CGFloat(marks), 0)
+  }
+
   func fittedLabel(_ zone: MirrorZone, placement: LabelPlacement) -> FittedLabel {
-    Self.fit(zone.labelForms, room: labelRoom(zone, placement: placement))
+    let fitted = Self.fit(zone.labelForms, room: labelRoom(zone, placement: placement))
+    guard zone.isCorner, !placement.inBar, fitted.clipWidth != nil else { return fitted }
+    return Self.fit([fitted.text], room: cornerGrowRoom(zone))
   }
 
   /// The first form whose width fits `room`, else the last form clipped to `room`.

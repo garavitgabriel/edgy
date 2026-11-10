@@ -302,14 +302,16 @@ struct BindingRowView: View {
   }
 
   /// "Default: X" under an overridden or turned-off row (with **Revert** trailing when the row had
-  /// no room for it), and "from Default" when it moved off the row.
+  /// no room for it), and "from Default" when it moved off the row. Every sub-line is
+  /// left-aligned under the gesture name (critique 29 should-fix 1).
   @ViewBuilder private func subLines(inline: Bool) -> some View {
     if customNamed, !isPicking {
       // "Hold Keys: fn Space": the real action and its parameter, so a custom name is never a mystery.
+      // Left, under the gesture name, like "Default: …" (critique 29 should-fix 1).
       HStack {
-        Spacer(minLength: 0)
         Text(BindingRowView.subLine(row.binding, model: model) ?? "").foregroundStyle(Tokens.ink2)
-          .multilineTextAlignment(.trailing)
+          .multilineTextAlignment(.leading)
+        Spacer(minLength: 0)
       }
     }
     if let base = row.defaultBinding, row.source == .overridden || row.source == .turnedOff {
@@ -323,8 +325,8 @@ struct BindingRowView: View {
       }
     } else if row.source == .inherited, !inline, !isPicking {
       HStack {
-        Spacer(minLength: 0)
         Text("from Default").foregroundStyle(Tokens.ink2)
+        Spacer(minLength: 0)
       }
     }
   }

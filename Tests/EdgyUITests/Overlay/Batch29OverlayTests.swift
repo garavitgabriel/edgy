@@ -24,6 +24,12 @@ struct Batch29OverlayTests {
   static let playNamed = EdgyCore.Binding(
     zone: corner, gesture: .doubleTap, action: BuiltInAction.playPause, customName: "Dictate")
 
+  /// The shots' custom-named trigger (critique 29 should-fix 5: "Dictate" is the long-press Hold
+  /// Keys binding, which can't take a double-tap): Open App named "Notes" on the double-tap.
+  static let notes = EdgyCore.Binding(
+    zone: corner, gesture: .doubleTap, action: BuiltInAction.openApp,
+    parameters: ["bundleID": "com.example.quillpad"], customName: "Notes")
+
   static let sequence = EdgyCore.Binding(
     zone: .edge(.top), gesture: .tap, action: BuiltInAction.keyboardShortcut, parameters: ["keys": "ctrl+b n"])
 
@@ -51,7 +57,13 @@ struct Batch29OverlayTests {
     #expect(
       plate(.actionRan(BuiltInAction.openApp, zone: Self.corner, kind: .tap), context: Self.context(app))?.title
         == "Write")
-    try shoot([content], "plate-custom-run")
+    // Before critique 29 should-fix 5 the shot showed "Dictate" on the double-tap:
+    // try shoot([content], "plate-custom-run")
+    let notes = try #require(
+      plate(.actionRan(BuiltInAction.openApp, zone: Self.corner, kind: .doubleTap), context: Self.context(Self.notes)))
+    #expect(notes.title == "Notes")
+    #expect(notes.detail == "Bottom-right corner, double-tap")
+    try shoot([notes], "plate-custom-run")
   }
 
   @Test func holdPlateReadsHeldThenReleased() throws {
@@ -93,7 +105,14 @@ struct Batch29OverlayTests {
       dryRun: true)
     #expect(held?.title == "Would hold Dictate")
     #expect(held?.released(cancelled: false)?.title == "Would release Dictate")
-    try shoot([content], "plate-custom-dry-run")
+    // Before critique 29 should-fix 5 the shot showed "Would run Dictate" on the double-tap:
+    // try shoot([content], "plate-custom-dry-run")
+    let notes = try #require(
+      plate(
+        .wouldRun(BuiltInAction.openApp, zone: Self.corner, kind: .doubleTap), context: Self.context(Self.notes),
+        dryRun: true))
+    #expect(notes.title == "Would run Notes")
+    try shoot([notes], "plate-custom-dry-run")
   }
 
   @Test func withoutACustomNameNothingChanges() {
