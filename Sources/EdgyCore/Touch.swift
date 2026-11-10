@@ -115,4 +115,15 @@ public protocol PointerGuarding: AnyObject, Sendable {
   func engage()
   /// Called when the gesture ends or is cancelled: restore normal pointer movement.
   func release()
+  /// Called when a finger lifts from a mapped zone as a tap that a tap or double-tap binding may
+  /// take. With tap-to-click on, the system reports that tap as a click shortly after the lift,
+  /// and the click lands on whatever is under the pointer (it can pull focus back from the app a
+  /// gesture just opened). The guard swallows that one click (a button-down and its button-up)
+  /// if it arrives within `seconds`. A physical press is never swallowed.
+  func expectTapClick(within seconds: TimeInterval)
+}
+
+extension PointerGuarding {
+  /// Guards that don't watch clicks ignore it.
+  public func expectTapClick(within seconds: TimeInterval) {}
 }
