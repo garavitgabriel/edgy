@@ -37,7 +37,7 @@ The first run also offers two other starting points: window moves on the bottom 
 
 ### Download
 
-Get the signed, notarized build: [DOWNLOAD_URL](DOWNLOAD_URL). It's the same app with the same features as the one you build yourself.
+Get the signed, notarized build at DOWNLOAD_URL. It's the same app with the same features as the one you build yourself.
 
 ### Build it yourself
 
@@ -75,7 +75,7 @@ Nothing it reads leaves your Mac. Settings live in `~/Library/Application Suppor
 
 ## Troubleshooting
 
-**Edgy stopped responding after you rebuilt it.** macOS ties the Accessibility grant to the app's signature, and an ad hoc rebuild has a new one. Open System Settings > Privacy & Security > Accessibility, remove Edgy with the minus button, then add the new build and switch it on.
+**Edgy stopped responding after you rebuilt it.** macOS ties the Accessibility grant to the app's signature, and an ad hoc rebuild has a new one. The menu-bar popover then says "Edgy needs Accessibility access to run actions." Click **Open Settings**, which opens the Accessibility list in System Settings, and switch Edgy on for the new build.
 
 **A gesture didn't fire.** Turn on Test Mode in the popover and try again. The plate names the reason and the numbers, such as "Ignored: typing, last key 200 ms ago, limit 500 ms". Adjust that limit under Advanced… in the settings window if it doesn't suit how you work.
 
