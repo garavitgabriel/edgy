@@ -57,3 +57,7 @@ Items found in testing or left open by builders, to fold into a future round.
 - **Key sequences** for Keyboard Shortcut: several combos sent in order ("ctrl+b, then n"), so a multiplexer's prefix commands work from one gesture. Stored in the existing `keys` parameter (combos separated by a space; one combo = today's behaviour, old files unchanged); small fixed gap between combos; all keys released on any error; max 4 combos. Recorder UI: record step by step, shown as "⌃B  N" chips (design to spec). Engine = Actions; UI = Inspector (after batch 29).
 - **Last App** action (Apps group): back to the app you were in before (one press of the app switcher, no slide). Tap / double-tap / long-press. His main loop is terminal ↔ browser.
 - Not possible to split an edge differently per app (he keeps ⌃Tab on the left edge's upper half for the browser's tab overview): consider per-app splits for v1.x.
+
+## Before going public (from batch 31's scan, 2026-11-09)
+- Fill `DOWNLOAD_URL` (README) and `SECURITY_CONTACT` (SECURITY.md); add "It updates itself." once the updater ships.
+- History has 5 commits with denylist hits (1 message, 4 diffs), private notes in `.parallel-plans/`, home paths in done reports, and a personal email as author on every commit. **Plan: the public repo starts from ONE clean first commit** (noreply author, no `.parallel-plans/`, denylist + home-path grep on that tree); this private repo stays the working one. Needs Gabriel's OK at launch.
