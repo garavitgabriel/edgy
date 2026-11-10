@@ -4,7 +4,7 @@ tag: EDGY-NAMES
 branch: worktree-edgy-names
 worktree_path: .claude/worktrees/edgy-names
 completed_at: 2026-11-09
-verification: swift build ✔ · swift test ✔ (every suite green; EdgyUI 483 tests) · swift format lint --strict -r Sources Tests Package.swift ✔ · denylist ✔ (empty, tracked and untracked) · token greps ✔ (empty) · `git diff --name-only main...` only owned paths
+verification: swift build ✔ · swift test ✔ (full run repeated after the last code change, the ValidationTests edit: every suite green; EdgyUI 483, EdgyRuntime 270) · item 5 blocked (blockers-batch-29.md) · swift format lint --strict -r Sources Tests Package.swift ✔ · denylist ✔ (empty, tracked and untracked) · token greps ✔ (empty) · `git diff --name-only main...` only owned paths
 ---
 
 # Done: batch 29, EDGY-NAMES (your own name and icon, Hold Keys first on a long-press, key sequences, Last App, Use Escape, target names)
@@ -47,7 +47,7 @@ Shots: `docs/design/build-shots/batch-29/<name>-light.png` + `-dark.png`. Test f
 - [x] **4. Hold Keys findability.** On a long-press, Keyboard moves to the top with Hold Keys first, including while searching. Other gestures are unchanged.
   - **Tests:** P `longPressPutsKeyboardFirstWithHoldKeysFirst`, `otherGesturesKeepCatalogOrder`.
   - **Shot:** `picker-long-press-order`.
-- [x] **5. Performance.**
+- [ ] **5. Performance: BLOCKED on the live numbers (see `blockers-batch-29.md`).** A read-only run against the running main build (not this branch; the Mac was in use) read CPU 16.08%, 146 wakeups/s. That is not a valid idle reading for this batch.
   - **No per-frame work:**
     - Pad labels and zone icons are computed in batch 28's `MirrorDataCache`, once per revision. `BindingNaming` is pure string work.
     - App marks go through `AppIconCache`, off main when `appIconsLoadOffMain` is set.
@@ -93,7 +93,7 @@ Shots: `docs/design/build-shots/batch-29/<name>-light.png` + `-dark.png`. Test f
   - **Ruling changes:** `Batch21MirrorTests` and `MirrorTests` have new label assertions; the old ones are kept as comments naming the ruling.
 
 ## Verification
-Run in this transcript after the last change:
+Run in this transcript after the last code change (the full `swift test` was repeated after the `ValidationTests.swift` edit):
 - `swift build`: Build complete.
 - `swift test`: every run passed, 0 ✘. EdgyUI ran 483 tests in 49 suites.
 - `swift format lint --strict -r Sources Tests Package.swift`: no output.
