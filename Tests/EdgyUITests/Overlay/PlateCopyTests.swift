@@ -235,7 +235,9 @@ func rejectionText(
         == "Opened Quillpad")
     #expect(
       plate(.actionRan(BuiltInAction.keyboardShortcut, zone: .edge(.top), kind: .tap), context: context)?.title
-        == "Pressed ⇧⌘ 4")
+        // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+        // == "Pressed ⇧⌘ 4")
+        == "Pressed ⇧⌘4")
   }
 
   @Test func splitEdgeNamesItsPart() {

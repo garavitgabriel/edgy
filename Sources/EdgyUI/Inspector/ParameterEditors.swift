@@ -294,7 +294,7 @@ struct FieldError: View {
 /// "Press keys…", held modifiers live in `ink2`. Esc cancels; ⌫ while idle clears.
 ///
 /// On a sequence field (Keyboard Shortcut's `keys`, BRIEF § Key sequences):
-/// - The value shows as keycap groups joined by ", " ("⌃ B, N").
+/// - The value shows as keycap groups joined by ", " ("⌃B, N").
 /// - "+ Then…" (quiet `ink2`) sits right of the field once a combo is set, and records the next
 ///   step. It's hidden while recording and at 4 steps.
 /// - ⌫ while idle removes the last step.
@@ -389,7 +389,10 @@ struct KeyRecorderField: View {
     .accessibilityLabel(controller.isRecording ? "Press keys" : displayText ?? "Click to record")
   }
 
-  private var displayText: String? {
+  private var displayText: String? { Self.text(stored) }
+
+  /// What the idle field reads for a stored value (the one formatter); `nil` when empty.
+  static func text(_ stored: String?) -> String? {
     guard let stored, !stored.isEmpty else { return nil }
     return KeyComboText.display(stored)
   }
@@ -398,7 +401,7 @@ struct KeyRecorderField: View {
     switch controller.phase {
     case .recording(let held):
       HStack(spacing: 6) {
-        if !held.isEmpty { Text(KeyComboText.symbols(held)).foregroundStyle(Tokens.ink2) }
+        if !held.isEmpty { Text(KeyComboText.held(held)).foregroundStyle(Tokens.ink2) }
         Text("Press keys…").foregroundStyle(Tokens.ink2)
       }
       .font(Tokens.font(Tokens.typeBody))

@@ -9,7 +9,7 @@ import Testing
 @testable import EdgyUI
 
 /// Batch 29 (BRIEF § Your own name and icon, § Key sequences): the pad tab, the zone icons and the
-/// mini mirror's hover line read a binding's custom name and icon; a key sequence reads "⌃ B, N".
+/// mini mirror's hover line read a binding's custom name and icon; a key sequence reads "⌃B, N".
 @MainActor
 @Suite(.serialized)
 struct Batch29MirrorTests {
@@ -111,12 +111,18 @@ struct Batch29MirrorTests {
     let shortcut = EdgyCore.Binding(
       zone: .corner(.bottomLeft), gesture: .doubleTap, action: BuiltInAction.keyboardShortcut,
       parameters: ["keys": "ctrl+b n"])
-    #expect(ZoneLabel.shortValue(for: shortcut) == "⌃ B, N")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(ZoneLabel.shortValue(for: shortcut) == "⌃ B, N")
+    #expect(ZoneLabel.shortValue(for: shortcut) == "⌃B, N")
     let model = model([shortcut])
     let corner = try zone(model, .corner(.bottomLeft))
-    #expect(corner.labelForms.contains("⌃ B, N"))
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(corner.labelForms.contains("⌃ B, N"))
+    #expect(corner.labelForms.contains("⌃B, N"))
     let mirror = pad(model)
-    #expect(mirror.fittedLabel(corner, placement: mirror.labelPlacement(corner)).text == "⌃ B, N")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(mirror.fittedLabel(corner, placement: mirror.labelPlacement(corner)).text == "⌃ B, N")
+    #expect(mirror.fittedLabel(corner, placement: mirror.labelPlacement(corner)).text == "⌃B, N")
     try shootPad(model, "pad-tab-sequence")
   }
 
@@ -188,10 +194,14 @@ struct Batch29MirrorTests {
       parameters: ["keys": "fn+space"])
     let model = config(replacing: [.edge(.left), .corner(.topLeft)], with: [edge, corner])
     let left = try zone(model, .edge(.left))
-    #expect(left.label == "⌃ Tab")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(left.label == "⌃ Tab")
+    #expect(left.label == "⌃Tab")
     #expect(!left.labelForms.contains("Keyboard Shortcut"))
     let mirror = pad(model)
-    #expect(mirror.fittedLabel(left, placement: mirror.labelPlacement(left)).text == "⌃ Tab")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(mirror.fittedLabel(left, placement: mirror.labelPlacement(left)).text == "⌃ Tab")
+    #expect(mirror.fittedLabel(left, placement: mirror.labelPlacement(left)).text == "⌃Tab")
     #expect(try zone(model, .corner(.topLeft)).label == "fn Space")
     try shootPad(model, "pad-shortcut-edge-and-corner")
   }

@@ -136,7 +136,7 @@ enum MirrorContent {
 ///    Right read "Spaces"; Left + Right Half read "Halves". The word takes the place of the pair's first
 ///    member.
 /// 4. Repeated names appear once.
-/// 5. Names are joined like a sentence: "A", "A and B", "A, B and C".
+/// 5. Names are joined without commas: "A", "A and B", "A and 2 more" (`joined`).
 ///
 /// 6. A custom name or a target is fixed: it never joins a pair and stays in every shorter form
 ///    (the custom name replaces the short-form rule). A custom name on a binding still missing
@@ -243,11 +243,16 @@ enum ZoneLabel {
     return forms
   }
 
+  /// Combined edge labels never use commas (", " is the key-sequence separator; critique 29
+  /// design answer 1): "A", "A and B", and from three names on "A and 2 more". Counted after
+  /// pairs collapse and repeats drop, so the default bottom edge still reads "Tracks and
+  /// Play/Pause". The hover line and the inspector list every binding.
   static func joined(_ names: [String]) -> String {
     switch names.count {
     case 0: return ""
     case 1: return names[0]
-    default: return names.dropLast().joined(separator: ", ") + " and " + names[names.count - 1]
+    case 2: return names[0] + " and " + names[1]
+    default: return "\(names[0]) and \(names.count - 1) more"
     }
   }
 

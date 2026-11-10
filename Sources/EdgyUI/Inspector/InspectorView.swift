@@ -330,7 +330,7 @@ struct BindingRowView: View {
   }
 
   /// The custom-name sub-line: the real action, then its parameter's short value when it has one
-  /// ("Hold Keys: fn Space", "Keyboard Shortcut: ⌃ B, N"), or "Needs keys" when it's still empty.
+  /// ("Hold Keys: fn Space", "Keyboard Shortcut: ⌃B, N"), or "Needs keys" when it's still empty.
   /// The sub-line under a row whose text isn't the action's name: a custom name gets the real
   /// action and parameter ("Hold Keys: fn Space"); a target gets the action ("Open App").
   static func subLine(_ binding: EdgyCore.Binding, model: SettingsModel) -> String? {

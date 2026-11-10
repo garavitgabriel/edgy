@@ -8,7 +8,7 @@ import Testing
 @testable import EdgyUI
 
 /// Batch 29 plates (BRIEF § Your own name and icon, § Key sequences): a custom name is the whole
-/// value line with no verb; a key sequence reads "Pressed ⌃ B, N". The second line never changes.
+/// value line with no verb; a key sequence reads "Pressed ⌃B, N". The second line never changes.
 @MainActor
 @Suite(.serialized)
 struct Batch29OverlayTests {
@@ -124,23 +124,31 @@ struct Batch29OverlayTests {
       plate(
         .actionRan(BuiltInAction.keyboardShortcut, zone: .edge(.top), kind: .tap), context: Self.context(Self.sequence))
     )
-    #expect(ran.title == "Pressed ⌃ B, N")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(ran.title == "Pressed ⌃ B, N")
+    #expect(ran.title == "Pressed ⌃B, N")
     #expect(ran.detail == "Top edge, tap")
     let dry = try #require(
       plate(
         .wouldRun(BuiltInAction.keyboardShortcut, zone: .edge(.top), kind: .tap), context: Self.context(Self.sequence),
         dryRun: true))
-    #expect(dry.title == "Would press ⌃ B, N")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(dry.title == "Would press ⌃ B, N")
+    #expect(dry.title == "Would press ⌃B, N")
     // One combo is unchanged when run, and reads "Would press" in dry run (BRIEF § Key sequences).
     var single = Self.sequence
     single.parameters = ["keys": "cmd+shift+4"]
     #expect(
       plate(.actionRan(BuiltInAction.keyboardShortcut, zone: .edge(.top), kind: .tap), context: Self.context(single))?
-        .title == "Pressed ⇧⌘ 4")
+        // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+        // .title == "Pressed ⇧⌘ 4")
+        .title == "Pressed ⇧⌘4")
     #expect(
       plate(
         .wouldRun(BuiltInAction.keyboardShortcut, zone: .edge(.top), kind: .tap), context: Self.context(single),
-        dryRun: true)?.title == "Would press ⇧⌘ 4")
+        // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+        // dryRun: true)?.title == "Would press ⇧⌘ 4")
+        dryRun: true)?.title == "Would press ⇧⌘4")
     #expect(PlateNaming.keys(["keys": "ctrl+b nope+"]) == nil)
     try shoot([ran, dry], "plate-sequence")
   }

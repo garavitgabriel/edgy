@@ -180,7 +180,11 @@ func drawnBarsSitInsideTheirZoneAndClearTheCornerTiles(segments: Int) {
       Binding(zone: zone, gesture: .swipe(.left), action: "spaces.left"),
       Binding(zone: zone, gesture: .longPress, action: "keyboard.shortcut"),
     ], catalog: catalog)
-  #expect(text == "Spaces, Mission Control and Keyboard Shortcut…")
+  // Before critique 29 design answer 1 (combined edge labels never use commas):
+  // #expect(text == "Spaces, Mission Control and Keyboard Shortcut…")
+  #expect(text == "Spaces and 2 more")
+  #expect(ZoneLabel.joined(["A", "B", "C"]) == "A and 2 more")
+  #expect(ZoneLabel.joined(["A", "B", "C", "D"]) == "A and 3 more")
   #expect(ZoneLabel.joined(["A"]) == "A")
   #expect(ZoneLabel.joined(["A", "B"]) == "A and B")
   // A lone member of a pair keeps its own name.
@@ -210,7 +214,9 @@ func drawnBarsSitInsideTheirZoneAndClearTheCornerTiles(segments: Int) {
   #expect(bottom?.overridden == true)
   // Before the target ruling (BRIEF § Bindings that name their target, batch 29: the target is the primary text):
   // #expect(bottom?.label == "Keyboard Shortcut, Next Track and \(playPause(model))")
-  #expect(bottom?.label == "⇧⌘ [, Next Track and \(playPause(model))")
+  // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo; critique 29 design answer 1: combined edge labels never use commas:
+  // #expect(bottom?.label == "⇧⌘ [, Next Track and \(playPause(model))")
+  #expect(bottom?.label == "⇧⌘[ and 2 more")
   #expect(zones[.edge(.left)]?.style == .offHere)
   #expect(zones[.edge(.left)]?.label == "Off here")
   #expect(zones[.edge(.right)]?.overridden == false)

@@ -44,25 +44,3 @@ public struct DisplayCheckRequest: Hashable, Sendable {
     return (String(detail[..<range.lowerBound]), DisplayCheckRequest(key: String(detail[range.upperBound...])))
   }
 }
-
-extension KeyCombo {
-  /// The combo as the user reads it: "fn" first, then the modifier symbols in the system's order
-  /// (⌃⌥⇧⌘), then a space and the key name ("⌃⌥ Space", "⇧⌘ 4", "fn", "⌃⌥").
-  public var displayText: String {
-    let symbols: [KeyCombo.Modifier: String] = [.ctrl: "⌃", .opt: "⌥", .shift: "⇧", .cmd: "⌘"]
-    var prefix = modifiers.contains(.fn) ? "fn" : ""
-    prefix += [KeyCombo.Modifier.ctrl, .opt, .shift, .cmd].filter(modifiers.contains).compactMap { symbols[$0] }
-      .joined()
-    guard let key else { return prefix }
-    let name = Self.keyDisplayNames[key] ?? key.uppercased()
-    return prefix.isEmpty ? name : prefix + " " + name
-  }
-
-  static let keyDisplayNames: [String: String] = [
-    "return": "Return", "tab": "Tab", "space": "Space", "delete": "Delete", "forwarddelete": "Forward Delete",
-    "escape": "Esc", "left": "Left Arrow", "right": "Right Arrow", "up": "Up Arrow", "down": "Down Arrow",
-    "home": "Home", "end": "End", "pageup": "Page Up", "pagedown": "Page Down", "minus": "-", "equal": "=",
-    "leftbracket": "[", "rightbracket": "]", "backslash": "\\", "semicolon": ";", "quote": "'", "comma": ",",
-    "period": ".", "slash": "/", "grave": "`",
-  ]
-}

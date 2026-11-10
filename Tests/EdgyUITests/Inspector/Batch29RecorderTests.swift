@@ -86,7 +86,9 @@ struct Batch29RecorderTests {
   }
 
   @Test func twoStepsDisplayAsKeycapGroups() {
-    #expect(KeyComboText.display("ctrl+b n") == "⌃ B, N")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(KeyComboText.display("ctrl+b n") == "⌃ B, N")
+    #expect(KeyComboText.display("ctrl+b n") == "⌃B, N")
   }
 
   @Test func thenRecordsTheNextStepAfterTheEarlierOnes() {
@@ -178,7 +180,9 @@ struct Batch29RecorderTests {
     c.useEscape()
     #expect(box.values.last == "ctrl+b escape")
     #expect(isValid("ctrl+b escape"))
-    #expect(KeyComboText.display("ctrl+b escape") == "⌃ B, Esc")
+    // Before critique 29 must-fix 1, BRIEF "How a key combo is written": no space inside a combo:
+    // #expect(KeyComboText.display("ctrl+b escape") == "⌃ B, Esc")
+    #expect(KeyComboText.display("ctrl+b escape") == "⌃B, Esc")
     // Idle: nothing.
     c.useEscape()
     #expect(box.values.count == 2)

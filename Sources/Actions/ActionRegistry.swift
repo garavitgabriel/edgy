@@ -226,8 +226,8 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
   ///   `systemHUDShown` is true for volume and built-in brightness while the HUD setting is
   ///   `native` (the system draws its indicator). External brightness: `detail` is the display's
   ///   name, followed by a display-check request when one is due (`DisplayCheckRequest`).
-  /// - **`keyboard.hold`**: `detail` is the combo as the user reads it (`KeyCombo.displayText`,
-  ///   e.g. "fn", "⌃⌥ Space").
+  /// - **`keyboard.hold`**: `detail` is the combo as the user reads it (`KeyComboText.text`,
+  ///   e.g. "fn", "⌃⌥Space").
   /// - **`apps.switcher`**: no level; `systemHUDShown` is true (the system's app switcher is the
   ///   feedback) once the switcher is open. While a stroke has armed it but not yet travelled one
   ///   step, nothing is showing and the outcome is `nil` (batch 26).
@@ -255,7 +255,7 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
       return nil
     case (.hold, .press(let down)):
       try performHold(id, down: down, context: context)
-      return ActionOutcome(detail: (try? combo(ActionParameterKey.keys, for: id, in: context))?.displayText)
+      return ActionOutcome(detail: (try? combo(ActionParameterKey.keys, for: id, in: context)).map(KeyComboText.text))
     default:
       throw ActionError.wrongInputShape(id)
     }
