@@ -1,12 +1,17 @@
 # Blockers: batch 28
 
-Turn budget (60) reached. The code items (1 script, 2–6) are committed and the verification triple and denylist are green. What's left is waiting on a person, or on a new turn budget.
+All code items (1–6) are committed, including add-app, chips and tabs (`AppMark`) through the icon cache. The verification triple and the denylist are green.
 
-## Blocked on a person (live)
-1. **"After" numbers.** These need the release build installed in place of the Edgy that's running. The brief says "Gabriel or the chief runs the live states". Steps are in `done-batch-28.md` § Needs Gabriel, all five states, each through `scripts/measure-idle.sh`.
-2. **App chooser empty list.** Reproducing it and checking the fix means driving the live UI. Also time open-to-visible against the 300 ms budget; no test covers that, because the parallel test runner skews the timing.
+## Blocked on the chief / Gabriel (live; this session must not launch or quit Edgy, per the chief)
+1. **"After" numbers with hands off.** Install this branch's release build (`scripts/bundle.sh` in the worktree, or after merge). Don't touch the trackpad. Run `scripts/measure-idle.sh` in each state:
+   - no window: `0.5 50`
+   - popover open: `3 150`
+   - Settings open: `3 150`
+   - Settings with the App chooser open: `3 150`
+   - onboarding open: `3 150`
 
-## Left for the next session (needs a new turn budget)
-3. A `sample Edgy 5` of any state still over budget: the "before" was 732 wakeups/s against a 50/s budget. Record which Apple-side cost remains.
-4. Add-app (`AddAppView`) and the popover chips: lazy rows and off-main cached icons (`AppIconCache` is ready to reuse).
-5. `/builder-close`.
+   What we have so far: wakeups went from 732/s to 0/s, but CPU could not be judged because the trackpad was in use (see done-batch-28.md). If a state is over budget, take `sample Edgy 5`. CPU from live touch frames redrawing an open mirror is a real change, not idle cost.
+2. **App chooser on device.** Open Open App → "Choose an app". The list should appear within 300 ms (after "Loading apps…" if slow). Confirm the empty-list report is gone. It was not reproduced from this session.
+
+## Still open from this session
+3. `/builder-close`.
