@@ -79,3 +79,10 @@ The design session closed on 2026-11-10; these go to Gabriel or a fresh design s
 - On device (Gabriel): Name and Icon opens scrolled to the selected icon; a fast double-trigger of a 2-step sequence shows one plate.
 - G1 checklist gains one item: app-mark desaturation on device (10 items now). Also still open: gut lines on S9–S12; switcher opens after one step.
 - Re-trigger during a sequence is now silent (`SequenceQuiet` in Overlay copies Actions' 40 ms step gap as a constant; if the gap changes, change both).
+
+## 2026-11-10 device session (Gabriel, mini + MacBook Pro) — after batch 34 (c2f4287)
+- Confirmed on device: Open App from a full-screen terminal, Last App loop (both Macs), key sequences, Escape (one Esc interrupts; Esc, Esc as a sequence for going back), "Add another key", quiet re-trigger.
+- Open App and Last App now bring a running app forward through the workspace (Dock-click route); a bare `activate()` is refused from a background app and dropped for full-screen Spaces. Last App logs front / remembered / target on each press. The ⌘Tab fallback is now reached only when the app has no bundle URL.
+- Still hidden for him: "Name and Icon…" in the row's "…" menu (missed twice). Candidate: make renaming more obvious.
+- zsh: `log` is a shell builtin; read Edgy's log with `/usr/bin/log show … --predicate 'subsystem == "com.garavit.edgy"'`.
+- MacBook Pro is on 18c17fd (pre-34); needs rsync + `scripts/run-dev.sh` in Terminal there.
