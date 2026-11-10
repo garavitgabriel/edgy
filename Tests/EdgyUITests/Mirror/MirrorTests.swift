@@ -208,13 +208,16 @@ func drawnBarsSitInsideTheirZoneAndClearTheCornerTiles(segments: Int) {
     uniqueKeysWithValues: model.mirrorZones(forApp: PreviewFixtures.wayfare).map { ($0.zone, $0) })
   let bottom = zones[.edge(.bottom)]
   #expect(bottom?.overridden == true)
-  #expect(bottom?.label == "Keyboard Shortcut, Next Track and \(playPause(model))")
+  // Before the target ruling (BRIEF § Bindings that name their target, batch 29: the target is the primary text):
+  // #expect(bottom?.label == "Keyboard Shortcut, Next Track and \(playPause(model))")
+  #expect(bottom?.label == "⇧⌘ [, Next Track and \(playPause(model))")
   #expect(zones[.edge(.left)]?.style == .offHere)
   #expect(zones[.edge(.left)]?.label == "Off here")
   #expect(zones[.edge(.right)]?.overridden == false)
   #expect(zones[.corner(.bottomRight)]?.style == .mapped)
   #expect(zones[.corner(.bottomRight)]?.overridden == false)
-  #expect(zones[.corner(.bottomRight)]?.label == "Hold Keys")
+  // Before the target ruling: #expect(zones[.corner(.bottomRight)]?.label == "Hold Keys")
+  #expect(zones[.corner(.bottomRight)]?.label == "fn")
   // Default shows no marks.
   #expect(!model.mirrorZones(forApp: nil).contains { $0.overridden || $0.style == .offHere })
 }

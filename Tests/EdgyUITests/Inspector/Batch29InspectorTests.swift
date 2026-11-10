@@ -129,3 +129,54 @@ import Testing
     try shot(InspectorView(model: model), "inspector-row-custom-name")
   }
 }
+
+// Item 11: bindings that name their target show the target (BRIEF § Binding parameters).
+@MainActor
+@Suite(.serialized) struct Batch29TargetRowTests {
+  static let app = EdgyCore.Binding(
+    zone: .corner(.topRight), gesture: .tap, action: "app.open", parameters: ["bundleID": "com.example.quillpad"])
+
+  func model(_ binding: EdgyCore.Binding) -> SettingsModel {
+    var config = PreviewFixtures.demoConfig
+    config.defaultProfile.bindings.removeAll { $0.zone == binding.zone }
+    config.defaultProfile.bindings.append(binding)
+    let model = InspectorFixtures.model(config: config)
+    model.selectedZone = binding.zone
+    return model
+  }
+
+  @Test func precedenceIsCustomThenTargetThenAction() {
+    var binding = Self.app
+    #expect(BindingNaming.label(binding, actionName: "Open App") == ("Quillpad", .target))
+    #expect(BindingNaming.icon(binding) == (.app(bundleID: "com.example.quillpad"), .target))
+    binding.customName = "Notes"
+    binding.customIcon = "file.open"
+    #expect(BindingNaming.label(binding, actionName: "Open App") == ("Notes", .custom))
+    #expect(BindingNaming.icon(binding) == (.action("file.open"), .custom))
+    let empty = EdgyCore.Binding(zone: .corner(.topRight), gesture: .tap, action: "app.open")
+    #expect(BindingNaming.label(empty, actionName: "Open App") == ("Open App", .action))
+    #expect(BindingNaming.icon(empty) == (.action("app.open"), .action))
+  }
+
+  @Test func targetsReadShort() {
+    func target(_ action: ActionID, _ key: String, _ value: String) -> String? {
+      BindingNaming.target(
+        EdgyCore.Binding(zone: .corner(.topLeft), gesture: .tap, action: action, parameters: [key: value]))
+    }
+    #expect(target("url.open", "url", "https://www.example.org/a") == "example.org")
+    #expect(target("file.open", "path", "~/Documents/Notes") == "Notes")
+    #expect(target("keyboard.shortcut", "keys", "ctrl+tab") == "⌃ Tab")
+    #expect(target("keyboard.shortcut", "keys", "ctrl+b n") == "⌃ B, N")
+    #expect(target("keyboard.hold", "keys", "fn+space") == "fn Space")
+    #expect(target("audio.mute", "keys", "a") == nil)
+  }
+
+  @Test func rowShowsTheTargetWithTheActionUnder() throws {
+    let model = model(Self.app)
+    let row = try #require(model.inspectorRows(for: .corner(.topRight)).first)
+    #expect(BindingRowView.subLine(row.binding, model: model) == "Open App")
+    let framed = InspectorView(model: model).frame(width: 360, height: 220, alignment: .top)
+      .background(Tokens.padTop.opacity(0.35)).background(Tokens.windowTint)
+    try Snapshot.write(framed, folder: "batch-29", name: "inspector-row-target")
+  }
+}

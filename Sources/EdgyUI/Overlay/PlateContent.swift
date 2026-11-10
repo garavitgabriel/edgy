@@ -34,6 +34,9 @@ public struct PlateContent: Hashable, Sendable {
   public var zone: Zone?
   /// The display a level plate (or display check) is about, by name, when it names one.
   public var displayName: String?
+  /// A hold plate for a binding with its own name: the name, so the release reads "Dictate,
+  /// released" without parsing the title. `nil` otherwise.
+  var heldName: String?
 
   public init(
     kind: Kind, mark: PlateView.Mark, title: String, detail: String? = nil, zone: Zone? = nil,
@@ -123,13 +126,24 @@ extension PlateContent {
 
   /// The plate a hold turns into when it comes up: "Released fn" (or "Would release fn" in dry
   /// run), and ", finger left the zone" when the hold was cancelled. `nil` for any other plate.
+  ///
+  /// With a custom name (BRIEF § Your own name and icon): "Dictate, held" becomes "Dictate,
+  /// released" (", finger left the zone" when cancelled); in dry run "Would hold Dictate" becomes
+  /// "Would release Dictate".
   public func released(cancelled: Bool) -> PlateContent? {
     guard kind == .holding else { return nil }
+    let tail = cancelled ? ", finger left the zone" : ""
+    if let heldName {
+      var next = self
+      next.kind = .released
+      next.title = "\(heldName), released" + tail
+      return next
+    }
     let dry = title.hasPrefix(Self.wouldHoldPrefix)
     let keys = String(title.dropFirst(dry ? Self.wouldHoldPrefix.count : Self.holdingPrefix.count))
     var next = self
     next.kind = .released
-    next.title = (dry ? "Would release " : "Released ") + keys + (cancelled ? ", finger left the zone" : "")
+    next.title = (dry ? "Would release " : "Released ") + keys + tail
     return next
   }
 
@@ -144,7 +158,14 @@ extension PlateContent {
   ) -> PlateContent? {
     let place = PlateNaming.place(zone: zone, kind: kind)
     let parameters = context.parameters(zone: zone, kind: kind)
+    let custom = context.customName(zone: zone, kind: kind)
     if catalog[id]?.shape == .hold {
+      if let custom {
+        var plate = PlateContent(
+          kind: .holding, mark: .recognized, title: "\(custom), held", detail: place, zone: zone)
+        plate.heldName = custom
+        return plate
+      }
       let keys = outcome?.detail ?? PlateNaming.keys(parameters) ?? PlateNaming.name(id, catalog: catalog)
       return PlateContent(kind: .holding, mark: .recognized, title: holdingPrefix + keys, detail: place, zone: zone)
     }
@@ -159,9 +180,9 @@ extension PlateContent {
         kind: .level, mark: .level(min(max(level, 0), 1)), title: title, detail: device, zone: zone,
         displayName: id == BuiltInAction.brightness ? outcome?.detail : nil)
     }
-    return PlateContent(
-      kind: .ran, mark: .recognized, title: runTitle(id, parameters: parameters, catalog: catalog, context: context),
-      detail: place, zone: zone)
+    // A custom name is the whole value line, with no verb ("Dictate").
+    let title = custom ?? runTitle(id, parameters: parameters, catalog: catalog, context: context)
+    return PlateContent(kind: .ran, mark: .recognized, title: title, detail: place, zone: zone)
   }
 
   private static func wouldRun(
@@ -169,17 +190,21 @@ extension PlateContent {
   ) -> PlateContent {
     let place = PlateNaming.place(zone: zone, kind: kind)
     let parameters = context.parameters(zone: zone, kind: kind)
-    let name = PlateNaming.name(id, catalog: catalog)
+    let custom = context.customName(zone: zone, kind: kind)
+    let name = custom ?? PlateNaming.name(id, catalog: catalog)
     switch catalog[id]?.shape {
     case .hold:
-      let keys = PlateNaming.keys(parameters) ?? name
+      // A custom name stands in for the keys: "Would hold Dictate", then "Would release Dictate".
+      let keys = custom ?? PlateNaming.keys(parameters) ?? name
       return PlateContent(kind: .holding, mark: .wouldRun, title: wouldHoldPrefix + keys, detail: place, zone: zone)
     case .continuous:
       return PlateContent(kind: .wouldRun, mark: .wouldRun, title: "Would set \(name)", detail: place, zone: zone)
     default:
-      let title =
-        PlateNaming.openTarget(id, parameters: parameters, context: context).map { "Would open \($0)" }
-        ?? "Would run \(name)"
+      // A custom name reads "Would run Dictate", whatever the action's own verb would be.
+      let pressed =
+        id == BuiltInAction.keyboardShortcut ? PlateNaming.keys(parameters).map { "Would press \($0)" } : nil
+      let opened = PlateNaming.openTarget(id, parameters: parameters, context: context).map { "Would open \($0)" }
+      let title = custom.map { "Would run \($0)" } ?? opened ?? pressed ?? "Would run \(name)"
       return PlateContent(kind: .wouldRun, mark: .wouldRun, title: title, detail: place, zone: zone)
     }
   }

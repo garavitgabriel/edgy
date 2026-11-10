@@ -20,10 +20,15 @@ struct MirrorZone: Hashable, Identifiable {
   var label: String?
   /// An app tab overrides at least one of this zone's default bindings (ink dot on the tab).
   var overridden: Bool
-  /// The action whose icon is drawn inside a mapped corner tile (the transcribed action family).
+  /// The action icon drawn inside a mapped corner tile (`nil` hides it). For an app mark it is
+  /// Open App's; `zoneIcon` says what is really drawn.
   var symbol: ActionID?
-  /// Shorter forms of `label`, longest first (bone 3: parameter short value, then action short
-  /// name). The pad draws the first form that fits, else the last one clipped with a fade.
+  /// What the corner tile draws (`BindingNaming.icon` of the first binding: custom icon > the
+  /// app's mark for Open App > the action's icon). `nil` draws `symbol`.
+  var zoneIcon: BindingNaming.Icon?
+  /// Shorter forms of `label`, longest first (bone 3: the action short names of bindings that
+  /// read by their action). The pad draws the first form that fits, else the last one clipped
+  /// with a fade.
   var shorter: [String] = []
   /// One of the zone's actions is unavailable on this Mac (§ Issue states, `actionUnavailable`):
   /// the tab reads in `ink2` with a small slashed-circle mark.
@@ -31,7 +36,14 @@ struct MirrorZone: Hashable, Identifiable {
   /// Every running action of the zone in pad gesture order (slide, swipes, tap, double-tap,
   /// long-press): the mini mirror draws up to two icons and names them all on hover (bone 10).
   var actions: [ActionID] = []
+  /// Each binding's name in `actions` order (`BindingNaming.label`: custom name > target > the
+  /// action's own name).
   var actionNames: [String] = []
+  /// Which `actionNames` are fixed (a custom name or a target): those never take a short name or
+  /// join a pair.
+  var customNamed: [Bool] = []
+  /// The icon each of `actions` draws (`BindingNaming.icon`); empty means the actions' own.
+  var icons: [BindingNaming.Icon] = []
 
   /// Every form of the label, longest first.
   var labelForms: [String] { label.map { [$0] + shorter.filter { $0 != label } } ?? [] }
@@ -85,15 +97,18 @@ enum MirrorContent {
           symbol: nil)
       }
       let bindings = running.map(\.binding)
-      let first = ZoneLabel.ordered(bindings).first
+      let ordered = ZoneLabel.ordered(bindings)
+      let icons = ordered.map { BindingNaming.icon($0).icon }
       return MirrorZone(
         zone: zone, style: .mapped, label: ZoneLabel.text(for: bindings, catalog: catalog),
         overridden: running.contains { $0.source == .overridden },
-        symbol: first?.action,
+        symbol: icons.first.map(\.symbol), zoneIcon: icons.first,
         shorter: ZoneLabel.shorterForms(for: bindings, catalog: catalog),
         unavailable: bindings.contains { !availability($0.action).isUsable },
-        actions: ZoneLabel.ordered(bindings).map(\.action),
-        actionNames: ZoneLabel.ordered(bindings).map { catalog[$0.action]?.displayName ?? $0.action.rawValue })
+        actions: ordered.map(\.action),
+        actionNames: ordered.map { ZoneLabel.name(for: $0, catalog: catalog) },
+        customNamed: ordered.map { ZoneLabel.isFixed($0, catalog: catalog) },
+        icons: icons)
     }
   }
 
@@ -111,22 +126,29 @@ enum MirrorContent {
 ///
 /// 1. Bindings are read in pad order: slide, swipes (up, down, left, right), tap, double-tap,
 ///    long-press.
-/// 2. Each action takes its catalog display name, spelled exactly as the catalog spells it (bone 3;
-///    batch-14 ruling 6: the UI never re-spells a name). An action whose required parameter is
-///    still empty ends in "…" (§ Binding parameters); that is the only "…" a pad label carries.
+/// 2. Each binding reads by `BindingNaming.label` (BRIEF § Bindings that name their target, one
+///    precedence for every surface): its custom name, else its target (Open App → the app,
+///    Open URL → the host, Open File → the file, Keyboard Shortcut / Hold Keys → the keys), else
+///    the catalog display name, spelled exactly as the catalog spells it (bone 3; batch-14 ruling
+///    6). A binding whose required parameter is still empty ends in "…" (§ Binding parameters);
+///    that is the only "…" a pad label carries.
 /// 3. Opposite pairs collapse into one word: Previous + Next Track read "Tracks"; Space Left + Space
 ///    Right read "Spaces"; Left + Right Half read "Halves". The word takes the place of the pair's first
 ///    member.
 /// 4. Repeated names appear once.
 /// 5. Names are joined like a sentence: "A", "A and B", "A, B and C".
 ///
+/// 6. A custom name or a target is fixed: it never joins a pair and stays in every shorter form
+///    (the custom name replaces the short-form rule). A custom name on a binding still missing
+///    its parameter keeps the "…" (it means "needs a parameter").
+///
 /// So the default bottom edge (swipe left: previous, swipe right: next, double-tap: play/pause)
 /// reads "Tracks and " plus the catalog's Play/Pause name.
 ///
-/// **Long labels** (bone 3, batch-14 ruling 5): `shorterForms` gives the parameter's short value
-/// (the key combo, the app or file name), then the action's short name ("Shortcut", "Repeat keys",
-/// "Mic off", "Link"). The pad draws the first form that fits and otherwise clips the last one
-/// with a 12 pt fade (`MirrorPad`). The full name is always in the inspector.
+/// **Long labels** (bone 3, batch-14 ruling 5): the target is already the primary text (batch
+/// 29), so `shorterForms` gives the action short names of bindings that read by their action
+/// ("Repeat keys", "Mic off", "Shortcut…"). The pad draws the first form that fits and otherwise
+/// clips the last one with a 12 pt fade (`MirrorPad`). The full name is always in the inspector.
 enum ZoneLabel {
   static let pairs: [(ActionID, ActionID, String)] = [
     (BuiltInAction.previous, BuiltInAction.next, "Tracks"),
@@ -155,11 +177,12 @@ enum ZoneLabel {
     for bindings: [Binding], catalog: [ActionID: ActionDescriptor], replacing: (Binding) -> String? = { _ in nil }
   ) -> String {
     let sorted = ordered(bindings)
-    let ids = Set(sorted.map(\.action))
+    let ids = Set(sorted.filter { !isFixed($0, catalog: catalog) }.map(\.action))
     var names: [String] = []
     var consumed = Set<ActionID>()
-    for binding in sorted where !consumed.contains(binding.action) {
-      if let pair = pairs.first(where: { ($0.0 == binding.action || $0.1 == binding.action) }),
+    for binding in sorted where isFixed(binding, catalog: catalog) || !consumed.contains(binding.action) {
+      if !isFixed(binding, catalog: catalog),
+        let pair = pairs.first(where: { ($0.0 == binding.action || $0.1 == binding.action) }),
         ids.contains(pair.0), ids.contains(pair.1)
       {
         consumed.formUnion([pair.0, pair.1])
@@ -173,9 +196,15 @@ enum ZoneLabel {
 
   static func name(for binding: Binding, catalog: [ActionID: ActionDescriptor]) -> String {
     let descriptor = catalog[binding.action]
-    var name = descriptor?.displayName ?? binding.action.rawValue
-    if isMissingParameter(binding, descriptor) { name += "…" }
-    return name
+    let actionName = descriptor?.displayName ?? binding.action.rawValue
+    if isMissingParameter(binding, descriptor) { return (BindingNaming.customName(binding) ?? actionName) + "…" }
+    return BindingNaming.label(binding, actionName: actionName).text
+  }
+
+  /// A binding whose name is its own (custom) or its target's: never paired, never shortened.
+  static func isFixed(_ binding: Binding, catalog: [ActionID: ActionDescriptor]) -> Bool {
+    if BindingNaming.customName(binding) != nil { return true }
+    return !isMissingParameter(binding, catalog[binding.action]) && BindingNaming.target(binding) != nil
   }
 
   static func isMissingParameter(_ binding: Binding, _ descriptor: ActionDescriptor?) -> Bool {
@@ -184,32 +213,27 @@ enum ZoneLabel {
     } ?? false
   }
 
-  /// (a) The parameter's short value: the key combo, the app's name, the file's name, the
-  /// shortcut's name. `nil` when the action has none or it's empty.
+  /// The parameter's short value (the target): the keys, the app's name, the host, the file's
+  /// name (`BindingNaming.target`), or the shortcut's name. `nil` when the action has none or
+  /// it's empty.
   static func shortValue(for binding: Binding) -> String? {
-    func value(_ key: String) -> String? {
-      let raw = (binding.parameters[key] ?? "").trimmingCharacters(in: .whitespaces)
-      return raw.isEmpty ? nil : raw
-    }
-    switch binding.action {
-    case BuiltInAction.keyboardShortcut, BuiltInAction.keyboardHold:
-      return value(ActionParameterKey.keys).map { KeyComboText.display($0) }
-    case BuiltInAction.openApp: return value(ActionParameterKey.bundleID).map(MirrorCopy.appName)
-    case BuiltInAction.openFile: return value(ActionParameterKey.path).map { ($0 as NSString).lastPathComponent }
-    case BuiltInAction.runShortcut: return value(ActionParameterKey.shortcutName)
-    default: return nil
-    }
+    if let target = BindingNaming.target(binding) { return target }
+    guard binding.action == BuiltInAction.runShortcut else { return nil }
+    let raw = (binding.parameters[ActionParameterKey.shortcutName] ?? "").trimmingCharacters(in: .whitespaces)
+    return raw.isEmpty ? nil : raw
   }
 
-  /// The shorter forms of `text(for:)`, longest first: each name replaced by its short value,
-  /// then by its short value or short name. A missing parameter keeps its "…": on the pad that
-  /// means "needs a parameter", never "cut off".
+  /// The shorter forms of `text(for:)`, longest first: each name that reads by its action replaced
+  /// by its short value (a shortcut's name), then by its short value or short name. A missing parameter keeps its "…": on the pad that means "needs a parameter", never
+  /// "cut off". Custom names and targets stay as they are.
   static func shorterForms(for bindings: [Binding], catalog: [ActionID: ActionDescriptor]) -> [String] {
     let full = text(for: bindings, catalog: catalog)
     var forms: [String] = []
     for useShortName in [false, true] {
       let form = text(for: bindings, catalog: catalog) { binding in
+        if isFixed(binding, catalog: catalog) { return nil }
         let missing = isMissingParameter(binding, catalog[binding.action])
+        if missing, BindingNaming.customName(binding) != nil { return nil }
         if !missing, let value = shortValue(for: binding) { return value }
         if useShortName, let short = shortNames[binding.action] { return missing ? short + "…" : short }
         return nil
@@ -242,6 +266,16 @@ enum ZoneLabel {
 
   private static func append(_ name: String, to names: inout [String]) {
     if !names.contains(name) { names.append(name) }
+  }
+}
+
+extension BindingNaming.Icon {
+  /// The action icon standing for this one: an app mark stands for Open App.
+  var symbol: ActionID {
+    switch self {
+    case .action(let id): return id
+    case .app: return BuiltInAction.openApp
+    }
   }
 }
 

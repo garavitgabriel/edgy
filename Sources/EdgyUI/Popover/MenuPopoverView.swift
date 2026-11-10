@@ -85,6 +85,11 @@ public struct MenuPopoverView: View {
       MiniMirrorView(model: model, frontmostApp: state.frontmost(model: model))
         .fadedByHost()
         .hoverLineWidth(PopoverMetrics.width - 2 * PopoverMetrics.inset)
+        // Open App zones draw the app's mark from the apps the popover already lists.
+        .environment(
+          \.mirrorAppPaths,
+          Dictionary(state.installedApps.map { ($0.bundleID, $0.path) }, uniquingKeysWith: { first, _ in first })
+        )
         .frame(width: size.width, height: size.height)
         .opacity(mirror.faded ? PopoverMetrics.fadedOpacity : 1)
         .frame(maxWidth: .infinity)

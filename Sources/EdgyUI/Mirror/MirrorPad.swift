@@ -103,16 +103,15 @@ struct MirrorPad: View {
 
   /// Up to two icons along a mapped bar, side by side on top/bottom, stacked on left/right.
   @ViewBuilder func barIcons(_ zone: MirrorZone, rect: CGRect) -> some View {
-    let icons = Array(zone.actions.prefix(2))
+    let icons = Array((zone.icons.isEmpty ? zone.actions.map { .action($0) } : zone.icons).prefix(2))
     let size = Self.miniIconSize
     Group {
       if rect.height > rect.width {
-        VStack(spacing: 2) { ForEach(Array(icons.enumerated()), id: \.offset) { ActionIcon(id: $1, size: size) } }
+        VStack(spacing: 2) { ForEach(Array(icons.enumerated()), id: \.offset) { ZoneMark(icon: $1, size: size) } }
       } else {
-        HStack(spacing: 2) { ForEach(Array(icons.enumerated()), id: \.offset) { ActionIcon(id: $1, size: size) } }
+        HStack(spacing: 2) { ForEach(Array(icons.enumerated()), id: \.offset) { ZoneMark(icon: $1, size: size) } }
       }
     }
-    .foregroundStyle(Tokens.ink)
   }
 
   /// Between the inner edges of the top and bottom bars, and of the side strips.
@@ -335,7 +334,7 @@ struct MirrorPad: View {
 
   @ViewBuilder private func cornerIcon(_ zone: MirrorZone) -> some View {
     if showsIcons, let action = zone.symbol {
-      ActionIcon(id: action, size: zoneIcons ? Self.miniIconSize : (full ? 16 : 12)).foregroundStyle(Tokens.ink)
+      ZoneMark(icon: zone.zoneIcon ?? .action(action), size: zoneIcons ? Self.miniIconSize : (full ? 16 : 12))
     }
   }
 

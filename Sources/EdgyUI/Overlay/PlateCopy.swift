@@ -33,6 +33,12 @@ public struct PlateContext: Sendable {
     bindings.first { $0.zone == zone && $0.gesture == kind }?.parameters ?? [:]
   }
 
+  /// The user's own name for the binding on this slot (BRIEF § Your own name and icon), `nil`
+  /// when it has none: the plate's value line then reads that name with no verb.
+  func customName(zone: Zone, kind: GestureKind) -> String? {
+    bindings.first { $0.zone == zone && $0.gesture == kind }.flatMap(BindingNaming.customName)
+  }
+
   func appName(_ bundleID: String) -> String {
     if let name = appNames[bundleID] { return name }
     let last = bundleID.split(separator: ".").last.map(String.init) ?? bundleID
@@ -178,9 +184,14 @@ enum PlateNaming {
     id == BuiltInAction.keyboardBacklight ? "Keyboard" : name(id, catalog: catalog)
   }
 
-  /// The held keys as the user reads them ("fn", "⌃⌥ Space"), from the binding's `keys`.
+  /// The keys as the user reads them ("fn", "⌃⌥ Space"), from the binding's `keys`. A key
+  /// sequence (Keyboard Shortcut, BRIEF § Key sequences) reads as its combos joined by ", "
+  /// ("⌃ B, N"). `nil` when the value is missing or any step doesn't parse.
   static func keys(_ parameters: [String: String]) -> String? {
-    parameters[ActionParameterKey.keys].flatMap(KeyCombo.init).map(\.displayText)
+    guard let stored = parameters[ActionParameterKey.keys] else { return nil }
+    let steps = ConfigValidator.keySteps(stored).map { KeyCombo($0) }
+    guard !steps.isEmpty, !steps.contains(nil) else { return nil }
+    return steps.compactMap { $0?.displayText }.joined(separator: ", ")
   }
 
   /// The object of "open": the app's name, the URL's host, the file's name.
