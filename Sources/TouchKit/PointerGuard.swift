@@ -196,8 +196,16 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
   func handleTap(_ kind: TapEventKind, location: Point2D? = nil) -> TapVerdict {
     switch kind {
     case .disabledByTimeout, .disabledByUserInput:
-      lock.withLock { _reEnableCount += 1 }
+      let first = lock.withLock { () -> Bool in
+        _reEnableCount += 1
+        return _reEnableCount == 1
+      }
       tap.setEnabled(true)
+      if first {
+        TouchKitLog.pointer.notice(
+          "pointer guard: the system turned the tap off (\(kind == .disabledByTimeout ? "timeout" : "user input", privacy: .public)); turned it back on (logged once)"
+        )
+      }
       return .pass
     case .pointerMotion:
       let wantsHistory = lookback > 0

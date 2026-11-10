@@ -17,3 +17,19 @@ import Testing
   #expect(cache.current() == nil)
   #expect(cache.reads == 2)
 }
+
+/// Batch 28: a key tap the system turns off (timeout or user input) is turned straight back on;
+/// ordinary events are left alone.
+@Test func keyTapDisabledByTimeoutIsReEnabled() {
+  var enabled = 0
+  #expect(TapReenable.handle(.tapDisabledByTimeout) { enabled += 1 })
+  #expect(TapReenable.handle(.tapDisabledByUserInput) { enabled += 1 })
+  #expect(!TapReenable.handle(.keyDown) { enabled += 1 })
+  #expect(enabled == 2)
+}
+
+/// Batch 28: the key tap's run loop is its own thread, never main.
+@Test func keyTapRunLoopIsNotMain() {
+  let loop = KeyTapRunLoop(name: "test.keytap")
+  #expect(loop.runLoop !== CFRunLoopGetMain())
+}

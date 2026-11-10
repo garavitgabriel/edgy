@@ -141,7 +141,8 @@ final class LiveProcessRunner: ProcessRunning {
 
 // MARK: - Key events
 
-/// A listen-only session event tap for key-down and flags-changed events, on the main run loop.
+/// A listen-only session event tap for key-down and flags-changed events, on the key tap thread's
+/// run loop (batch 28: never on main, where drawing could delay it into a timeout).
 /// It never changes or blocks an event. Installed by `start`, removed by `stop`.
 final class LiveKeyEventTap: KeyEventSource, @unchecked Sendable {
   private let lock = NSLock()
@@ -172,7 +173,7 @@ final class LiveKeyEventTap: KeyEventSource, @unchecked Sendable {
     self.runLoopSource = source
     self.handler = handler
     lock.unlock()
-    CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
+    if let source { KeyTapRunLoop.shared.add(source) }
     CGEvent.tapEnable(tap: tap, enable: true)
   }
 
@@ -185,7 +186,7 @@ final class LiveKeyEventTap: KeyEventSource, @unchecked Sendable {
     handler = nil
     lock.unlock()
     if let tap { CGEvent.tapEnable(tap: tap, enable: false) }
-    if let source { CFRunLoopRemoveSource(CFRunLoopGetMain(), source, .commonModes) }
+    if let source { KeyTapRunLoop.shared.remove(source) }
     if let tap { CFMachPortInvalidate(tap) }
   }
 
@@ -194,8 +195,7 @@ final class LiveKeyEventTap: KeyEventSource, @unchecked Sendable {
     let handler = self.handler
     let tap = self.tap
     lock.unlock()
-    if type == .tapDisabledByTimeout || type == .tapDisabledByUserInput {
-      if let tap { CGEvent.tapEnable(tap: tap, enable: true) }
+    if TapReenable.handle(type, reenable: { if let tap { CGEvent.tapEnable(tap: tap, enable: true) } }) {
       return
     }
     guard
@@ -205,5 +205,76 @@ final class LiveKeyEventTap: KeyEventSource, @unchecked Sendable {
         isRepeat: event.getIntegerValueField(.keyboardEventAutorepeat) != 0)
     else { return }
     handler(input)
+  }
+}
+
+/// The system turns an event tap off when it is slow (`tapDisabledByTimeout`) or on some user input
+/// (`tapDisabledByUserInput`). Turn it straight back on, and log it once per process.
+enum TapReenable {
+  private static let logged = Locked(false)
+
+  /// Whether `type` was a disable notice (handled: `reenable` was called).
+  static func handle(_ type: CGEventType, reenable: () -> Void) -> Bool {
+    guard type == .tapDisabledByTimeout || type == .tapDisabledByUserInput else { return false }
+    reenable()
+    if logged.exchange(true) == false {
+      let why = type == .tapDisabledByTimeout ? "timeout" : "user input"
+      actionsLog.notice("key recorder: the system turned the tap off (\(why, privacy: .public)); turned it back on (logged once)")
+    }
+    return true
+  }
+}
+
+final class Locked<Value>: @unchecked Sendable {
+  private let lock = NSLock()
+  private var value: Value
+  init(_ value: Value) { self.value = value }
+  /// Stores `new` and returns the previous value.
+  func exchange(_ new: Value) -> Value {
+    lock.withLock {
+      let old = value
+      value = new
+      return old
+    }
+  }
+}
+
+/// A dedicated thread with its own run loop for the key recorder's tap (batch 28). Same shape as
+/// TouchKit's input thread; Actions doesn't depend on TouchKit.
+final class KeyTapRunLoop: @unchecked Sendable {
+  static let shared = KeyTapRunLoop(name: "com.garavit.edgy.keytap")
+
+  let runLoop: CFRunLoop
+
+  init(name: String) {
+    final class Handoff: @unchecked Sendable {
+      var runLoop: CFRunLoop?
+      let ready = DispatchSemaphore(value: 0)
+    }
+    let handoff = Handoff()
+    let thread = Thread {
+      let loop = CFRunLoopGetCurrent()!
+      var context = CFRunLoopSourceContext()
+      let keepAlive = CFRunLoopSourceCreate(kCFAllocatorDefault, 0, &context)
+      CFRunLoopAddSource(loop, keepAlive, .defaultMode)
+      handoff.runLoop = loop
+      handoff.ready.signal()
+      while true { CFRunLoopRun() }
+    }
+    thread.name = name
+    thread.qualityOfService = .userInteractive
+    thread.start()
+    handoff.ready.wait()
+    runLoop = handoff.runLoop!
+  }
+
+  func add(_ source: CFRunLoopSource) {
+    CFRunLoopAddSource(runLoop, source, .commonModes)
+    CFRunLoopWakeUp(runLoop)
+  }
+
+  func remove(_ source: CFRunLoopSource) {
+    CFRunLoopRemoveSource(runLoop, source, .commonModes)
+    CFRunLoopWakeUp(runLoop)
   }
 }
