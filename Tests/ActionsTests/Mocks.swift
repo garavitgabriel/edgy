@@ -446,7 +446,12 @@ final class MockSwitcherInput: SwitcherInputMonitor, @unchecked Sendable {
     stops += 1
     handler = nil
   }
-  func switcherAppCount() -> Int? { appCount }
+  /// How many times the app count was read (batch 28: only when the switcher opens).
+  private(set) var appCountReads = 0
+  func switcherAppCount() -> Int? {
+    appCountReads += 1
+    return appCount
+  }
 
   /// Delivers an interrupt as the live monitor would (only while listening).
   func send(_ interrupt: SwitcherInterrupt) { handler?(interrupt) }

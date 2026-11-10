@@ -233,7 +233,13 @@ Both lists are public on `ConfigValidator`: `legacyParameters` and `pressTimePar
   down and it opens on the next app. That first step is the opening. A stroke that ends or is
   interrupted before then does nothing at all (no key events), so a finger resting on the edge, a
   tap, or a short nudge never opens it. The `actionFired` click, the outcome
-  (`systemHUDShown`) and the idle watchdog all start at the opening. When a stroke ends (or is interrupted by a palm or a second finger), command stays down for
+  (`systemHUDShown`) and the idle watchdog all start at the opening; so do the Router's feed
+  report (`actionRan`, the "Switch Apps" plate) and the count of apps the switcher lists, and no
+  `gestureCaught` tick plays for the slide (the opening's click is its feedback; batch 28).
+  Test Mode still reports `wouldRun` at the stroke's start (nothing runs there, so there is no
+  opening to wait for). The opening travel is measured after the binding's `sensitivity`, which
+  scales slide travel: at `sensitivity` 2 the default 8 mm step opens at 4 mm of real finger
+  travel, at 0.5 at 16 mm. When a stroke ends (or is interrupted by a palm or a second finger), command stays down for
   `keepOpenMS`; a stroke that begins within that time continues the same session. It selects
   when the time passes, or at once on a click or clear pointer movement (40 pt); Escape closes it
   without selecting. Sliding back past the app it opened on cancels (escape). A stronger click

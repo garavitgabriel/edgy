@@ -104,8 +104,8 @@ public final class OnboardingController: NSObject, NSWindowDelegate {
     monitor?.stop()
     monitor = nil
     state.windowClosed()
-    // The feed is shared; the popover (opened next on Done) or the settings window start it
-    // again when they show. Same rule as the settings window's controller.
-    model.stopFeed()
+    // Batch 28: the feed stays on. It is shared, and the overlay (always running, no longer
+    // ticking while idle) wakes on its decisions; it costs nothing while no finger is down.
+    // Was: model.stopFeed()
   }
 }

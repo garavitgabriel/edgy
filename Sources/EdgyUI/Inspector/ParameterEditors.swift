@@ -410,10 +410,13 @@ struct AppChooserField: View {
     }
     .buttonStyle(.plain)
     .popover(isPresented: $open, arrowEdge: .bottom) {
-      AppListView(apps: apps, current: bundleID) { app in
+      // Batch 28: the list loads itself when the popover opens (the field's `.task` result never
+      // reached an already-open popover), and icons load off the main thread.
+      AppListView(apps: apps, current: bundleID, provider: provider) { app in
         open = false
         commit(app.bundleID)
       }
+      .environment(\.appIconsLoadOffMain, true)
     }
     .task {
       guard apps.isEmpty, let provider else { return }
@@ -431,66 +434,171 @@ struct AppChooserField: View {
 /// `ink2` (critique 22 must-fix), never the system's generic pale square.
 struct AppIcon: View {
   var path: String
+  @Environment(\.appIconsLoadOffMain) private var offMain
+  @State private var loaded: AppIconCache.Icon?
+
   var body: some View {
     Group {
-      if let icon = AppMark.icon(path) {
+      switch loaded ?? (offMain ? AppIconCache.shared.cached(path) : AppIconCache.shared.icon(path)) {
+      case .image(let icon)?:
         Image(nsImage: icon).resizable().frame(width: 16, height: 16)
-      } else {
+      case .none?:
         ActionIcon(id: "app.open", size: 16).foregroundStyle(Tokens.ink2)
+      case nil:
+        // Loading off the main thread: hold the row's place.
+        Color.clear.frame(width: 16, height: 16)
       }
     }
     .accessibilityHidden(true)
+    .task(id: path) {
+      guard offMain, AppIconCache.shared.cached(path) == nil else { return }
+      loaded = await AppIconCache.shared.load(path)
+    }
   }
+}
+
+/// App icons by bundle path, read once (batch 28). `icon(_:)` reads on the calling thread (fixed
+/// lists in previews and snapshots); `load(_:)` reads off the main thread for live lists.
+@MainActor
+final class AppIconCache {
+  enum Icon: @unchecked Sendable {
+    case image(NSImage)
+    /// The bundle has no icon of its own: the Open App tile.
+    case none
+  }
+
+  static let shared = AppIconCache()
+  private var icons: [String: Icon] = [:]
+  /// For tests: how many icons were read.
+  private(set) var reads = 0
+
+  func cached(_ path: String) -> Icon? { icons[path] }
+
+  func icon(_ path: String) -> Icon {
+    if let known = icons[path] { return known }
+    let icon = Self.read(path)
+    store(icon, path)
+    return icon
+  }
+
+  func load(_ path: String) async -> Icon {
+    if let known = icons[path] { return known }
+    let icon = await Task.detached(priority: .userInitiated) { Self.read(path) }.value
+    store(icon, path)
+    return icon
+  }
+
+  private func store(_ icon: Icon, _ path: String) {
+    icons[path] = icon
+    reads += 1
+  }
+
+  nonisolated private static func read(_ path: String) -> Icon {
+    AppMark.icon(path).map(Icon.image) ?? .none
+  }
+}
+
+extension EnvironmentValues {
+  /// Live lists load app icons off the main thread; previews and snapshots read them in place.
+  @Entry var appIconsLoadOffMain = false
 }
 
 /// Search, then Running (apps open now), then All apps — the same list as add-app.
 struct AppListView: View {
-  var apps: [InstalledApp]
   var current: String?
+  var provider: InstalledAppsProviding?
   var choose: (InstalledApp) -> Void
+  @State private var apps: [InstalledApp]
+  @State private var loading: Bool
   @State private var query = ""
   @FocusState private var searching: Bool
 
-  var body: some View {
+  static let loadingCopy = "Loading apps\u{2026}"
+
+  /// `apps`: what the caller already has. Empty with a `provider`: the list loads when it opens
+  /// and says "Loading apps…" until the apps arrive.
+  init(
+    apps: [InstalledApp], current: String?, provider: InstalledAppsProviding? = nil,
+    choose: @escaping (InstalledApp) -> Void
+  ) {
+    self.current = current
+    self.provider = provider
+    self.choose = choose
+    _apps = State(initialValue: apps)
+    _loading = State(initialValue: apps.isEmpty && provider != nil)
+  }
+
+  /// One row per app per section. IDs carry the section, so the app that sits in both Running and
+  /// All apps is two distinct rows (a lazy stack keyed by the app alone drew the repeat empty).
+  struct Row: Identifiable, Equatable {
+    var section: String
+    var app: InstalledApp
+    var isHeader = false
+    var id: String { isHeader ? "header|\(section)" : "\(section)|\(app.bundleID)" }
+  }
+
+  static func rows(_ apps: [InstalledApp], query: String) -> [Row] {
     let filtered = apps.filter { query.isEmpty || $0.name.localizedCaseInsensitiveContains(query) }
+    var rows: [Row] = []
+    for (title, list) in [("Running", filtered.filter(\.isRunning)), ("All apps", filtered)] where !list.isEmpty {
+      rows.append(Row(section: title, app: list[0], isHeader: true))
+      rows += list.map { Row(section: title, app: $0) }
+    }
+    return rows
+  }
+
+  /// Loads the apps once; safe to call again.
+  static func load(from provider: InstalledAppsProviding) async -> [InstalledApp] {
+    await provider.installedApps()
+  }
+
+  var body: some View {
     VStack(alignment: .leading, spacing: 8) {
       SearchField(text: $query, prompt: "Search apps").focused($searching)
       ScrollView {
-        // A plain VStack: the same app sits in both sections, and a lazy stack keyed by the app
-        // alone drew the repeat as an empty row.
-        VStack(alignment: .leading, spacing: 2) {
-          section("Running", filtered.filter(\.isRunning))
-          section("All apps", filtered)
+        LazyVStack(alignment: .leading, spacing: 2) {
+          if loading {
+            Text(Self.loadingCopy).font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
+              .padding(.top, 6)
+          }
+          ForEach(Self.rows(apps, query: query)) { row in
+            if row.isHeader { header(row.section) } else { appRow(row.app) }
+          }
         }
       }
     }
     .padding(12)
     .frame(width: 280, height: 320)
     .onAppear { searching = true }
+    .task {
+      guard apps.isEmpty, let provider else { return }
+      let loaded = await Self.load(from: provider)
+      apps = loaded
+      loading = false
+    }
   }
 
   /// Section headers are 13 semibold `ink2`: 11 pt is for the action picker's group headers only
   /// (batch-15 design answer 3).
-  @ViewBuilder private func section(_ title: String, _ apps: [InstalledApp]) -> some View {
-    if !apps.isEmpty {
-      Text(title).font(Tokens.font(Tokens.typeBody, semibold: true)).foregroundStyle(Tokens.ink2)
-        .padding(.top, 6)
-      ForEach(apps, id: \.bundleID) { app in
-        Button {
-          choose(app)
-        } label: {
-          HStack(spacing: 8) {
-            AppIcon(path: app.path)
-            Text(app.name).font(Tokens.font(Tokens.typeBody, semibold: app.bundleID == current))
-              .foregroundStyle(Tokens.ink)
-            Spacer()
-          }
-          .frame(minHeight: 24)
-          .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
+  private func header(_ title: String) -> some View {
+    Text(title).font(Tokens.font(Tokens.typeBody, semibold: true)).foregroundStyle(Tokens.ink2)
+      .padding(.top, 6)
+  }
+
+  private func appRow(_ app: InstalledApp) -> some View {
+    Button {
+      choose(app)
+    } label: {
+      HStack(spacing: 8) {
+        AppIcon(path: app.path)
+        Text(app.name).font(Tokens.font(Tokens.typeBody, semibold: app.bundleID == current))
+          .foregroundStyle(Tokens.ink)
+        Spacer()
       }
+      .frame(minHeight: 24)
+      .contentShape(Rectangle())
     }
+    .buttonStyle(.plain)
   }
 }
 

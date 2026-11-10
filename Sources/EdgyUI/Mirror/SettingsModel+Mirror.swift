@@ -47,20 +47,53 @@ extension SettingsModel {
     return nil
   }
 
-  /// The catalog by id, for label names and parameter checks.
-  var mirrorCatalog: [ActionID: ActionDescriptor] {
-    Dictionary(editor.catalogByCategory.flatMap(\.actions).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+  /// The catalog by id, for label names and parameter checks. Cached per revision (batch 28).
+  var mirrorCatalog: [ActionID: ActionDescriptor] { mirrorData.catalog }
+
+  /// `editor.catalogByCategory` (a sort over the whole catalog), cached per revision.
+  var mirrorGroups: [ActionGroup] { mirrorData.groups }
+
+  /// `editor.availability(of:)`, cached per revision and engine status: the live answer reads
+  /// the displays, which a view body must not do on every evaluation.
+  func mirrorAvailability(of id: ActionID) -> ActionAvailability {
+    let data = mirrorData
+    if let known = data.availability[id] { return known }
+    let answer = editor.availability(of: id)
+    data.availability[id] = answer
+    return answer
+  }
+
+  /// The cache for the current revision and engine status. Reading it registers both with
+  /// Observation, so views still re-render on every real change.
+  var mirrorData: MirrorDataCache {
+    let key = MirrorDataCache.Key(revision: revision, status: engineStatus)
+    let id = ObjectIdentifier(self)
+    if let entry = MirrorDataCache.entries[id], entry.owner === self {
+      if entry.cache.key == key { return entry.cache }
+      entry.cache.reset(key: key, editor: editor)
+      return entry.cache
+    }
+    MirrorDataCache.entries = MirrorDataCache.entries.filter { $0.value.owner != nil }
+    let cache = MirrorDataCache(key: key, editor: editor)
+    MirrorDataCache.entries[id] = MirrorDataCache.Entry(owner: self, cache: cache)
+    return cache
   }
 
   /// The zones a mirror draws for `app` (`nil` = Default): its effective bindings.
   /// `unavailableAsUnmapped`: the popover's mini mirror draws a zone whose action is unavailable
   /// on this Mac as unmapped (§ Issue states); the settings mirror marks its tab instead.
+  /// Computed once per revision, engine status and arguments (batch 28), not per body evaluation.
   func mirrorZones(forApp app: String?, unavailableAsUnmapped: Bool = false) -> [MirrorZone] {
-    _ = revision
+    let data = mirrorData
+    let key = MirrorDataCache.ZonesKey(app: app, unavailableAsUnmapped: unavailableAsUnmapped)
+    if let zones = data.zones[key] { return zones }
     let off = app.flatMap { editor.config.appProfiles[$0]?.disabled } ?? false
-    return MirrorContent.zones(
-      rows: editor.effectiveBindings(forApp: app), catalog: mirrorCatalog, allHairline: off,
-      availability: { self.editor.availability(of: $0) }, unavailableAsUnmapped: unavailableAsUnmapped)
+    let zones = MirrorContent.zones(
+      rows: editor.effectiveBindings(forApp: app), catalog: data.catalog, allHairline: off,
+      availability: { self.mirrorAvailability(of: $0) }, unavailableAsUnmapped: unavailableAsUnmapped)
+    data.zones[key] = zones
+    data.zoneComputations += 1
+    return zones
   }
 
   /// The pad state for `app` (`nil` = Default). `includesPaused: false` for the settings window,
@@ -80,5 +113,51 @@ extension SettingsModel {
   /// second click, which batch 15 owns; selecting never touches `picking`.
   func selectZone(_ zone: Zone) {
     selectedZone = zone
+  }
+}
+
+/// Mirror data for one revision and engine status (batch 28): the catalog, its groups, the
+/// availability answers and the zones each mirror draws. Rebuilt when either changes. Lives beside
+/// the model (the model's stored state is frozen), one per model, dropped with it.
+@MainActor
+final class MirrorDataCache {
+  struct Key: Equatable {
+    var revision: Int
+    var status: EngineStatus
+  }
+
+  struct ZonesKey: Hashable {
+    var app: String?
+    var unavailableAsUnmapped: Bool
+  }
+
+  struct Entry {
+    weak var owner: SettingsModel?
+    var cache: MirrorDataCache
+  }
+
+  static var entries: [ObjectIdentifier: Entry] = [:]
+
+  private(set) var key: Key
+  private(set) var catalog: [ActionID: ActionDescriptor] = [:]
+  private(set) var groups: [ActionGroup] = []
+  var availability: [ActionID: ActionAvailability] = [:]
+  var zones: [ZonesKey: [MirrorZone]] = [:]
+  /// For tests: how many times the catalog was rebuilt and zones were computed.
+  private(set) var catalogComputations = 0
+  var zoneComputations = 0
+
+  init(key: Key, editor: SettingsEditor) {
+    self.key = key
+    reset(key: key, editor: editor)
+  }
+
+  func reset(key: Key, editor: SettingsEditor) {
+    self.key = key
+    groups = editor.catalogByCategory
+    catalog = Dictionary(groups.flatMap(\.actions).map { ($0.id, $0) }, uniquingKeysWith: { a, _ in a })
+    availability = [:]
+    zones = [:]
+    catalogComputations += 1
   }
 }

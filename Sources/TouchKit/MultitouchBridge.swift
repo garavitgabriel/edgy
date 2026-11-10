@@ -14,7 +14,8 @@ typealias MTContactCallback = @convention(c) (MTDeviceRef?, UnsafeMutableRawPoin
 enum MultitouchOptions {
   /// `EDGY_MT_SKIP_START=1`: do not call the device-start function after registering.
   static var skipStart: Bool { env("EDGY_MT_SKIP_START") }
-  /// `EDGY_MT_RUNLOOP=1`: schedule devices on the main run loop (callbacks arrive on main).
+  /// `EDGY_MT_RUNLOOP=1`: schedule devices on a run loop (callbacks arrive on the input thread,
+  /// never on main: batch 28).
   static var scheduleOnRunLoop: Bool { env("EDGY_MT_RUNLOOP") }
   /// `EDGY_MT_SKIP_LAYOUT_CHECK=1`: deliver frames even when the layout check fails.
   static var skipLayoutCheck: Bool { env("EDGY_MT_SKIP_LAYOUT_CHECK") }
@@ -228,7 +229,8 @@ final class LiveMultitouchBackend: MultitouchBackend, @unchecked Sendable {
     }
     lock.withLock { active[device.info.id] = (handle, context, usedRefcon) }
     if MultitouchOptions.scheduleOnRunLoop, let schedule = framework.scheduleOnRunLoop {
-      schedule(handle, CFRunLoopGetMain(), CFRunLoopMode.defaultMode.rawValue)
+      schedule(handle, InputRunLoop.shared.runLoop, CFRunLoopMode.defaultMode.rawValue)
+      CFRunLoopWakeUp(InputRunLoop.shared.runLoop)
     }
     if !MultitouchOptions.skipStart, let start = framework.start {
       let status = start(handle, 0)

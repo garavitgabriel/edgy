@@ -106,7 +106,7 @@ extension ActionRegistry {
     keySessionGeneration += 1
     switcher = SwitcherSession(
       stepper: SlideStepper(step: feel.unit.step, speedUp: feel.speedUp), keepOpen: feel.keepOpen,
-      appCount: switcherInput.switcherAppCount())
+      appCount: nil)
   }
 
   /// The armed session earned its first step: command down, then the opening tab.
@@ -120,6 +120,9 @@ extension ActionRegistry {
     }
     // From here on every exit releases command.
     switcher?.opened = true
+    // Counted at the opening, not on every `.began` (batch 26 follow-up, batch 28): a resting
+    // finger costs no window-list read.
+    switcher?.appCount = switcherInput.switcherAppCount()
     try releasingSwitcherOnError(id) { try tapSwitcher(forward: true) }
     actionsLog.debug("app switcher: opened after one step of travel")
     if settings.allowsHaptic(.actionFired, parameters: context.parameters) {

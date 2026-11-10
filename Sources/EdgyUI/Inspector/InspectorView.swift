@@ -315,7 +315,7 @@ struct BindingRowView: View {
       default:
         let parameter = descriptor?.parameters.first { $0.key == issue.parameter }
         let text = IssueCopy.message(
-          for: issue, parameter: parameter, availability: model.editor.availability(of: row.binding.action))
+          for: issue, parameter: parameter, availability: model.mirrorAvailability(of: row.binding.action))
         return text.map { (IssueCopy.Style(issue.severity), $0) }
       }
     }

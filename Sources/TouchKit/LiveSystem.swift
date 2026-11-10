@@ -69,7 +69,8 @@ final class HIDButtonState: ButtonStateSource, @unchecked Sendable {
   }
 }
 
-/// Active event tap on pointer motion at the HID level.
+/// Active event tap on pointer motion at the HID level, on the input thread's run loop (batch 28):
+/// every pointer event in the system waits on this tap, so it never shares a thread with drawing.
 final class LiveEventTap: EventTapping, @unchecked Sendable {
   private let lock = NSLock()
   private var port: CFMachPort?
@@ -85,9 +86,9 @@ final class LiveEventTap: EventTapping, @unchecked Sendable {
         callback: liveTapCallback, userInfo: Unmanaged.passUnretained(self).toOpaque())
     else { return false }
     guard let source = CFMachPortCreateRunLoopSource(kCFAllocatorDefault, tap, 0) else { return false }
-    CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
-    CGEvent.tapEnable(tap: tap, enable: true)
     lock.withLock { port = tap }
+    InputRunLoop.shared.add(source)
+    CGEvent.tapEnable(tap: tap, enable: true)
     // Intentionally retained for the process lifetime (the tap's userInfo points at self).
     _ = Unmanaged.passRetained(self)
     return true
