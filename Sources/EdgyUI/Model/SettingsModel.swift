@@ -123,6 +123,9 @@ public final class SettingsModel {
 
   /// Hands the accumulated decisions to the caller (the overlay) and clears them.
   public func takeDecisions() -> [LiveDecision] {
+    // No write when there is nothing to take: a write, even of the same value, tells every
+    // observing view it changed, and the overlay asks on every tick.
+    guard !pendingDecisions.isEmpty else { return [] }
     defer { pendingDecisions = [] }
     return pendingDecisions
   }
@@ -153,10 +156,11 @@ public final class SettingsModel {
       {
         mirroredDevice = device
       }
-      if frame.deviceID == mirroredDevice?.id { liveTouches = frame.touches }
+      // Only real changes are written (see `takeDecisions()`): frames repeat while a finger rests.
+      if frame.deviceID == mirroredDevice?.id, liveTouches != frame.touches { liveTouches = frame.touches }
     }
-    pendingDecisions += update.decisions
     if !update.decisions.isEmpty {
+      pendingDecisions += update.decisions
       recentDecisions = Array((recentDecisions + update.decisions).suffix(Self.recentDecisionLimit))
       decisionSerial += update.decisions.count
     }

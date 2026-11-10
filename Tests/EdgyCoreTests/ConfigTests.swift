@@ -67,3 +67,18 @@ import Testing
   let clamped = try JSONDecoder().decode(AppSettings.self, from: Data(wild.utf8))
   #expect(clamped.hapticTickStrength == 1 && clamped.hapticClickStrength == 6)
 }
+
+@Test func bindingCustomNameAndIconAreOptionalInTheFile() throws {
+  // Older files have neither key; a binding without them writes neither.
+  let plain = Binding(zone: .corner(.topLeft), gesture: .tap, action: "audio.mute")
+  let plainJSON = String(decoding: try JSONEncoder().encode(plain), as: UTF8.self)
+  #expect(!plainJSON.contains("customName") && !plainJSON.contains("customIcon"))
+  #expect(try JSONDecoder().decode(Binding.self, from: Data(plainJSON.utf8)) == plain)
+
+  let named = Binding(
+    zone: .corner(.topLeft), gesture: .longPress, action: "keyboard.hold", parameters: ["keys": "fn"],
+    customName: "Dictate", customIcon: "system.dictation")
+  let back = try JSONDecoder().decode(Binding.self, from: try JSONEncoder().encode(named))
+  #expect(back == named)
+  #expect(back.customName == "Dictate" && back.customIcon == "system.dictation")
+}

@@ -44,12 +44,23 @@ public struct Binding: Codable, Hashable, Sendable {
   public var gesture: GestureKind
   public var action: ActionID
   public var parameters: [String: String]
+  /// The user's own name for this binding ("Dictate" instead of "fn Space"). `nil`: the UI names
+  /// it from the action and its parameters. Presentation only; the engine never reads it.
+  public var customName: String?
+  /// The user's own icon for this binding: the ID of an action in the icon library (the icon
+  /// drawn for that action). `nil`: the bound action's icon. Presentation only.
+  public var customIcon: ActionID?
 
-  public init(zone: Zone, gesture: GestureKind, action: ActionID, parameters: [String: String] = [:]) {
+  public init(
+    zone: Zone, gesture: GestureKind, action: ActionID, parameters: [String: String] = [:],
+    customName: String? = nil, customIcon: ActionID? = nil
+  ) {
     self.zone = zone
     self.gesture = gesture
     self.action = action
     self.parameters = parameters
+    self.customName = customName
+    self.customIcon = customIcon
   }
 }
 
