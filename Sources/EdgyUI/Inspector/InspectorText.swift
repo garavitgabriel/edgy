@@ -215,6 +215,9 @@ enum IssueCopy {
       if case .unavailable(let reason) = availability { return reason }
       return "Not available on this Mac."
     case .tapWaitsForDoubleTap: return issue.detail.map(tapWaits)
+    case .keySequenceTooLong: return "Up to 4 shortcuts in a row."
+    case .keySequenceNotAllowed: return "This takes one shortcut."
+    case .unknownCustomIcon, .customNameTooLong: return nil
     case .overlappingZones, .invalidProfileID, .settingOutOfRange: return nil
     // Codes added after this batch (e.g. batch 20's notes) still say something.
     default: return note(for: issue)
@@ -266,9 +269,20 @@ enum KeyComboText {
     return mods.isEmpty ? name : "\(mods) \(name)"
   }
 
-  /// Display text for a stored combo string; the raw text when it doesn't parse.
+  /// Display text for a stored combo string; the raw text when it doesn't parse. A key sequence
+  /// (Keyboard Shortcut, "ctrl+b n") shows as keycap groups joined by ", ": "⌃ B, N" (BRIEF § Key
+  /// sequences), the same in the field, the pad tab, the sub-line and the plates.
   static func display(_ stored: String) -> String {
-    KeyCombo(stored).map(display) ?? stored
+    if let combo = KeyCombo(stored) { return display(combo) }
+    let steps = ConfigValidator.keySteps(stored).map { KeyCombo($0) }
+    guard steps.count > 1, !steps.contains(nil) else { return stored }
+    return steps.compactMap { $0.map(display) }.joined(separator: ", ")
+  }
+
+  /// The stored steps of a `keys` value ("ctrl+b n" → ["ctrl+b", "n"]); empty for an empty value.
+  static func steps(_ stored: String) -> [String] {
+    let trimmed = stored.trimmingCharacters(in: .whitespaces)
+    return trimmed.isEmpty ? [] : ConfigValidator.keySteps(trimmed)
   }
 
   static func keyName(_ key: String) -> String {
@@ -281,5 +295,28 @@ enum KeyComboText {
     ]
     if let name = named[key] { return name }
     return key.uppercased()
+  }
+}
+
+/// The user's own name and icon for a binding (BRIEF § Your own name and icon), read the same on
+/// every surface. Presentation only. The picker never reads these: it always shows real actions.
+enum BindingNaming {
+  /// The custom name, trimmed; `nil` when unset or blank.
+  static func customName(_ binding: Binding) -> String? {
+    guard let name = binding.customName?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else {
+      return nil
+    }
+    return name
+  }
+
+  /// The icon a zone draws: the custom icon when the library draws it, else the action's own.
+  static func iconID(_ binding: Binding) -> ActionID {
+    if let icon = binding.customIcon, icon != .doNothing, ActionIcons.has(icon) { return icon }
+    return binding.action
+  }
+
+  /// The IDs the icon library draws (what `SettingsEditor.setNameAndIcon` may store).
+  static func library(catalog: [ActionDescriptor]) -> Set<ActionID> {
+    Set(catalog.map(\.id).filter { $0 != .doNothing && ActionIcons.has($0) })
   }
 }

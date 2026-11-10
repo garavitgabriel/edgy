@@ -95,6 +95,17 @@ public struct ValidationIssue: Hashable, Sendable, CustomStringConvertible {
     /// edge), so swipes there need a clearer flick (the recognizer raises its swipe speed and
     /// travel on a zone with a slide bound). Attached to each such swipe. Not a warning.
     case slideAndSwipes
+    /// A key sequence (`keys` of Keyboard Shortcut: combos separated by one space, `"ctrl+b n"`)
+    /// with more than `ConfigValidator.keySequenceLimit` (4) steps.
+    case keySequenceTooLong
+    /// More than one combo where only one is taken: any key parameter but Keyboard Shortcut's
+    /// `keys` (Hold Keys holds ONE combo).
+    case keySequenceNotAllowed
+    /// Warning: `customIcon` isn't an action in the catalog; the UI draws the action's own icon.
+    case unknownCustomIcon
+    /// Warning: `customName` is longer than `SettingsEditor.customNameLimit` (a hand edit); the UI
+    /// shows it with the fade, the editor saves at most 24 characters.
+    case customNameTooLong
   }
 
   public var severity: Severity
@@ -284,14 +295,17 @@ public struct ConfigValidator: Sendable {
         if parameter.required { add(.error, .missingParameter, parameter: parameter.key) }
         continue
       }
-      if let code = Self.check(value, against: parameter.kind) {
+      if case .keyCombo = parameter.kind {
+        let allowsSequence = Self.keySequenceActions.contains(binding.action) && parameter.key == "keys"
+        if let (code, detail) = Self.checkKeys(value, allowsSequence: allowsSequence, hold: descriptor.shape == .hold) {
+          add(.error, code, parameter: parameter.key, detail: detail)
+        }
+      } else if let code = Self.check(value, against: parameter.kind) {
         add(.error, code, parameter: parameter.key)
-      } else if case .keyCombo = parameter.kind, descriptor.shape != .hold,
-        KeyCombo(value.trimmingCharacters(in: .whitespaces))?.isModifierOnly == true
-      {
-        add(.error, .invalidKeyCombo, parameter: parameter.key, detail: ValidationIssue.modifierOnlyNeedsHold)
       }
     }
+    if let icon = binding.customIcon, byID[icon] == nil || icon == .doNothing { add(.warning, .unknownCustomIcon) }
+    if let name = binding.customName, name.count > Self.customNameLimit { add(.warning, .customNameTooLong) }
     var known = Set(descriptor.parameters.map(\.key)).union(Self.crossCuttingParameters)
       .union(Self.legacyParameters[binding.action] ?? [])
     let pressTime = Self.pressTimeParameter
@@ -422,6 +436,44 @@ public struct ConfigValidator: Sendable {
     else { return false }
     // Compare [seg/count, (seg+1)/count) intervals with integer cross-multiplication.
     return segA * countB < (segB + 1) * countA && segB * countA < (segA + 1) * countB
+  }
+
+  // MARK: Key sequences (batch 29 + 32; shared format)
+
+  /// Actions whose `keys` may hold a sequence: Keyboard Shortcut only.
+  public static let keySequenceActions: Set<ActionID> = ["keyboard.shortcut"]
+  /// Most steps in a key sequence.
+  public static let keySequenceLimit = 4
+  /// Longest custom name (mirrors `SettingsEditor.customNameLimit`).
+  static let customNameLimit = 24
+
+  /// The steps of a stored `keys` value: combos separated by ONE space (`"ctrl+b n"` → `["ctrl+b",
+  /// "n"]`). The ends are trimmed; a doubled space yields an empty step (which doesn't parse). One
+  /// combo is today's value exactly: `["cmd+shift+4"]`.
+  /// A value that parses as one combo as a whole (an older hand edit like `"cmd + 4"`) stays one step.
+  public static func keySteps(_ value: String) -> [String] {
+    let trimmed = value.trimmingCharacters(in: .whitespaces)
+    if KeyCombo(trimmed) != nil { return [trimmed] }
+    return trimmed.split(separator: " ", omittingEmptySubsequences: false).map(String.init)
+  }
+
+  /// The issue a `keyCombo` value has, or `nil`. Each step must parse (`invalidKeyCombo`); a
+  /// modifier-only step is refused unless `hold` (`invalidKeyCombo` with `modifierOnlyNeedsHold`);
+  /// more than one step needs `allowsSequence` (`keySequenceNotAllowed`) and at most
+  /// `keySequenceLimit` steps (`keySequenceTooLong`).
+  public static func checkKeys(
+    _ value: String, allowsSequence: Bool, hold: Bool
+  ) -> (ValidationIssue.Code, String?)? {
+    let steps = keySteps(value)
+    if steps.count > 1 {
+      guard allowsSequence else { return (.keySequenceNotAllowed, nil) }
+      guard steps.count <= keySequenceLimit else { return (.keySequenceTooLong, nil) }
+    }
+    for step in steps {
+      guard let combo = KeyCombo(step), !step.isEmpty else { return (.invalidKeyCombo, nil) }
+      if combo.isModifierOnly, !hold { return (.invalidKeyCombo, ValidationIssue.modifierOnlyNeedsHold) }
+    }
+    return nil
   }
 
   /// The `Code` for a value that fails its kind's check, or `nil` if it passes.

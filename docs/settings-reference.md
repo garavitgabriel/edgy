@@ -280,6 +280,38 @@ are stable.
 | `actionUnavailable` | warning | The action can't work on this Mac right now; the binding is kept. |
 | `tapWaitsForDoubleTap` | info | The zone has a tap and a double-tap, so a tap waits `doubleTapWindowMS` (`detail`, in ms) before it runs. |
 | `slideAndSwipes` | info | The edge has a slide and a swipe (same zone, or overlapping segments of one edge), so swipes there need a clearer flick. Attached to each such swipe. Copy: "Quick slides can look like swipes here, so swipes need a clearer flick on this edge." The recognizer asks a swipe on a zone with a slide bound for 260 mm/s and 9 mm (elsewhere 180 mm/s and 6 mm). |
+| `keySequenceTooLong` | error | Keyboard Shortcut's `keys` holds more than 4 steps. |
+| `keySequenceNotAllowed` | error | More than one combo where only one is taken: every key parameter except Keyboard Shortcut's `keys` (Hold Keys holds one combo). |
+| `unknownCustomIcon` | warning | A binding's `customIcon` isn't an action in the catalog (a hand edit). The UI draws the action's own icon. |
+| `customNameTooLong` | warning | A binding's `customName` is over 24 characters (a hand edit). The UI shows it with the fade. |
+
+### Key sequences (batch 29 UI, batch 32 engine)
+
+Keyboard Shortcut's `keys` holds **1–4 combos separated by one space**: `"ctrl+b n"`. Each step uses the
+one-combo syntax above. One combo is today's value exactly (a value that parses as one combo as a whole
+stays one step, so an older `"cmd + 4"` is still one combo). Every step must parse (`invalidKeyCombo`), a
+modifier-only step is refused with `invalidKeyCombo` + `modifierOnlyNeedsHold`, more than 4 steps is
+`keySequenceTooLong`, and a second step anywhere else (Hold Keys, Slide to Repeat Keys) is
+`keySequenceNotAllowed`. `ConfigValidator.keySteps(_:)` splits a value; `checkKeys(_:allowsSequence:hold:)`
+checks one. The UI shows steps as keycap groups joined by ", " ("⌃ B, N").
+
+### Your own name and icon (`Binding.customName`, `Binding.customIcon`)
+
+Presentation only: the engine never reads either field. Change both with **one** call (one undo step):
+
+```swift
+try editor.setNameAndIcon(key, in: ref, name: "Dictate", icon: "system.dictation", library: drawnIDs)
+```
+
+- **Name:** trimmed, cut to `SettingsEditor.customNameLimit` (24) characters; empty or equal to the
+  action's display name saves as `nil`. `SettingsEditor.customName(_:actionName:)` is the rule.
+- **Icon:** an action ID the icon library draws (`library`, default `editor.iconLibrary`: every
+  catalog action but "Do nothing"). The bound action's own icon saves as `nil`; anything else outside
+  the library throws `SettingsEditorError.unknownIcon` and changes nothing.
+- **Reset:** `name: nil, icon: nil`.
+- **App tabs:** on an inheriting app profile, naming a binding that shows through from Default creates
+  an override (the same action and parameters, the new name and icon), so it shows the override dot
+  and Revert (`revertToDefault`). Nothing bound at the slot throws `bindingNotFound`.
 
 ## A broken config file
 
