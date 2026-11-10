@@ -37,7 +37,7 @@ The first run also offers two other starting points: window moves on the bottom 
 
 ### Download
 
-The signed, notarized build updates itself: [DOWNLOAD_URL](DOWNLOAD_URL). It's the same app with the same features as the one you build yourself.
+Get the signed, notarized build: [DOWNLOAD_URL](DOWNLOAD_URL). It's the same app with the same features as the one you build yourself.
 
 ### Build it yourself
 
@@ -51,7 +51,7 @@ make app
 
 `make app` builds a release copy at `build/release/Edgy.app`. It signs it with your local Apple Development identity if you have one, and otherwise signs it ad hoc. It doesn't install or launch anything; drag the app into Applications and open it.
 
-The trade-off: a build you make yourself doesn't update itself, so you pull and rebuild for new versions. If it was signed ad hoc, macOS treats each rebuild as a new app, and you'll need to grant Accessibility again (see Troubleshooting).
+The trade-off: to get a new version, you pull and rebuild. If it was signed ad hoc, macOS treats each rebuild as a new app, and you'll need to grant Accessibility again (see Troubleshooting).
 
 ## First run
 

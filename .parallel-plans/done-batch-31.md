@@ -38,7 +38,7 @@ Branch `worktree-edgy-public`. Changed only the owned paths: `README.md`, `LICEN
 | `SECURITY.md` | `SECURITY_CONTACT`. Also confirm the "reply within a week" promise, or change it. |
 | `README.md`, `.github/ISSUE_TEMPLATE/config.yml` | Clone/security URL `github.com/garavitgabriel/edgy` (from `git remote -v`). Change it if the public repo gets a different name or owner. |
 | `README.md` § Build it yourself | The `make app` description: re-check it against batch 30's real `Makefile`. |
-| `README.md` § Download | "The signed, notarized build updates itself": the updater is not on `main` and not in batch 30 (release plan P2 step 4). Keep the sentence only if the updater ships before launch. |
+| `README.md` § Download | The README makes no auto-update claim: the updater is not on `main` and not in batch 30 (release plan P2 step 4). Once it ships, add "It updates itself." to the Download line and restore the update contrast in the build-it-yourself trade-off. |
 | `README.md` § Troubleshooting, first case | It says to remove and re-add Edgy in Accessibility after an ad hoc rebuild. Confirm that is the fix on device. |
 
 ## History scan (counts and hashes only)
