@@ -267,6 +267,8 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
   - **fn is a word, so it's followed by one space:** "fn Space", "fn ⌃B". On its own it's "fn".
   - Named keys are words: Space, Tab, Return, Esc, Delete, plus arrows as "←", "→", "↑", "↓".
   - Sequences join steps with ", ": "⌃B, N".
+  - **Combined edge labels never use commas:** two bindings read "A and B"; three or more read "A and 2 more". The hover line and inspector list them all.
+  - **Corner tabs** may grow along their edge up to 40% of its length before fading.
   - Right-hand modifiers stay "Right ⌘" in the field; tabs and plates use the plain symbol.
 - **Recording Escape itself** (owner case 2026-11-09: a zone that sends Escape to interrupt a terminal). A bare Esc still **cancels** recording, as people expect. While a Keyboard Shortcut field (or a sequence step) is recording, a quiet **"Use Escape"** text button (`ink2`, 13) appears under the field, with the tooltip "Record the Escape key itself". Clicking it commits `escape` as that step and ends recording. Esc with modifiers (e.g. ⌥Esc) records normally. It's **not shown on Hold Keys** (holding Escape has no use case). Every other key, including Return, Tab, Space and Delete, records directly while recording; only Esc needs the button. Display: "Esc" (in sequences: "⌃B, Esc").
 - **Key sequences (Keyboard Shortcut only; owner request 2026-11-09).** One gesture can send up to **4 shortcuts in order** (e.g. a terminal prefix, then a command):
@@ -322,9 +324,9 @@ Every row has a "…" menu with Change action…, Turn off here and Revert to De
   - **Zone icons** (full mirror corners and the mini mirror): the custom icon.
   - **Mini-mirror hover line:** the custom name ("Bottom-right: Dictate").
   - **Inspector row:** the custom name in `ink` as the action text, with a sub-line in `ink2` naming the real action and its parameter ("Hold Keys: fn Space"), so it's never a mystery. Bindings without a custom name are unchanged.
-  - **Plates:** the value line is the custom name **with no verb** ("Dictate"). Holds read "Dictate, held" → "Dictate, released". Dry run reads "Would run Dictate". The second line is unchanged ("Bottom-right corner, long-press").
+  - **Plates:** the value line is the custom name **with no verb** ("Dictate"). Dry run uses the verb for the kind: "Would set Dictate" (continuous), "Would hold Dictate" (hold), "Would run Dictate" (trigger). Holds read "Dictate, held" → "Dictate, released". Dry run reads "Would run Dictate". The second line is unchanged ("Bottom-right corner, long-press").
   - **The picker** always shows real action names. The checkmark row is the real action.
-- **App profiles:** the name and icon belong to the binding. An inherited binding shows Default's name and icon. Renaming an inherited binding on an app tab creates an **override** (the same action with the new name), shown with the override dot and Revert, like any other override. Changing an overridden binding's action keeps its custom name only if the user hasn't cleared it.
+- **App profiles:** the name and icon belong to the binding. An inherited binding shows Default's name and icon. Renaming an inherited binding on an app tab creates an **override** (the same action with the new name), shown with the override dot and Revert, like any other override. A custom name carries only within the same binding: picking a new action on an **inherited** row creates an override **without** Default's custom name; on an already-overridden row, a name set there carries. In the icon grid, identical drawings appear once (the tooltip names every action that uses it).
 
 **Slide feel and hold timing (batch 20).**
 - These use the same parameter rows: a number gets a slider with its value plus unit on the right, and on/off gets a checkbox.
