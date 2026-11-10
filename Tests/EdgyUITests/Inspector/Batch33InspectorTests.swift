@@ -78,21 +78,33 @@ struct Batch33InspectorTests {
 
   // MARK: Should-fix 4: the field keeps its place
 
-  @Test func fieldKeepsItsWidthWhenThenHides() {
-    func width(_ keys: String, sequence: Bool) -> CGFloat {
-      let view = KeyRecorderField(stored: keys, isHold: false, allowsSequence: sequence, recorder: nil) { _ in }
-      return NSHostingView(rootView: view).fittingSize.width
+  @Test func fieldKeepsItsWidthWhenThenHides() throws {
+    // Before the owner ruling 2026-11-10 ("+ Then…" became "Add another key" on its own line under
+    // the field, so nothing sits beside the field any more), this measured the reserved width
+    // beside it:
+    // func width(_ keys: String, sequence: Bool) -> CGFloat {
+    //   let view = KeyRecorderField(stored: keys, isHold: false, allowsSequence: sequence, recorder: nil) { _ in }
+    //   return NSHostingView(rootView: view).fittingSize.width
+    // }
+    // func trailing(_ keys: String) -> CGFloat { width(keys, sequence: true) - width(keys, sequence: false) }
+    // let two = trailing("ctrl+b n")
+    // let four = trailing("ctrl+b n cmd+k x")
+    // let thenWidth = NSHostingView(
+    //   rootView: QuietTextButton(title: KeyRecorderField.thenLabel, tooltip: "") {}
+    // ).fittingSize.width
+    // #expect(four >= thenWidth, "the hidden button still holds its width")
+    // #expect(abs(two - four) <= 0.5, "two \(two), four \(four)")
+    // Now: the field's real frame in the row, with the button showing (two steps) or hidden (four).
+    func field(_ keys: String) throws -> CGRect {
+      let view = LabeledParameter(label: "Keys", labelWidth: 80) {
+        KeyRecorderField(stored: keys, isHold: false, allowsSequence: true, recorder: nil) { _ in }
+      }
+      return try #require(Batch34RecorderTests.Laid(view).frames[.field])
     }
-    // What sits right of the field: the same with "+ Then…" showing (two steps) or hidden (four),
-    // so the field's trailing edge never moves.
-    func trailing(_ keys: String) -> CGFloat { width(keys, sequence: true) - width(keys, sequence: false) }
-    let two = trailing("ctrl+b n")
-    let four = trailing("ctrl+b n cmd+k x")
-    let thenWidth = NSHostingView(
-      rootView: QuietTextButton(title: KeyRecorderField.thenLabel, tooltip: "") {}
-    ).fittingSize.width
-    #expect(four >= thenWidth, "the hidden button still holds its width")
-    #expect(abs(two - four) <= 0.5, "two \(two), four \(four)")
+    let two = try field("ctrl+b n")
+    let four = try field("ctrl+b n cmd+k x")
+    #expect(abs(two.minX - four.minX) <= 0.5, "two \(two.minX), four \(four.minX)")
+    #expect(abs(two.width - four.width) <= 0.5, "two \(two.width), four \(four.width)")
   }
 
   // MARK: Should-fix 1: one alignment for sub-lines

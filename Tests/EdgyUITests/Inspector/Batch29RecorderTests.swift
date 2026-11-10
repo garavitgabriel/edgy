@@ -73,7 +73,9 @@ struct Batch29RecorderTests {
 
   @Test func oneStepShowsThen() {
     #expect(KeyRecorderController.showsThen(stored: "ctrl+b", allowsSequence: true, isRecording: false))
-    #expect(KeyRecorderField.thenLabel == "+ Then…")
+    // Before the owner ruling 2026-11-10 ("+ Then…" hid in plain sight; now "Add another key"):
+    // #expect(KeyRecorderField.thenLabel == "+ Then…")
+    #expect(KeyRecorderField.thenLabel == "Add another key")
     #expect(KeyRecorderField.thenTooltip == "Send another shortcut after this one")
   }
 

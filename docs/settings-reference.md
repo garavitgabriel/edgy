@@ -293,7 +293,9 @@ stays one step, so an older `"cmd + 4"` is still one combo). Every step must par
 modifier-only step is refused with `invalidKeyCombo` + `modifierOnlyNeedsHold`, more than 4 steps is
 `keySequenceTooLong`, and a second step anywhere else (Hold Keys, Slide to Repeat Keys) is
 `keySequenceNotAllowed`. `ConfigValidator.keySteps(_:)` splits a value; `checkKeys(_:allowsSequence:hold:)`
-checks one. The UI shows steps as keycap groups joined by ", " ("⌃B, N").
+checks one. The UI shows steps as keycap groups joined by ", " ("⌃B, N"). In the inspector, once a combo
+is set, an **Add another key** button under the field records the next step (hidden at 4 steps and while
+recording; batch 34, replacing the quiet "+ Then…"), with the line "Sends these one after another." under it.
 
 ### Your own name and icon (`Binding.customName`, `Binding.customIcon`)
 
