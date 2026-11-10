@@ -59,6 +59,19 @@ struct Batch33MirrorTests {
     try shootPad(model, "pad-corner-tab-forty-percent")
   }
 
+  // MARK: Fix 5: format once per revision
+
+  @Test func comboLabelsAreFormattedOncePerRevision() throws {
+    let shortcut = EdgyCore.Binding(
+      zone: .corner(.bottomLeft), gesture: .doubleTap, action: BuiltInAction.keyboardShortcut,
+      parameters: ["keys": "ctrl+b n"])
+    let model = model(replacing: [.corner(.bottomLeft)], with: [shortcut])
+    let before = model.mirrorData.zoneComputations
+    for _ in 0..<60 { _ = model.mirrorZones(forApp: nil) }  // a second of frames
+    #expect(model.mirrorData.zoneComputations - before <= 1)
+    #expect(model.mirrorZones(forApp: nil).first { $0.zone == .corner(.bottomLeft) }?.label == "⌃B, N")
+  }
+
   // MARK: Answer 1
 
   @Test func combinedEdgeLabelHasNoCommas() throws {
