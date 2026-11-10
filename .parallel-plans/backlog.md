@@ -52,3 +52,8 @@ Items found in testing or left open by builders, to fold into a future round.
   3. Mirror bodies recompute `catalogByCategory` (sort) and `availability(of:)` → `LiveBrightnessOutput.builtInDisplay()` (CGGetOnlineDisplayList) per render.
   4. The pointer-guard event tap and the multitouch callback run on the MAIN run loop, the same thread doing (1)–(3): pointer events system-wide wait on Edgy's UI work (input lag; risk of tapDisabledByTimeout). Possible link to Gabriel's "settings freezes" report.
 - Fix plan: batch 28 (event-driven overlay, Observation hygiene, cached mirror data, taps/callbacks on their own thread with timeout re-enable) + `scripts/measure-idle.sh` with a budget (idle, no window: <0.5% CPU and <50 wakeups/s; settings open and idle: <3%).
+
+## Requested by Gabriel 2026-11-09 (after the setup review) → batch 32, after batch 28 merges
+- **Key sequences** for Keyboard Shortcut: several combos sent in order ("ctrl+b, then n"), so a multiplexer's prefix commands work from one gesture. Stored in the existing `keys` parameter (combos separated by a space; one combo = today's behaviour, old files unchanged); small fixed gap between combos; all keys released on any error; max 4 combos. Recorder UI: record step by step, shown as "⌃B  N" chips (design to spec). Engine = Actions; UI = Inspector (after batch 29).
+- **Last App** action (Apps group): back to the app you were in before (one press of the app switcher, no slide). Tap / double-tap / long-press. His main loop is terminal ↔ browser.
+- Not possible to split an edge differently per app (he keeps ⌃Tab on the left edge's upper half for the browser's tab overview): consider per-app splits for v1.x.
