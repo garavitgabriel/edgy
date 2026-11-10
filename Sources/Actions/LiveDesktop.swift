@@ -103,12 +103,13 @@ final class LiveWorkspaceOutput: WorkspaceOutput {
   }
 
   func activate(bundleID: String) throws {
-    if let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first {
-      running.unhide()
-      running.activate()
-      return
-    }
-    guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+    // A running app is brought forward the way a Dock click does it, through the workspace.
+    // `NSRunningApplication.activate()` alone is a request the system may drop when the front
+    // app is in a full-screen Space (reported 2026-11-10: a full-screen terminal kept the front).
+    let running = NSRunningApplication.runningApplications(withBundleIdentifier: bundleID).first
+    running?.unhide()
+    guard let url = running?.bundleURL ?? NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID)
+    else {
       throw OutputError("no app installed with bundle ID \(bundleID)")
     }
     let configuration = NSWorkspace.OpenConfiguration()
