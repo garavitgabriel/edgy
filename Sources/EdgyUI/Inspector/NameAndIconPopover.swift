@@ -30,7 +30,9 @@ struct NameAndIconPopover: View {
   private var isSet: Bool { row.binding.customName != nil || row.binding.customIcon != nil }
 
   var body: some View {
-    VStack(alignment: .leading, spacing: 0) {
+    // Built once per body pass and handed to every cell.
+    let groups = Self.groups(model: model)
+    return VStack(alignment: .leading, spacing: 0) {
       Text("Name").font(Tokens.font(Tokens.typeBody)).foregroundStyle(Tokens.ink2)
         .padding(.bottom, 4)
       TextField("", text: $name, prompt: Text(ownName).foregroundStyle(Tokens.ink2))
@@ -57,7 +59,7 @@ struct NameAndIconPopover: View {
               // Not lazy: every cell exists on open, so the selected one can be scrolled to.
               Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
                 ForEach(Self.rows(group.ids), id: \.self) { row in
-                  GridRow { ForEach(row, id: \.self) { id in iconCell(id).id(id) } }
+                  GridRow { ForEach(row, id: \.self) { id in iconCell(id, groups: groups).id(id) } }
                 }
               }
             }
@@ -90,9 +92,7 @@ struct NameAndIconPopover: View {
     stride(from: 0, to: ids.count, by: columnCount).map { Array(ids[$0..<min($0 + columnCount, ids.count)]) }
   }
 
-  private var groups: [Group] { Self.groups(model: model) }
-
-  private func iconCell(_ id: ActionID) -> some View {
+  private func iconCell(_ id: ActionID, groups: [Group]) -> some View {
     let sharing = Self.sharing(id, in: groups)
     let selected = id == Self.cell(for: selectedIcon, in: groups)
     let own = sharing.contains(row.binding.action)

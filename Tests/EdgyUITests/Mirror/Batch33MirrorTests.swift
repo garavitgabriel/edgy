@@ -59,6 +59,20 @@ struct Batch33MirrorTests {
     try shootPad(model, "pad-corner-tab-forty-percent")
   }
 
+  @Test func nameWiderThanFortyPercentStillFades() throws {
+    let wide = String(repeating: "W", count: SettingsEditor.customNameLimit)
+    let hold = EdgyCore.Binding(
+      zone: .corner(.bottomRight), gesture: .longPress, action: BuiltInAction.keyboardHold,
+      parameters: ["keys": "fn"], customName: wide)
+    let model = model(replacing: [.corner(.bottomRight)], with: [hold])
+    let mirror = pad(model)
+    let corner = try #require(model.mirrorZones(forApp: nil).first { $0.zone == .corner(.bottomRight) })
+    let fit = mirror.fittedLabel(corner, placement: mirror.labelPlacement(corner))
+    #expect(fit.clipWidth == mirror.cornerGrowRoom(corner))
+    #expect(!fit.text.contains("…"))
+    try shootPad(model, "pad-corner-tab-wide-name-fades")
+  }
+
   // MARK: Fix 5: format once per revision
 
   @Test func comboLabelsAreFormattedOncePerRevision() throws {
