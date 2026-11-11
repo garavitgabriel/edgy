@@ -14,7 +14,7 @@ Private file; `.parallel-plans/` does not go into the public tree.
 2. Repo settings (web): upload `docs/readme/social-preview.png` under Settings → Social preview; turn on Security → Private vulnerability reporting (public repos only); turn on Discussions if wanted.
 3. `gh repo edit --homepage https://edgy.to --add-topic macos,macos-app,menu-bar,menubar-app,trackpad,gestures,multitouch,swift,swiftui,productivity,open-source,accessibility`
 4. Start the Check workflow once by hand; when it is green, add its status badge to the README.
-5. Demo clip: drag the .mp4 into the README's marked slot in the GitHub web editor (it only plays in place when uploaded that way; a video file committed to the repo shows as a link).
+5. Film (done 2026-11-11 as a poster linking to edgy.to/film.mp4; finished cuts are in `~/Movies/edgy-film/2026-11-10-v2-final/`). Optional upgrade for in-place playback: drag `edgy-site/film.mp4` (5 MB) into the README in the GitHub web editor (it only plays in place when uploaded that way; a video file committed to the repo shows as a link).
 6. Cut a GitHub release for the tag with the changelog section as its notes. The DMG itself is sold on edgy.to, not attached.
 7. README claims to re-check on that day: "$5", "notarized", "Included in the $5" (new versions), clone URL.
 
