@@ -20,4 +20,4 @@ Edgy's issues, pull requests and discussions are for making Edgy better. Everyon
 
 A maintainer may edit or remove a comment, close or lock a thread, or block an account, depending on how serious it is and whether it repeats.
 
-To report a problem, contact the maintainer through their GitHub profile. Reports are kept private.
+To report a problem, write to hello@edgy.to. Reports are kept private.

@@ -18,6 +18,10 @@ Private file; `.parallel-plans/` does not go into the public tree.
 6. Cut a GitHub release for the tag with the changelog section as its notes. The DMG itself is sold on edgy.to, not attached.
 7. README claims to re-check on that day: "$5", "notarized", "Included in the $5" (new versions), clone URL.
 
+- Re-add to the changelog once confirmed on device: a tap Edgy takes as a gesture no longer also clicks (batch 35).
+- Check GitHub's current size limit for a video dragged into the editor before exporting the clip.
+- edgy.to's Buy button is a mailto today; the README's "buy and download the disk image" is launch-day copy.
+
 ## Open with Gabriel
 - Who makes the interim demo clip (a 15–20 s screen recording with Test Mode plates would do until the 30 s film exists).
 - Run the Check workflow once now (uses about 10 billed macOS minutes ×10 on a private repo) or wait for public.

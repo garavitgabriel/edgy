@@ -12,7 +12,6 @@ What changed for people using Edgy, newest first. Versions follow the git tags.
 ### Changed
 - Open App and Last App bring an app forward the way a click on its Dock icon does, so they also work from a full-screen app.
 - Last App counts only apps that had a window on screen while they were in front.
-- A tap that Edgy takes as a gesture no longer also clicks what is under the pointer when tap to click is on.
 - Edge labels with two actions read "A and B"; with more, "A and 2 more".
 
 ## 0.5.0

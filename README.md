@@ -23,9 +23,7 @@ Edgy is a macOS menu-bar app. Slide a finger up the right edge to change the vol
 
 The source is here, free to build. A signed, notarized build is [$5 at edgy.to](https://edgy.to). Both are the same app with the same features.
 
-<!-- DEMO VIDEO SLOT. When the clip exists: edit this file on github.com, drag the .mp4 (under 10 MB)
-     onto the editor here, and keep the link it inserts on a line of its own. It then plays in place.
-     Delete this comment afterwards. -->
+<!-- Demo video goes here. -->
 
 ## What it does
 
