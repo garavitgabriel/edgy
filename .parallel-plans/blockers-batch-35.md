@@ -21,6 +21,21 @@ without touching a frozen path.
   EdgyRuntime can't import Gestures. So an "output field added in Gestures" has no way to reach
   the Engine.
 
+### The brief's path, tried and shown impossible
+
+I put a probe at `Sources/Gestures/_probe.swift` with
+`extension GestureOutput { public var tapLifts: [Zone] = [] }` and ran
+`swift build --target Gestures`. The compiler refused it:
+
+```
+_probe.swift:4:14: error: extensions must not contain stored properties
+```
+
+I removed the probe, so the tree is clean. A computed property doesn't work either:
+`GestureOutput` is a value type with no identity to key a side table on. Even if one compiled,
+it would be declared in Gestures, and EdgyRuntime has no dependency on Gestures (`Package.swift`:
+`EdgyRuntime` depends on `["EdgyCore"]` only). The Engine could not read it.
+
 ## Workarounds I rejected (each is dishonest or dead on device)
 
 - **Inferring from `nextFlushDeadline`:** it is nil while any other finger is on that device, and
