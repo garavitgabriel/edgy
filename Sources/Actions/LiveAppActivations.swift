@@ -20,7 +20,14 @@ final class LiveAppActivations: AppActivationOutput, @unchecked Sendable {
       forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: nil
     ) { note in
       guard let app = note.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication else { return }
-      handler(Self.describe(app))
+      let activation = Self.describe(app)
+      handler(activation)
+      guard !activation.hasWindowOnScreen else { return }
+      // Its window may still be sliding in (a full-screen Space): look once more, if it stayed.
+      DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + Self.windowRecheckS) {
+        guard NSWorkspace.shared.frontmostApplication?.processIdentifier == app.processIdentifier else { return }
+        handler(Self.describe(app))
+      }
     }
     if let front = NSWorkspace.shared.frontmostApplication { handler(Self.describe(front)) }
   }
@@ -49,8 +56,30 @@ final class LiveAppActivations: AppActivationOutput, @unchecked Sendable {
     return true
   }
 
+  /// How long after an activation with no window the app is looked at again.
+  static let windowRecheckS: Double = 1
+  /// Smaller than this (points, either side) is a strip, a badge or a bar, not a window.
+  static let minWindowSide: Double = 100
+
   private static func describe(_ app: NSRunningApplication) -> AppActivation {
     AppActivation(
-      pid: app.processIdentifier, bundleID: app.bundleIdentifier, isRegular: app.activationPolicy == .regular)
+      pid: app.processIdentifier, bundleID: app.bundleIdentifier, isRegular: app.activationPolicy == .regular,
+      hasWindowOnScreen: hasWindowOnScreen(pid: app.processIdentifier))
+  }
+
+  /// An ordinary window (layer 0, window-sized) of this process on screen now. Overlays, panels
+  /// and status items sit on other layers. Reads geometry only, never titles or contents. If the
+  /// window list can't be read, the app counts (as before this check existed).
+  private static func hasWindowOnScreen(pid: Int32) -> Bool {
+    let options: CGWindowListOption = [.optionOnScreenOnly, .excludeDesktopElements]
+    guard let windows = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else { return true }
+    return windows.contains { window in
+      guard (window[kCGWindowOwnerPID as String] as? Int32) == pid,
+        (window[kCGWindowLayer as String] as? Int) == 0,
+        let bounds = window[kCGWindowBounds as String] as? [String: Any],
+        let width = bounds["Width"] as? Double, let height = bounds["Height"] as? Double
+      else { return false }
+      return width >= minWindowSide && height >= minWindowSide
+    }
   }
 }

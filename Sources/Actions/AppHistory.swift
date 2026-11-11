@@ -7,6 +7,10 @@ struct AppActivation: Equatable, Sendable {
   var bundleID: String?
   /// A regular app (Dock icon, menu bar). Menu-bar extras, agents and background apps aren't.
   var isRegular: Bool
+  /// It showed a real window (not only a floating overlay or panel) while in front. A helper that
+  /// comes forward just to draw an overlay, as a dictation bar does on every Space change, is not
+  /// an app the user was in (reported 2026-11-10: it kept becoming the "last app").
+  var hasWindowOnScreen = true
 }
 
 /// Which apps come to the front, and bringing one back (`app.last`).
@@ -45,9 +49,10 @@ struct AppHistory: Equatable {
 
   private(set) var recent: [AppActivation] = []
 
-  /// An app came to the front. Edgy itself (`ownPID`) and apps that aren't regular never count.
+  /// An app came to the front. Edgy itself (`ownPID`), apps that aren't regular and apps that came
+  /// forward without a window of their own never count (and keep their old place, if they had one).
   mutating func record(_ app: AppActivation, ownPID: Int32) {
-    guard app.isRegular, app.pid != ownPID else { return }
+    guard app.isRegular, app.hasWindowOnScreen, app.pid != ownPID else { return }
     recent.removeAll { $0.pid == app.pid }
     recent.insert(app, at: 0)
     if recent.count > Self.limit { recent.removeLast(recent.count - Self.limit) }

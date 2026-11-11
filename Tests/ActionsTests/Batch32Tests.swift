@@ -258,6 +258,24 @@ private func refused(_ body: () throws -> Void) -> Bool {
     #expect(!h.apps.activated.contains(agent.pid))
   }
 
+  /// An app that comes forward showing no window of its own (a dictation bar's helper, on every
+  /// Space change) is not an app the user was in: it never becomes the target and never pushes
+  /// the real previous app down (owner report 2026-11-10).
+  @Test func appsThatComeForwardWithoutAWindowNeverCount() throws {
+    let h = Harness()
+    let overlay = AppActivation(pid: 300, bundleID: "com.example.overlay", isRegular: true, hasWindowOnScreen: false)
+    h.apps.userActivates(a)
+    h.apps.userActivates(overlay)
+    h.apps.userActivates(b)
+    h.apps.userActivates(overlay)
+    try h.trigger(last)
+    #expect(h.apps.activated == [a.pid])
+    h.apps.userActivates(overlay)
+    try h.trigger(last)
+    #expect(h.apps.activated == [a.pid, b.pid])
+    #expect(!h.apps.activated.contains(overlay.pid))
+  }
+
   /// With Edgy in front, Last App goes back to the app that was in front before it.
   @Test func fromEdgysWindowGoesToTheAppBeforeIt() throws {
     let h = Harness()

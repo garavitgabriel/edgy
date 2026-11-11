@@ -19,7 +19,11 @@ extension ActionRegistry {
     let front = apps.frontmost()
     appHistoryLock.lock()
     if let front { appHistory.record(front, ownPID: apps.ownPID) }
-    let target = appHistory.previous(frontmostPID: front?.pid, isRunning: apps.isRunning)
+    // An app in front with no window of its own (an overlay helper) isn't where the user is: the
+    // app they are in is the most recent remembered one, so that one is skipped instead.
+    let overlayInFront = front.map { $0.isRegular && !$0.hasWindowOnScreen && $0.pid != apps.ownPID } ?? false
+    let current = overlayInFront ? appHistory.recent.first?.pid : front?.pid
+    let target = appHistory.previous(frontmostPID: current, isRunning: apps.isRunning)
     let remembered = appHistory.recent.prefix(4).map { $0.bundleID ?? "pid \($0.pid)" }.joined(separator: " > ")
     appHistoryLock.unlock()
     actionsLog.notice(
