@@ -176,6 +176,8 @@ struct FrameStep {
   var rejections: [(contactID: Int32, reason: RejectionReason)] = []
   /// The number behind each rejection in `rejections`, when one means something.
   var measures: [Int32: RejectionMeasure] = [:]
+  /// Zones where a contact lifted this step as an accepted tap (`GestureOutput.tapLifts`).
+  var tapLifts: [Zone] = []
 
   var now: Double { frame.timestamp }
 
@@ -238,7 +240,8 @@ struct FrameStep {
     releasePendingTaps()
     let claimed = Set(state.candidates.filter(\.claims).flatMap(\.members))
     return GestureOutput(
-      events: events, claimedContactIDs: claimed, rejections: rejections, rejectionMeasures: measures)
+      events: events, claimedContactIDs: claimed, rejections: rejections, rejectionMeasures: measures,
+      tapLifts: tapLifts)
   }
 
   static func isDown(_ state: TouchContact.State) -> Bool {
@@ -596,7 +599,10 @@ struct FrameStep {
     }
   }
 
+  /// Every branch is a lift accepted as a tap, so each one is reported in `tapLifts`: the system's
+  /// tap-to-click will follow it whether the tap fires now, waits, or completes a double-tap.
   mutating func tap(_ candidate: Candidate) {
+    tapLifts.append(candidate.zone)
     if let last = state.lastTap[candidate.zone], candidate.birthTime >= last,
       candidate.birthTime - last <= timing.doubleTapWindow
     {

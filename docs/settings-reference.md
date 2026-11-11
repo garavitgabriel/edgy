@@ -344,7 +344,7 @@ These live on `Engine`, not in the config.
 | Feature | API | Notes |
 |---|---|---|
 | Pause | `pause(until:)` / `resume()` | Timed pauses are driven by the app. |
-| Test Mode | `setTestMode(_:)`, `isTestMode`, `EngineStatus.testMode` | Gestures are recognized and routed, but no action runs. Each would-be action gives the "caught" haptic and a `wouldRun` feed decision. Switching either way drops in-flight gestures safely. |
+| Test Mode | `setTestMode(_:)`, `isTestMode`, `EngineStatus.testMode` | Gestures are recognized and routed, but no action runs. Each would-be action gives the "caught" haptic and a `wouldRun` feed decision. Switching either way drops in-flight gestures safely. With tap-to-click on, the system turns a tap into a click on whatever is under the pointer, so Edgy swallows that one click after a tap it takes (a physical press is never swallowed), and Test Mode still swallows it: nothing runs, but the tap was Edgy's. |
 | Live feed | `observeFeed(on:_:)` / `removeFeedObserver(_:)` | Normalized touches per device (`down` / `claimed` / `rejected`), at most 60 Hz. Decisions as they happen: recognized, rejected (with the zone it landed in and its `measure`), action ran (with its `outcome`) / updated / failed / unavailable / would run, and `displayCheckDue(key:name:)`. Runs only while someone observes and the engine is active. |
 
 ### Feed decisions with numbers (v0.5)

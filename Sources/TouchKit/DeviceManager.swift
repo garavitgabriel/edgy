@@ -73,6 +73,7 @@ public final class DeviceManager: @unchecked Sendable {
   private let backend: MultitouchBackend
   private let notifier: DeviceChangeNotifying
   private let buttonState: ButtonStateSource
+  private let padContacts: PadContacts?
 
   /// Serializes refreshes and protects registration bookkeeping.
   private let refreshLock = NSLock()
@@ -89,12 +90,16 @@ public final class DeviceManager: @unchecked Sendable {
 
   /// - Parameter buttonState: started on `start` (before any device registers, so the first frame
   ///   is already stamped) and stopped on `stop`. Defaults to none: every frame reads button up.
+  /// - Parameter padContacts: told about every frame as it is handed out (and about devices that
+  ///   go away), so the pointer guard knows whether a finger is on a pad (batch 35). Defaults to none.
   public init(
-    backend: MultitouchBackend, notifier: DeviceChangeNotifying, buttonState: ButtonStateSource = NoButtonState()
+    backend: MultitouchBackend, notifier: DeviceChangeNotifying, buttonState: ButtonStateSource = NoButtonState(),
+    padContacts: PadContacts? = nil
   ) {
     self.backend = backend
     self.notifier = notifier
     self.buttonState = buttonState
+    self.padContacts = padContacts
   }
 
   public var devices: [TouchDeviceInfo] {
@@ -175,6 +180,7 @@ public final class DeviceManager: @unchecked Sendable {
         }
       }
       current = infos
+      if let padContacts, !drop.isEmpty { padContacts.forget(deviceIDs: drop) }
       return (alwaysNotify || !diff.isEmpty) ? infos : nil
     }
     if let notifyList {
@@ -188,6 +194,7 @@ public final class DeviceManager: @unchecked Sendable {
     guard let handler else { return }
     var stamped = frame
     stamped.buttonDown = frame.buttonDown || (live && buttonState.isDown)
+    padContacts?.observe(stamped)
     handler(stamped)
   }
 }

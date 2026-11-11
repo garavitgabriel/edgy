@@ -15,7 +15,7 @@ public func makeLiveTouchSource() -> TouchSource { LiveTouchSource() }
 public func makeLivePointerGuard() -> PointerGuarding {
   let core = PointerGuardCore(
     tap: LiveEventTap(), cursor: LiveCursor(), scheduler: DispatchGuardScheduler(),
-    lookback: livePointerLookbackS, pinWhileEngaged: true)
+    lookback: livePointerLookbackS, pinWhileEngaged: true, padContacts: PadContacts.shared)
   core.prepare()
   return core
 }

@@ -8,7 +8,8 @@
 # Dictation, the keyboard backlight, and snaps a full-screen window. v0.4 steps (24+): fn-only
 # push-to-talk, the hold watchdog, the key recorder (needs Input Monitoring for your terminal
 # app), and the installed-apps and Shortcuts listings. Batch 32 steps (35+): key sequences
-# into a terminal multiplexer and a text field, and Last App. It asks before each step and
+# into a terminal multiplexer and a text field, and Last App. Batch 35 step (38): a tap Edgy
+# takes doesn't also click (by hand, with Edgy running). It asks before each step and
 # restores prior values at the end (levels also on Ctrl-C); it closes the document it opened.
 #
 # Media keys, key shortcuts and window snapping need Accessibility for your terminal app (System Settings → Privacy & Security →
@@ -570,6 +571,20 @@ if ask("37. Last App: back and forth between two apps, then after one of them qu
   print("  Did it go to the app you used before A (or do nothing if there was none), never relaunch A?")
   print("  Logs say which path ran (\"was refused; pressing the switcher shortcut\" means the fallback):")
   print("    /usr/bin/log show --last 2m --predicate 'subsystem == \"com.garavit.edgy\"' --info | grep 'last app'")
+}
+if ask("38. A tap Edgy takes doesn't also click (by hand, with Edgy running and tap-to-click on)?") {
+  print("  Bind a tap (or a double-tap) on a corner, e.g. Last App on a double-tap, in Edgy's settings.")
+  print("  a. Put the pointer over a window of ANOTHER app (not the frontmost one). Tap the bound zone.")
+  print("     The action runs, and that window is NOT clicked: it doesn't come to the front or change.")
+  print("     For a double-tap binding, double-tap: neither tap clicks the window under the pointer.")
+  print("  b. Physically press the pad anywhere (a real click, even in the bound corner): it still clicks.")
+  print("  c. Tap in the middle of the pad (no zone): it still clicks, as always.")
+  print("  d. Turn on Test Mode and tap the zone: nothing runs and the window is still not clicked.")
+  print("  Logs (look for 'swallowed the system's click' and 'arrived after the click passed'):")
+  print("    /usr/bin/log show --last 2m --predicate 'subsystem == \"com.garavit.edgy\"' --info | grep -i 'tap click'")
+  print("  If you see 'arrived after the click passed', the click beat the engine: note how often in the report.")
+  print("  Press return when done.")
+  _ = readLine()
 }
 print("\nNot run here: system.lockScreen and system.sleepDisplay (they end the session). Bind them and try by hand.")
 

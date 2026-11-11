@@ -105,6 +105,9 @@ final class FakePointerGuard: PointerGuarding, @unchecked Sendable {
   let calls = Locked<[String]>([])
   func engage() { calls.value.append("engage") }
   func release() { calls.value.append("release") }
+  /// `expectTapClick(within:)` windows, kept apart from `calls` (batch 35).
+  let tapClicks = Locked<[TimeInterval]>([])
+  func expectTapClick(within seconds: TimeInterval) { tapClicks.value.append(seconds) }
 }
 
 final class FakeTyping: TypingActivitySource, @unchecked Sendable {
