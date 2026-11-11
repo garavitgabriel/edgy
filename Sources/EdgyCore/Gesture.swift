@@ -142,16 +142,22 @@ public struct GestureOutput: Sendable {
   /// The measurement behind a rejection in `rejections`, keyed by contact id, when one means
   /// something (none for a click or a system-gesture handoff).
   public var rejectionMeasures: [Int32: RejectionMeasure]
+  /// Zones where a contact lifted this step as an accepted tap: a `.tap` emitted now, a first tap
+  /// held back for the double-tap window, or the second tap of a `.doubleTap`. Empty for rejected
+  /// lifts and for output from a flush (a held tap released later is not a new lift). The runtime
+  /// uses it to expect the system's tap-to-click click (`PointerGuarding.expectTapClick`).
+  public var tapLifts: [Zone]
 
   public init(
     events: [GestureEvent] = [], claimedContactIDs: Set<Int32> = [],
     rejections: [(contactID: Int32, reason: RejectionReason)] = [],
-    rejectionMeasures: [Int32: RejectionMeasure] = [:]
+    rejectionMeasures: [Int32: RejectionMeasure] = [:], tapLifts: [Zone] = []
   ) {
     self.events = events
     self.claimedContactIDs = claimedContactIDs
     self.rejections = rejections
     self.rejectionMeasures = rejectionMeasures
+    self.tapLifts = tapLifts
   }
 }
 
