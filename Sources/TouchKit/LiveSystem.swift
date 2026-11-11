@@ -24,7 +24,7 @@ final class LiveTouchSource: TouchSource, @unchecked Sendable {
       if let manager { return manager }
       let created = DeviceManager(
         backend: LiveMultitouchBackend(framework: framework), notifier: LiveDeviceChangeNotifier(),
-        buttonState: HIDButtonState())
+        buttonState: HIDButtonState(), padContacts: .shared)
       manager = created
       return created
     }
@@ -69,7 +69,7 @@ final class HIDButtonState: ButtonStateSource, @unchecked Sendable {
   }
 }
 
-/// Active event tap on pointer motion at the HID level, on the input thread's run loop (batch 28):
+/// Active event tap on pointer motion and left button down/up at the HID level, on the input thread's run loop (batch 28):
 /// every pointer event in the system waits on this tap, so it never shares a thread with drawing.
 final class LiveEventTap: EventTapping, @unchecked Sendable {
   private let lock = NSLock()
@@ -78,7 +78,9 @@ final class LiveEventTap: EventTapping, @unchecked Sendable {
 
   func install(handler: @escaping @Sendable (TapEventKind, Point2D?) -> TapVerdict) -> Bool {
     lock.withLock { self.handler = handler }
-    let types: [CGEventType] = [.mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged]
+    let types: [CGEventType] = [
+      .mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged, .leftMouseDown, .leftMouseUp,
+    ]
     let mask = types.reduce(CGEventMask(0)) { $0 | (CGEventMask(1) << CGEventMask($1.rawValue)) }
     guard
       let tap = CGEvent.tapCreate(
@@ -98,14 +100,17 @@ final class LiveEventTap: EventTapping, @unchecked Sendable {
     if let port = lock.withLock({ port }) { CGEvent.tapEnable(tap: port, enable: enabled) }
   }
 
-  fileprivate func handle(_ type: CGEventType, location: CGPoint) -> TapVerdict {
+  fileprivate func handle(_ type: CGEventType, event: CGEvent) -> TapVerdict {
     let kind: TapEventKind
     switch type {
     case .mouseMoved, .leftMouseDragged, .rightMouseDragged, .otherMouseDragged: kind = .pointerMotion
+    case .leftMouseDown: kind = .leftDown(clickState: Int(event.getIntegerValueField(.mouseEventClickState)))
+    case .leftMouseUp: kind = .leftUp
     case .tapDisabledByTimeout: kind = .disabledByTimeout
     case .tapDisabledByUserInput: kind = .disabledByUserInput
     default: kind = .other
     }
+    let location = event.location
     let point = kind == .pointerMotion ? Point2D(x: location.x, y: location.y) : nil
     return lock.withLock { handler }?(kind, point) ?? .pass
   }
@@ -114,7 +119,7 @@ final class LiveEventTap: EventTapping, @unchecked Sendable {
 private let liveTapCallback: CGEventTapCallBack = { _, type, event, refcon in
   guard let refcon else { return Unmanaged.passUnretained(event) }
   let tap = Unmanaged<LiveEventTap>.fromOpaque(refcon).takeUnretainedValue()
-  return tap.handle(type, location: event.location) == .swallow ? nil : Unmanaged.passUnretained(event)
+  return tap.handle(type, event: event) == .swallow ? nil : Unmanaged.passUnretained(event)
 }
 
 /// Cursor position in global display coordinates (origin top-left of the main display).

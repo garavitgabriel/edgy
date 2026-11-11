@@ -312,6 +312,7 @@ public final class Engine: @unchecked Sendable {
     defer { scheduleFlush() }
     trackHeldPresses(output.events)
     updatePointerGuard(claimed: !output.claimedContactIDs.isEmpty, at: frame.timestamp)
+    expectTapClick(output.tapLifts, profile: profile)
     for (contactID, reason) in output.rejections where reason != .startedOutsideZone {
       logger.log(.info, "Rejected contact \(contactID): \(reason)")
     }
@@ -484,6 +485,25 @@ public final class Engine: @unchecked Sendable {
     guard status != lastStatus else { return }
     lastStatus = status
     statusHandler?(status)
+  }
+
+  /// How long after a tap's lift the guard waits for the system's tap-to-click click (batch 35).
+  /// The guard anchors it to the moment the pads emptied, not to this call.
+  static let tapClickWindowS: Double = 0.5
+
+  /// A finger lifted as a tap that a tap or double-tap binding may take: with tap-to-click on, the
+  /// system clicks whatever is under the pointer shortly after. Ask the guard to swallow that click.
+  /// Only from `process` (a lift happens on a frame; a flushed held tap is not a new lift), only
+  /// where this profile binds a tap or double-tap in the zone. Runs in Test Mode too: the tap was
+  /// Edgy's even though no action runs. `handle` already returns early when Enabled is off.
+  private func expectTapClick(_ lifts: [Zone], profile: Profile) {
+    guard !lifts.isEmpty, !profile.disabled else { return }
+    let taken = lifts.filter { zone in
+      profile.bindings.contains { $0.zone == zone && ($0.gesture == .tap || $0.gesture == .doubleTap) }
+    }
+    guard let zone = taken.first else { return }
+    pointerGuard.expectTapClick(within: Self.tapClickWindowS)
+    logger.log(.info, "Tap lift in \(zone): expecting the system's tap click")
   }
 
   /// While a claim lasts, re-engage this often so the guard's safety timeout never ends a long slide.
