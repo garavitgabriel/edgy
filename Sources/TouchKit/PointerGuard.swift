@@ -104,8 +104,10 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
     var deadline: TimeInterval
   }
   private var expectations: [TapClickExpectation] = []
-  /// The pad-empty epoch in which a left-down with no finger on any pad last arrived.
+  /// The pad-empty epoch in which a left-down with no finger on any pad last passed.
   private var noFingerClickEpoch: Int?
+  /// The pad-empty epoch of the last expectation opened (one lift, one click).
+  private var lastExpectedEpoch: Int?
   private var awaitingUp = false
   private var upGeneration = 0
   private var upTimer: (any GuardCancellable)?
@@ -160,7 +162,10 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
       }
       guard deadline >= at else { return false }
       // One lift, one click: a second call for the same lift (several zones in one step) is the same.
-      if let epoch = pad?.emptyEpoch, expectations.contains(where: { $0.epoch == epoch }) { return false }
+      if let epoch = pad?.emptyEpoch {
+        if lastExpectedEpoch == epoch { return false }
+        lastExpectedEpoch = epoch
+      }
       expectations.append(TapClickExpectation(epoch: pad?.emptyEpoch, deadline: deadline))
       return false
     }
@@ -261,10 +266,19 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
   func handleTap(_ kind: TapEventKind, location: Point2D? = nil) -> TapVerdict {
     switch kind {
     case .disabledByTimeout, .disabledByUserInput:
-      let first = lock.withLock { () -> Bool in
+      let (first, stale) = lock.withLock { () -> (Bool, (any GuardCancellable)?) in
         _reEnableCount += 1
-        return _reEnableCount == 1
+        // While the tap was off a swallowed click's up (and a real down) may have gone by: never
+        // wait for that up any more, or the next real up would be eaten.
+        let pending = awaitingUp ? upTimer : nil
+        if awaitingUp {
+          awaitingUp = false
+          upGeneration += 1
+          upTimer = nil
+        }
+        return (_reEnableCount == 1, pending)
       }
+      stale?.cancel()
       tap.setEnabled(true)
       if first {
         TouchKitLog.pointer.notice(
@@ -314,9 +328,11 @@ public final class PointerGuardCore: PointerGuarding, @unchecked Sendable {
         stale = upTimer
         upTimer = nil
       }
-      if !fingersDown, let pad { noFingerClickEpoch = pad.emptyEpoch }
       expectations.removeAll { $0.deadline < at }
-      guard !fingersDown, !expectations.isEmpty else { return (false, stale, 0) }
+      guard !fingersDown, !expectations.isEmpty else {
+        if !fingersDown, let pad { noFingerClickEpoch = pad.emptyEpoch }
+        return (false, stale, 0)
+      }
       expectations.removeFirst()
       awaitingUp = true
       upGeneration += 1

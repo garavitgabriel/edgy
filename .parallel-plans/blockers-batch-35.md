@@ -1,6 +1,6 @@
 # Batch 35 — EDGY-TAPCLICK: blocker
 
-Status: **stopped before building**. No source or test changed. Only this note was added.
+Status: **resolved.** The chief added `GestureOutput.tapLifts` on main (`ef7e77c`); batch 35 was then built (see `done-batch-35.md`). Kept as the record of why it stopped.
 
 ## What's blocked
 

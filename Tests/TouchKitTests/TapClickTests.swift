@@ -160,6 +160,47 @@ private struct Rig {
     #expect(rig.click(at: 10.3) == [.pass, .pass])
   }
 
+  @Test func secondExpectationAfterTheFirstClickWasSwallowedStillCounts() {
+    // Both lifts happen, then the system's first click, then the engine's call for the second lift.
+    let rig = Rig()
+    rig.tapLift(at: 10)
+    rig.clock.t = 10.02
+    rig.core.expectTapClick(within: 0.5)
+    rig.tapLift(at: 10.2)
+    #expect(rig.click(at: 10.21) == [.swallow, .swallow])
+    rig.clock.t = 10.23
+    rig.core.expectTapClick(within: 0.5)
+    #expect(rig.core.lateTapClickExpectations == 0)
+    #expect(rig.click(at: 10.25, clickState: 2) == [.swallow, .swallow])
+    #expect(rig.click(at: 10.3) == [.pass, .pass])
+  }
+
+  @Test func sameLiftExpectedAgainAfterItsClickWasSpentOpensNothing() {
+    let rig = Rig()
+    rig.tapLift(at: 10)
+    rig.clock.t = 10.02
+    rig.core.expectTapClick(within: 0.5)
+    #expect(rig.click(at: 10.04) == [.swallow, .swallow])
+    rig.clock.t = 10.06
+    rig.core.expectTapClick(within: 0.5)
+    #expect(rig.core.openTapClickExpectations == 0)
+    #expect(rig.click(at: 10.1) == [.pass, .pass])
+  }
+
+  @Test func tapDisabledBetweenASwallowedDownAndItsUpStopsWaitingForTheUp() {
+    let rig = Rig()
+    rig.tapLift(at: 10)
+    rig.clock.t = 10.02
+    rig.core.expectTapClick(within: 0.5)
+    rig.clock.t = 10.04
+    #expect(rig.tap.send(.leftDown(clickState: 1)) == .swallow)
+    // The system turned the tap off; the up went by unseen. The next real click passes whole.
+    #expect(rig.tap.send(.disabledByTimeout) == .pass)
+    #expect(rig.scheduler.pending.isEmpty)
+    #expect(rig.tap.send(.leftUp) == .pass)
+    #expect(rig.click(at: 11) == [.pass, .pass])
+  }
+
   @Test func sameLiftExpectedTwiceIsOneClick() {
     let rig = Rig()
     rig.tapLift(at: 10)
