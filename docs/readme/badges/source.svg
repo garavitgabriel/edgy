@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="107" height="24" viewBox="0 0 107 24" role="img" aria-label="Source: open">
+  <title>Source: open</title>
+  <clipPath id="r"><rect width="107" height="24" rx="7"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="61" height="24" fill="#3B2219"/>
+    <rect x="61" width="46" height="24" fill="#D9AE8C"/>
+  </g>
+  <g font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" text-anchor="middle">
+    <text x="30.5" y="16" fill="#FBEADB" textLength="41" lengthAdjust="spacingAndGlyphs">Source</text>
+    <text x="84.0" y="16" fill="#3B2219" textLength="26" lengthAdjust="spacingAndGlyphs">open</text>
+  </g>
+</svg>

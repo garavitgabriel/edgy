@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="80" height="24" viewBox="0 0 80 24" role="img" aria-label="Swift: 6">
+  <title>Swift: 6</title>
+  <clipPath id="r"><rect width="80" height="24" rx="7"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="53" height="24" fill="#3B2219"/>
+    <rect x="53" width="27" height="24" fill="#D9AE8C"/>
+  </g>
+  <g font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" text-anchor="middle">
+    <text x="26.5" y="16" fill="#FBEADB" textLength="33" lengthAdjust="spacingAndGlyphs">Swift</text>
+    <text x="66.5" y="16" fill="#3B2219" textLength="7" lengthAdjust="spacingAndGlyphs">6</text>
+  </g>
+</svg>

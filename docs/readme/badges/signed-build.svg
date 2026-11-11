@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="155" height="24" viewBox="0 0 155 24" role="img" aria-label="Signed build: $5 once">
+  <title>Signed build: $5 once</title>
+  <clipPath id="r"><rect width="155" height="24" rx="7"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="90" height="24" fill="#3B2219"/>
+    <rect x="90" width="65" height="24" fill="#B4542B"/>
+  </g>
+  <g font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" text-anchor="middle">
+    <text x="45.0" y="16" fill="#FBEADB" textLength="70" lengthAdjust="spacingAndGlyphs">Signed build</text>
+    <text x="122.5" y="16" fill="#FFFFFF" textLength="45" lengthAdjust="spacingAndGlyphs">$5 once</text>
+  </g>
+</svg>

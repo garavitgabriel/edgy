@@ -59,7 +59,7 @@ Items found in testing or left open by builders, to fold into a future round.
 - Not possible to split an edge differently per app (he keeps ⌃Tab on the left edge's upper half for the browser's tab overview): consider per-app splits for v1.x.
 
 ## Before going public (from batch 31's scan, 2026-11-09)
-- Fill `DOWNLOAD_URL` (README) and `SECURITY_CONTACT` (SECURITY.md); add "It updates itself." once the updater ships.
+- `DOWNLOAD_URL` and `SECURITY_CONTACT` are filled (2026-11-11: edgy.to, GitHub private vulnerability reporting). Add "It updates itself." once the updater ships. Launch-day steps: `public-launch-checklist.md`.
 - History has 5 commits with denylist hits (1 message, 4 diffs), private notes in `.parallel-plans/`, home paths in done reports, and a personal email as author on every commit. **Plan: the public repo starts from ONE clean first commit** (noreply author, no `.parallel-plans/`, denylist + home-path grep on that tree); this private repo stays the working one. Needs Gabriel's OK at launch.
 
 ## Batch 28 result (measured 2026-11-09, Mac mini, main 4273147, hands off 36 s)

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="109" height="24" viewBox="0 0 109 24" role="img" aria-label="Licence: MIT">
+  <title>Licence: MIT</title>
+  <clipPath id="r"><rect width="109" height="24" rx="7"/></clipPath>
+  <g clip-path="url(#r)">
+    <rect width="65" height="24" fill="#3B2219"/>
+    <rect x="65" width="44" height="24" fill="#D9AE8C"/>
+  </g>
+  <g font-family="system-ui, -apple-system, sans-serif" font-size="12" font-weight="600" text-anchor="middle">
+    <text x="32.5" y="16" fill="#FBEADB" textLength="45" lengthAdjust="spacingAndGlyphs">Licence</text>
+    <text x="87.0" y="16" fill="#3B2219" textLength="24" lengthAdjust="spacingAndGlyphs">MIT</text>
+  </g>
+</svg>
