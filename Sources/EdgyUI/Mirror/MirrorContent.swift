@@ -4,6 +4,19 @@ import EdgyRuntime
 import Foundation
 
 /// One zone as the mirror draws it.
+/// A split chosen on an edge that has no bindings yet: `(edge, segments)` from the selected zone.
+struct PendingSplit: Hashable {
+  var edge: Zone.Edge
+  var segments: Int
+
+  /// The selection's split, when it is a part of a split edge (`segments > 1`).
+  init?(selection: Zone?) {
+    guard case .edge(let edge, _, let segments) = selection, segments > 1 else { return nil }
+    self.edge = edge
+    self.segments = segments
+  }
+}
+
 struct MirrorZone: Hashable, Identifiable {
   enum Style: Hashable {
     /// Has at least one binding that runs here: a solid bar (edge) or solid tile with icon (corner).
@@ -68,13 +81,20 @@ enum MirrorContent {
   /// `unavailableAsUnmapped` (the popover's mini mirror), don't count as mapped at all.
   static func zones(
     rows: [EffectiveBinding], catalog: [ActionID: ActionDescriptor], allHairline: Bool = false,
-    availability: (ActionID) -> ActionAvailability = { _ in .available }, unavailableAsUnmapped: Bool = false
+    availability: (ActionID) -> ActionAvailability = { _ in .available }, unavailableAsUnmapped: Bool = false,
+    pendingSplit: PendingSplit? = nil
   ) -> [MirrorZone] {
     var segmentsByEdge: [Zone.Edge: Int] = [:]
     for row in rows {
       if case .edge(let edge, _, let segments) = row.binding.zone {
         segmentsByEdge[edge] = max(segmentsByEdge[edge] ?? 1, min(max(segments, 1), 4))
       }
+    }
+    // A split of an edge with no bindings lives only in the selection (split lives in bindings, so
+    // there is nothing to write yet). Draw it anyway: the inspector shows the parts, and the
+    // picker anchors to the drawn zone, so without this "Add gesture…" on a part opened nothing.
+    if let pendingSplit, segmentsByEdge[pendingSplit.edge] == nil {
+      segmentsByEdge[pendingSplit.edge] = min(max(pendingSplit.segments, 1), 4)
     }
     var zones: [Zone] = []
     for edge in Zone.Edge.allCases {

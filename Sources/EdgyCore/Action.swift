@@ -65,11 +65,17 @@ public struct ActionContext: Sendable {
   public var parameters: [String: String]
   /// For slide input: the physical motion behind the normalized delta. `nil` when unknown.
   public var motion: SlideMotion?
+  /// The multitouch device the gesture came from, so haptics play on the trackpad under the
+  /// finger (a Magic Trackpad beside a closed MacBook, not the built-in one). `nil` when unknown.
+  public var deviceID: UInt64?
 
-  public init(frontmostBundleID: String?, parameters: [String: String], motion: SlideMotion? = nil) {
+  public init(
+    frontmostBundleID: String?, parameters: [String: String], motion: SlideMotion? = nil, deviceID: UInt64? = nil
+  ) {
     self.frontmostBundleID = frontmostBundleID
     self.parameters = parameters
     self.motion = motion
+    self.deviceID = deviceID
   }
 }
 

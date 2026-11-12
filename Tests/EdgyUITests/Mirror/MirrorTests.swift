@@ -301,3 +301,21 @@ func drawnBarsSitInsideTheirZoneAndClearTheCornerTiles(segments: Int) {
   let corner = pad.labelPlacement(zone(.corner(.topLeft)))
   #expect(corner.point.y < tile.maxY && corner.point.x < tile.maxX)
 }
+
+/// Split of an edge with no bindings (2026-11-12): the drawing shows the parts the selection names,
+/// so the picker has a zone to anchor to. Was: the edge drew whole and "Add gesture…" on a part
+/// opened nothing until the edge had a binding.
+@MainActor @Test func emptyEdgeSplitInTheSelectionIsDrawnInParts() {
+  let none = MirrorContent.zones(rows: [], catalog: [:])
+  #expect(none.filter { if case .edge(.right, _, _) = $0.zone { return true } else { return false } }.count == 1)
+
+  let pending = PendingSplit(selection: .edge(.right, segment: 1, segments: 2))
+  let zones = MirrorContent.zones(rows: [], catalog: [:], pendingSplit: pending).map(\.zone)
+  #expect(zones.contains(.edge(.right, segment: 0, segments: 2)))
+  #expect(zones.contains(.edge(.right, segment: 1, segments: 2)))
+  #expect(!zones.contains(.edge(.right, segment: 0, segments: 1)))
+  // Other edges stay whole.
+  #expect(zones.contains(.edge(.left, segment: 0, segments: 1)))
+  // A whole-edge selection is no split.
+  #expect(PendingSplit(selection: .edge(.right, segment: 0, segments: 1)) == nil)
+}

@@ -98,6 +98,7 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
 
   public func feedback(_ event: HapticEvent, context: ActionContext) {
     guard settings.allowsHaptic(event, parameters: context.parameters) else { return }
+    haptics.target(deviceID: context.deviceID)
     switch event {
     case .gestureCaught, .slideSteps: haptics.tick(strength: settings.hapticTickStrength)
     case .actionFired, .slideLimits: haptics.strongTick(strength: settings.hapticClickStrength)
@@ -141,6 +142,10 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
 
   /// Logged once: level keys couldn't be posted and the registry fell back to setting levels.
   private var loggedLevelKeyFallback = false
+  /// The last level-key post failed and the level was set directly. The legacy system HUD is not
+  /// shown then (it read as an old copy of Edgy); the outcome says no system HUD, so Edgy's own
+  /// level plate shows instead. Cleared by the next post that works.
+  private var levelKeysFallingBack = false
 
   // App switcher and hold-a-key sessions (see `ActionRegistry+Keys.swift`). Guarded by
   // `keyLock`: their watchdogs fire on the scheduler's queue.
@@ -235,6 +240,7 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
   public func performReporting(_ id: ActionID, input: ActionInput, context: ActionContext) throws
     -> ActionOutcome?
   {
+    haptics.target(deviceID: context.deviceID)
     guard let descriptor = available.first(where: { $0.id == id }) else {
       throw ActionError.unknownAction(id)
     }
@@ -276,8 +282,7 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     let step = LevelStep.apply(delta: felt, sensitivity: Self.sensitivity(context), to: old)
     session.level = step.level
     levelSessions[id] = session
-    let outcome = levelOutcome(session.target, level: step.level)
-    guard step.level != old else { return outcome }
+    guard step.level != old else { return levelOutcome(session.target, level: step.level) }
 
     try unavailable(id) { try setLevel(session.target, from: old, to: step.level) }
     if step.strongTick && settings.allowsHaptic(.slideLimits, parameters: context.parameters) {
@@ -286,14 +291,15 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     if settings.allowsHaptic(.slideSteps, parameters: context.parameters) {
       for _ in 0..<step.ticks { haptics.tick(strength: settings.hapticTickStrength) }
     }
-    return outcome
+    // After `setLevel`: it decides whether the system drew its HUD (keys) or not (fallback).
+    return levelOutcome(session.target, level: step.level)
   }
 
   /// What a level slide reports at `level` on `target`.
   func levelOutcome(_ target: LevelTarget, level: Double) -> ActionOutcome {
     switch target {
     case .volume, .builtInBrightness:
-      return ActionOutcome(level: level, systemHUDShown: settings.hud == .native)
+      return ActionOutcome(level: level, systemHUDShown: settings.hud == .native && !levelKeysFallingBack)
     case .keyboardBacklight:
       return ActionOutcome(level: level)
     case .displayBrightness(let id):
@@ -376,7 +382,8 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
   ///
   /// Volume and built-in brightness, HUD `.native`: the system's own keys with fine steps, so
   /// macOS changes the level and shows its current HUD. If the keys can't be posted, the level
-  /// is set directly and the legacy HUD shown instead. HUD `.none`: set directly, silently.
+  /// is set directly and Edgy's own level plate shows (no legacy HUD: on macOS 26 it looked like an
+  /// old copy of Edgy). HUD `.none`: set directly, silently.
   private func setLevel(_ target: LevelTarget, from old: Double, to new: Double) throws {
     let rising = new > old
     switch target {
@@ -391,7 +398,7 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
         try audio.setOutputMuted(false)
         muted = false
       }
-      showHUD(.volume(muted: muted, headphones: audio.outputIsHeadphones()), level: new)
+      _ = muted  // Edgy's plate shows the level; the legacy HUD's mute glyph is no longer drawn.
     case .builtInBrightness:
       if settings.hud == .native,
         try pressLevelKeys(rising ? .brightnessUp : .brightnessDown, from: old, to: new)
@@ -399,7 +406,6 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
         return
       }
       try display.setBrightness(new)
-      showHUD(.brightness, level: new)
     case .displayBrightness(let id):
       try displays.setBrightness(new, of: id)
     case .keyboardBacklight:
@@ -416,8 +422,10 @@ public final class ActionRegistry: ActionPerforming, @unchecked Sendable {
     guard presses > 0 else { return true }
     do {
       try levelKeys.press(key, count: presses, fine: true)
+      levelKeysFallingBack = false
       return true
     } catch {
+      levelKeysFallingBack = true
       if !loggedLevelKeyFallback {
         loggedLevelKeyFallback = true
         actionsLog.notice(

@@ -153,7 +153,7 @@ private struct ParameterRow: View {
       // The helper starts at the label's x, not the box's, and has 8 pt after it like every other
       // helper line (critique 22 should-fix 1).
       HStack(alignment: .firstTextBaseline, spacing: CheckboxHelperRow.boxSpacing) {
-        Toggle(isOn: SwiftUI.Binding(get: { isOn }, set: set)) {
+        Toggle(isOn: SwiftUI.Binding(get: { isOn }, set: { on in set(on) })) {
           Text(ActionNaming.parameterLabel(parameter, action: row.binding.action))
         }
         .toggleStyle(.checkbox)
@@ -619,7 +619,14 @@ final class AppIconCache {
 
 extension EnvironmentValues {
   /// Live lists load app icons off the main thread; previews and snapshots read them in place.
-  @Entry var appIconsLoadOffMain = false
+  var appIconsLoadOffMain: Bool {
+    get { self[AppIconsLoadOffMainKey.self] }
+    set { self[AppIconsLoadOffMainKey.self] = newValue }
+  }
+}
+
+private struct AppIconsLoadOffMainKey: EnvironmentKey {
+  static let defaultValue = false
 }
 
 /// Search, then Running (apps open now), then All apps — the same list as add-app.

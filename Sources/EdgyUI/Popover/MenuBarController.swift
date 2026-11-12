@@ -1,6 +1,9 @@
 import AppKit
 import Observation
 import SwiftUI
+import os
+
+private let popoverLog = Logger(subsystem: "com.garavit.edgy", category: "popover")
 
 /// Hosts Edgy in the menu bar: the `NSStatusItem` with the glyph for the current state, and a
 /// transient `NSPopover` hosting `MenuPopoverView` (stage-2 brief, batch 17).
@@ -20,6 +23,7 @@ public final class MenuBarController: NSObject {
 
   private var statusItem: NSStatusItem?
   private var popover: NSPopover?
+  private var popoverResizeObserver: NSObjectProtocol?
   private var shownGlyph: MenuGlyph.State?
 
   public init(model: SettingsModel, actions: MenuBarActions = .none, state: MenuBarState = MenuBarState()) {
@@ -78,6 +82,26 @@ public final class MenuBarController: NSObject {
     model.startFeed()
     popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     popover.contentViewController?.view.window?.makeKey()
+    logPopoverFrame("shown", button: button)
+    if popoverResizeObserver == nil, let window = popover.contentViewController?.view.window {
+      popoverResizeObserver = NotificationCenter.default.addObserver(
+        forName: NSWindow.didResizeNotification, object: window, queue: .main
+      ) { [weak self] _ in
+        MainActor.assumeIsolated { self?.logPopoverFrame("resized", button: button) }
+      }
+    }
+  }
+
+  /// One info line per show: the popover's frame against the glyph and the screen's visible area,
+  /// so a popover drawn up over its own glyph shows up in the log (`category == "popover"`).
+  /// A placed popover's top edge sits at the glyph's bottom edge (`aboveGlyph false`).
+  private func logPopoverFrame(_ event: String, button: NSStatusBarButton) {
+    guard let window = popover?.contentViewController?.view.window else { return }
+    let glyph = button.window.map { $0.convertToScreen(button.convert(button.bounds, to: nil)) } ?? .zero
+    let visible = window.screen?.visibleFrame ?? .zero
+    popoverLog.info(
+      "popover \(event, privacy: .public): frame \(NSStringFromRect(window.frame), privacy: .public) glyph \(NSStringFromRect(glyph), privacy: .public) visible \(NSStringFromRect(visible), privacy: .public) aboveGlyph \(window.frame.maxY > glyph.minY + 1, privacy: .public)"
+    )
   }
 
   public func closePopover() {
@@ -98,7 +122,13 @@ public final class MenuBarController: NSObject {
     let root = MenuPopoverView(model: model)
       .environment(state)
       .environment(\.menuBarActions, wrapped)
-    popover.contentViewController = NSHostingController(rootView: root)
+    // The mini mirror is drawn to scale, so the popover's height changes when the mirrored
+    // trackpad changes (a Magic Trackpad beside a built-in one). Without `.preferredContentSize`
+    // the hosting view resized the popover window from its bottom-left origin, so it grew upward
+    // over the menu bar and off the top of the screen. With it, NSPopover re-anchors to the glyph.
+    let hosting = NSHostingController(rootView: root)
+    hosting.sizingOptions = [.preferredContentSize]
+    popover.contentViewController = hosting
     return popover
   }
 

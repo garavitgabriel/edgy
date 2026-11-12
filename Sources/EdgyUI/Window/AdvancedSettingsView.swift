@@ -28,7 +28,7 @@ public struct AdvancedSettingsView: View {
       row("Fingers for a slide") {
         Picker(
           "Fingers for a slide",
-          selection: Binding(get: { model.editor.config.gestures.fingers }, set: model.setFingers)
+          selection: Binding(get: { model.editor.config.gestures.fingers }, set: { model.setFingers($0) })
         ) {
           ForEach(Array(GestureSettingsLimits.fingers), id: \.self) { Text("\($0)").tag($0) }
         }

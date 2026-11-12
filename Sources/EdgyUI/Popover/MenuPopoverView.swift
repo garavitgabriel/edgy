@@ -126,7 +126,7 @@ public struct MenuPopoverView: View {
           get: {
             _ = model.revision
             return model.editor.config.app.enabled
-          }, set: model.setEnabled))
+          }, set: { model.setEnabled($0) }))
       SwitchRow(
         title: "Test Mode", isOn: SwiftUI.Binding(get: { state.testMode }, set: { state.setTestMode($0, model: model) })
       )

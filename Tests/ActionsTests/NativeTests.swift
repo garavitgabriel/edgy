@@ -122,11 +122,26 @@ private let panel = DisplayInfo(id: 1, name: "Built-in Display", kind: .builtIn,
 }
 
 @Suite struct LevelFallbackTests {
-  @Test func keysFailingFallsBackToCoreAudioAndLegacyHUD() throws {
+  /// 2026-11-12: the fallback no longer draws the legacy HUD (it read as an old copy of Edgy); it
+  /// reports no system HUD, so Edgy's own level plate shows.
+  @Test func keysFailingFallsBackToCoreAudioAndEdgysPlate() throws {
     let h = Harness(settings: .with(hud: .native), levelKeys: false)
-    try h.slide("audio.volume", 0.25, phase: .began)
+    let context = ActionContext(frontmostBundleID: nil, parameters: [:])
+    let outcome = try h.registry.performReporting("audio.volume", input: .delta(0.25, phase: .began), context: context)
     #expect(h.audio.setVolumeCalls == [0.75])
-    #expect(h.hud.shown == [.init(kind: .volume(muted: false, headphones: false), level: 0.75)])
+    #expect(h.hud.shown.isEmpty)
+    #expect(outcome?.systemHUDShown == false)
+    #expect(outcome?.level == 0.75)
+  }
+
+  @Test func keysWorkingAgainReportsTheSystemHUD() throws {
+    let h = Harness(settings: .with(hud: .native), levelKeys: false)
+    let context = ActionContext(frontmostBundleID: nil, parameters: [:])
+    _ = try h.registry.performReporting("audio.volume", input: .delta(0.25, phase: .began), context: context)
+    h.levelKeys.works = true
+    let outcome = try h.registry.performReporting(
+      "audio.volume", input: .delta(-0.25, phase: .changed), context: context)
+    #expect(outcome?.systemHUDShown == true)
   }
 
   @Test func keysFailingMidSlideFallsBackFromTheSessionLevel() throws {

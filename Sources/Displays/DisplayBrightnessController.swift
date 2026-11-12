@@ -15,6 +15,7 @@ enum DisplayReason {
   static let needsAppleSilicon = "External brightness needs an Apple silicon Mac."
   static let backlightUnreadable = "macOS didn't let Edgy read this display's brightness."
   static let writeFailed = "The monitor stopped accepting brightness changes."
+  static let checking = "Edgy is still checking this monitor's brightness control."
 }
 
 /// The USB/EDID vendor number CoreGraphics reports for Apple-made displays.
@@ -121,6 +122,8 @@ final class LiveDisplayBrightness: DisplayBrightnessControlling, @unchecked Send
 
   /// Serializes probes so concurrent first calls probe once.
   private let probeLock = NSLock()
+  /// The first main-thread call started the full probe on a background queue.
+  private var backgroundProbeStarted = false
 
   init(environment: DisplayEnvironment) {
     self.environment = environment
@@ -131,7 +134,25 @@ final class LiveDisplayBrightness: DisplayBrightnessControlling, @unchecked Send
 
   // MARK: DisplayBrightnessControlling
 
-  func displays() -> [DisplayInfo] { snapshot().map(\.info) }
+  /// Never probes monitors on the main thread. A DDC read on a monitor that doesn't answer waits
+  /// for its I2C timeout (about 9 s per monitor, measured 2026-11-12 with two externals), and the
+  /// first call comes from `applicationDidFinishLaunching` via `ActionRegistry.availability(of:)`,
+  /// so launch stalled ~20 s: no menu, no permission check. On the main thread before the first
+  /// probe has finished, this starts it in the background and answers without DDC (built-in and
+  /// Apple displays as usual, third-party ones "still checking"). Callers off the main thread (the
+  /// brightness actions) still wait for the real answer.
+  func displays() -> [DisplayInfo] {
+    if let entries = stateLock.withLock({ entries }) { return entries.map(\.info) }
+    guard Thread.isMainThread else { return snapshot().map(\.info) }
+    let start = stateLock.withLock {
+      defer { backgroundProbeStarted = true }
+      return !backgroundProbeStarted
+    }
+    if start {
+      DispatchQueue.global(qos: .userInitiated).async { [weak self] in _ = self?.snapshot() }
+    }
+    return probe(readingDDC: false).map(\.info)
+  }
 
   func activeDisplayID() -> UInt32? {
     let system = environment.system
@@ -235,7 +256,7 @@ final class LiveDisplayBrightness: DisplayBrightnessControlling, @unchecked Send
     }
   }
 
-  private func probe() -> [Entry] {
+  private func probe(readingDDC: Bool = true) -> [Entry] {
     let online = environment.system.onlineDisplays()
     let externals = online.filter { !$0.isBuiltIn }
     let appleSilicon = externals.isEmpty ? true : environment.isAppleSilicon()
@@ -274,6 +295,7 @@ final class LiveDisplayBrightness: DisplayBrightnessControlling, @unchecked Send
         guard appleSilicon else { return entry(.none, reason: DisplayReason.needsAppleSilicon) }
         guard let candidate else { return entry(.none, reason: DisplayReason.noPath) }
         guard let transport = candidate.transport else { return entry(.none, reason: DisplayReason.noResponse) }
+        guard readingDDC else { return entry(.none, reason: DisplayReason.checking) }
         let device = DDCDevice(
           transport: transport, pause: environment.pause, replyDelay: environment.replyDelay,
           readAttempts: environment.readAttempts)

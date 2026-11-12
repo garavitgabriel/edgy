@@ -236,6 +236,13 @@ import Testing
     #expect(h.haptics.strengths.last == 4)
   }
 
+  /// 2026-11-12: with two trackpads, the tick goes to the one the gesture came from.
+  @Test func hapticsTargetTheGesturesTrackpad() throws {
+    let h = Harness(settings: .defaults)
+    h.registry.feedback(.gestureCaught, context: ActionContext(frontmostBundleID: nil, parameters: [:], deviceID: 42))
+    #expect(h.haptics.targets == [42])
+  }
+
   @Test func noHapticsWhenDisabled() throws {
     let h = Harness(settings: .with(haptics: false))
     try h.slide("audio.volume", 0.5, phase: .began)
@@ -256,16 +263,15 @@ import Testing
 }
 
 @Suite struct HUDTests {
-  @Test func nativeHUDShowsEachChange() throws {
+  /// Level keys refused (the harness default): levels are set directly and Edgy's plate shows; the
+  /// legacy HUD is never drawn for a level (2026-11-12, it read as an old copy of Edgy).
+  @Test func fallbackLevelsDrawNoLegacyHUD() throws {
     let h = Harness(settings: .with(hud: .native))
     h.audio.headphones = true
     try h.slide("audio.volume", 0.1, phase: .began)
     try h.slide("display.brightness", -0.1, phase: .began)
-    #expect(
-      h.hud.shown == [
-        .init(kind: .volume(muted: false, headphones: true), level: 0.6),
-        .init(kind: .brightness, level: 0.4),
-      ])
+    #expect(h.hud.shown.isEmpty)
+    #expect(h.audio.setVolumeCalls == [0.6])
   }
 
   @Test func nativeHUDShowsMute() throws {
@@ -284,11 +290,13 @@ import Testing
   }
 
   @Test func settingsChangesApplyLive() throws {
-    let h = Harness(settings: .with(hud: .none))
+    let h = Harness(settings: .with(hud: .none), levelKeys: true)
     try h.slide("audio.volume", 0.1, phase: .began)
+    #expect(h.levelKeys.presses.isEmpty)
     h.registry.settings.hud = .native
     try h.slide("audio.volume", 0.1)
-    #expect(h.hud.shown.count == 1)
+    #expect(!h.levelKeys.presses.isEmpty)
+    #expect(h.audio.setVolumeCalls.count == 1)
   }
 
   @Test func noHUDWhenNothingChanges() throws {

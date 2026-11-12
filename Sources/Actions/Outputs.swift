@@ -53,6 +53,8 @@ protocol HapticOutput: AnyObject {
   /// `strength` is on `AppSettings.hapticStrengthRange` (1 = lightest).
   func tick(strength: Int)
   func strongTick(strength: Int)
+  /// The trackpad the next ticks play on (`ActionContext.deviceID`); `nil` = the default trackpad.
+  func target(deviceID: UInt64?)
 }
 
 /// Runs a user Shortcut. Must return immediately; the work happens off the caller's thread.

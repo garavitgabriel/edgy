@@ -95,7 +95,7 @@ Buy it once at [edgy.to](https://edgy.to) for $5 and download the disk image. Th
 
 ### Build it yourself
 
-You need a Swift 6.0 or later toolchain.
+You need macOS 14 or later and a Swift 6.0 or later toolchain. The Command Line Tools are enough (`xcode-select --install`); Xcode is only needed to run the tests.
 
 ```bash
 git clone https://github.com/garavitgabriel/edgy.git
@@ -129,7 +129,16 @@ Nothing it reads leaves your Mac. Settings live in `~/Library/Application Suppor
 
 ## Troubleshooting
 
-**Edgy stopped responding after you rebuilt it.** macOS ties the Accessibility grant to the app's signature, and an ad hoc rebuild has a new one. The menu-bar popover then says "Edgy needs Accessibility access to run actions." Click **Open Settings**, which opens the Accessibility list in System Settings, and switch Edgy on for the new build.
+**Edgy stopped responding after you rebuilt it.** macOS ties the Accessibility grant to the app's signature, and an ad hoc rebuild has a new one. The menu-bar popover then says "Edgy needs Accessibility access to run actions." System Settings may still show Edgy switched on, but that switch belongs to the old build, and toggling it doesn't help. Clear the stale entry, then grant it again:
+
+```bash
+pkill -x Edgy
+tccutil reset Accessibility com.garavit.edgy
+tccutil reset PostEvent com.garavit.edgy
+open /Applications/Edgy.app
+```
+
+Switch Edgy on under System Settings > Privacy & Security > Accessibility. Edgy restarts itself a couple of seconds later so the grant takes full effect.
 
 **A gesture didn't fire.** Turn on Test Mode in the popover and try again. The plate names the reason and the numbers, such as "Ignored: typing, last key 200 ms ago, limit 500 ms". Adjust that limit under Advanced… in the settings window if it doesn't suit how you work.
 

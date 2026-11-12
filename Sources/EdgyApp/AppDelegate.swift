@@ -34,6 +34,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
   private var pauseTimer: Timer?
   private var activationObserver: NSObjectProtocol?
   private var feedObserver: UUID?
+  /// Accessibility arrived while onboarding was open: relaunch when it finishes (see
+  /// `relaunchIfPostingNeedsIt`).
+  private var relaunchAfterOnboarding = false
+  private var relaunching = false
+  /// The permission as last reported in this run. Only a denied-to-granted change relaunches, so a
+  /// launch that already has Accessibility (whatever posting says) can never loop.
+  private var lastPermission: PermissionState?
   private var settingsModel: SettingsModel?
   private var settingsWindow: SettingsWindowController?
 
@@ -132,6 +139,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             UserDefaults.standard.set(true, forKey: Self.onboardingDoneKey)
             NSApp.setActivationPolicy(.accessory)
             self?.onboarding = nil
+            if self?.relaunchAfterOnboarding == true {
+              self?.relaunch()
+              return
+            }
             self?.menuBar?.showPopover()
           }),
         permissions: AccessibilityPermissionChecker())
@@ -158,6 +169,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       [weak self] state in
       self?.logger.log(.info, "Accessibility permission: \(state.rawValue)")
       self?.refreshMenu()
+      if state == .granted, self?.lastPermission == .denied { self?.relaunchIfPostingNeedsIt() }
+      self?.lastPermission = state
     }
     self.permissions = permissions
     permissions.start()
@@ -170,6 +183,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
       }
     }
     refreshMenu()
+  }
+
+  /// Posting key events (`CGPreflightPostEventAccess`) is read once per process: Accessibility
+  /// granted while Edgy runs flips `AXIsProcessTrusted` but not posting, so volume, brightness and
+  /// shortcuts silently took the fallback (old-style volume HUD) until the user restarted Edgy.
+  /// Relaunch once instead; during onboarding, wait for Done so the flow isn't cut short.
+  private func relaunchIfPostingNeedsIt() {
+    guard !CGPreflightPostEventAccess(), Bundle.main.bundleURL.pathExtension == "app" else { return }
+    if onboarding != nil {
+      relaunchAfterOnboarding = true
+      return
+    }
+    relaunch()
+  }
+
+  private func relaunch() {
+    guard !relaunching else { return }
+    relaunching = true
+    logger.log(.info, "Accessibility granted while running; relaunching so Edgy may post key events")
+    let task = Process()
+    task.executableURL = URL(fileURLWithPath: "/bin/sh")
+    // `open` on a running app only activates it, so wait for this instance to quit first.
+    task.arguments = ["-c", "sleep 1; /usr/bin/open \"$0\"", Bundle.main.bundleURL.path]
+    do {
+      try task.run()
+      NSApp.terminate(nil)
+    } catch {
+      relaunching = false
+      logger.log(.error, "relaunch failed: \(error)")
+    }
   }
 
   func applicationWillTerminate(_ notification: Notification) {

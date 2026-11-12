@@ -111,7 +111,8 @@ public final class Router {
     }
     guard let binding else { return }
     let context = ActionContext(
-      frontmostBundleID: frontmostBundleID, parameters: binding.parameters, motion: Self.motion(of: event))
+      frontmostBundleID: frontmostBundleID, parameters: binding.parameters, motion: Self.motion(of: event),
+      deviceID: event.deviceID)
     if shapes[binding.action] == .hold {
       press(binding, event: event, key: key, context: context)
       return

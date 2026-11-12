@@ -85,12 +85,14 @@ extension SettingsModel {
   /// Computed once per revision, engine status and arguments (batch 28), not per body evaluation.
   func mirrorZones(forApp app: String?, unavailableAsUnmapped: Bool = false) -> [MirrorZone] {
     let data = mirrorData
-    let key = MirrorDataCache.ZonesKey(app: app, unavailableAsUnmapped: unavailableAsUnmapped)
+    let pending = PendingSplit(selection: selectedZone)
+    let key = MirrorDataCache.ZonesKey(app: app, unavailableAsUnmapped: unavailableAsUnmapped, pendingSplit: pending)
     if let zones = data.zones[key] { return zones }
     let off = app.flatMap { editor.config.appProfiles[$0]?.disabled } ?? false
     let zones = MirrorContent.zones(
       rows: editor.effectiveBindings(forApp: app), catalog: data.catalog, allHairline: off,
-      availability: { self.mirrorAvailability(of: $0) }, unavailableAsUnmapped: unavailableAsUnmapped)
+      availability: { self.mirrorAvailability(of: $0) }, unavailableAsUnmapped: unavailableAsUnmapped,
+      pendingSplit: pending)
     data.zones[key] = zones
     data.zoneComputations += 1
     return zones
@@ -129,6 +131,7 @@ final class MirrorDataCache {
   struct ZonesKey: Hashable {
     var app: String?
     var unavailableAsUnmapped: Bool
+    var pendingSplit: PendingSplit? = nil
   }
 
   struct Entry {

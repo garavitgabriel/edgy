@@ -79,6 +79,8 @@ final class MockHapticOutput: HapticOutput {
     strongTicks += 1
     strengths.append(strength)
   }
+  private(set) var targets: [UInt64?] = []
+  func target(deviceID: UInt64?) { targets.append(deviceID) }
 }
 
 final class MockShortcutRunner: ShortcutRunner {

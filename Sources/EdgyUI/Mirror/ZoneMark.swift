@@ -68,7 +68,14 @@ final class MirrorAppPaths {
 extension EnvironmentValues {
   /// Bundle paths the host already knows (the popover's installed apps; snapshot fixtures), by
   /// bundle ID. A missing ID is looked up once through `MirrorAppPaths`.
-  @Entry var mirrorAppPaths: [String: String] = [:]
+  var mirrorAppPaths: [String: String] {
+    get { self[MirrorAppPathsKey.self] }
+    set { self[MirrorAppPathsKey.self] = newValue }
+  }
+}
+
+private struct MirrorAppPathsKey: EnvironmentKey {
+  static let defaultValue: [String: String] = [:]
 }
 
 extension BindingNaming.Icon: Hashable {
