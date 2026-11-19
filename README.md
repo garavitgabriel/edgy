@@ -21,7 +21,7 @@ Every edge and corner of your trackpad, mapped to whatever you want.
 
 Edgy is a macOS menu-bar app. Slide a finger up the right edge to change the volume, double-tap a corner to mute the microphone, swipe along the bottom edge to skip a track.
 
-The source is here, free to build. A signed, notarized build is [$5 at edgy.to](https://edgy.to). Both are the same app with the same features.
+The source is here, free to build. A signed, notarized build for $5 is coming to [edgy.to](https://edgy.to); it isn't available yet. Both are the same app with the same features.
 
 <div align="center">
 
@@ -35,7 +35,7 @@ The source is here, free to build. A signed, notarized build is [$5 at edgy.to](
 
 - **Any zone, any action.** Four edges and four corners. An edge can be split into up to four parts. Edges take a slide, a tap, a double-tap, a swipe along the edge or a long-press; corners take a tap, a double-tap or a long-press. Each gesture runs one action from [the list below](#actions).
 - **Per-app profiles.** Add an app and override only the gestures you want changed there. Everything else follows the default profile, and you can turn Edgy off in one app entirely.
-- **No misfires.** A resting palm, a two-finger scroll near the edge, a touch right after you typed, a physical click: each is turned down, and Test Mode tells you why, with the measure and the limit where there is one. Contacts wider than 18 mm are palms. Edge gestures wait 500 ms after a key press. You can change each limit under Advanced… in the settings window.
+- **Misfire defenses.** A resting palm, a two-finger scroll near the edge, a touch right after you typed, a physical click: each is turned down, and Test Mode tells you why, with the measure and the limit where there is one. Contacts wider than 18 mm are palms. Edge gestures wait 500 ms after a key press. You can change each limit under Advanced… in the settings window.
 - **Test Mode.** Turn it on in the menu-bar popover and each gesture in a mapped zone shows a plate on screen: what ran ("Volume 64%"), or why a touch was ignored ("Ignored: palm, 21 mm wide, limit 18 mm"). Check "Don't run actions" to see what would have run without running it.
 - **Key sequences.** A Keyboard Shortcut can send up to four shortcuts one after another, 40 ms apart, from one tap.
 - **Your own name and icon.** Give any gesture a name of up to 24 characters and one of Edgy's icons, and the trackpad drawing shows them.
@@ -83,7 +83,7 @@ The first run also offers two other starting points: window moves on the bottom 
 |---|---|---|
 | Price | $5, once | Free |
 | Features | All of them | The same |
-| Where | [edgy.to](https://edgy.to) | This repo |
+| Where | [edgy.to](https://edgy.to) (coming soon) | This repo |
 | Opening it | Signed and notarized, so it opens like any Mac app | Signed on your Mac by `make app` |
 | New versions | Included in the $5 | Pull and rebuild |
 
@@ -91,7 +91,7 @@ Both need macOS 14 or later.
 
 ### Signed build
 
-Buy it once at [edgy.to](https://edgy.to) for $5 and download the disk image. The $5 pays for the signing and for the work on Edgy. You get the same code that is in this repo.
+Coming soon. It's waiting on Apple's signing approval. Leave your email at [edgy.to](https://edgy.to) to hear when it's out. It will cost $5 once, include updates, and be the same code that is in this repo. Until then, build it yourself.
 
 ### Build it yourself
 
